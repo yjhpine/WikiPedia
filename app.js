@@ -122,16 +122,17 @@ function renderCaseDocument(puzzle) {
         <div class="answer-result" id="answer-result" aria-live="polite">연결된 기록을 읽은 뒤 답을 입력하세요.</div>
       </form>`;
   return `
-    ${renderHistoryControls()}
-    <div class="doc-document-id">${puzzle.id} / ${puzzle.typeName}</div>
-    <h2 class="doc-heading">${puzzle.title}</h2>
-    <div class="doc-meta">${puzzle.meta.map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join("")}</div>
+    <header class="case-document-head">
+      <div class="doc-document-id">${puzzle.id} / ${puzzle.typeName}</div>
+      <span>CASE ${puzzle.meta[0][1]} · ${puzzle.meta[1][1]}</span>
+      <h2 class="doc-heading">${puzzle.title}</h2>
+    </header>
     <section class="wiki-case-body">
       <h3>미완성 기록</h3>
       <p class="case-prompt">${renderCasePrompt(puzzle)}</p>
+      ${form}
       <p class="case-instruction">${puzzle.instruction}</p>
       <div class="case-trail"><span>CROSS-REFERENCES VERIFIED: ${verified}/${puzzle.evidence.length}</span><p>첫 기록: ${leads}</p></div>
-      ${form}
     </section>`;
 }
 
