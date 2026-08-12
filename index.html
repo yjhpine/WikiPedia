@@ -1,10 +1,121 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>WikiPedia</title>
-</head>
-<body>
-    <h1>Hello WikiPedia!</h1>
-</body>
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050607" />
+    <title>열한 번째 관찰석</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-scene" id="game-scene" data-mode="BOOT" data-focus="none">
+      <div class="room" aria-hidden="true">
+        <div class="ceiling-light"></div>
+        <div class="window"><span></span></div>
+        <div class="wall-stain stain-one"></div>
+        <div class="wall-stain stain-two"></div>
+        <div class="filing-cabinet"><i></i><i></i><i></i></div>
+        <div class="archive-box box-a"></div>
+        <div class="archive-box box-b"></div>
+        <div class="doorway"></div>
+        <div class="floor-shadow"></div>
+      </div>
+
+      <div class="desk" aria-label="제4관찰소 책상">
+        <div class="desk-grain"></div>
+        <div class="desk-edge"></div>
+        <div class="keyboard" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="mouse" aria-hidden="true"><i></i></div>
+        <div class="coffee" aria-hidden="true"><i></i></div>
+        <div class="pencil" aria-hidden="true"></div>
+        <div class="paper-stack" aria-hidden="true"></div>
+        <div class="desk-lamp" aria-hidden="true"><i></i><b></b><em></em></div>
+      </div>
+
+      <button class="desk-note object" id="note-object" type="button" aria-label="책상 위 쪽지 확인">
+        <span class="note-fold" aria-hidden="true"></span>
+        <span class="note-stamp">관찰석 B / 04:12</span>
+        <strong id="note-question">OBS-14/B의<br />원래 담당자는 누구인가?</strong>
+        <span class="note-copy">기록은 남아 있을 거야.</span>
+        <span class="note-sign">— ?</span>
+        <span class="note-anomaly" id="note-anomaly" hidden>그런데 네 자리는<br />왜 아직 그를 기다리지?</span>
+      </button>
+
+      <section class="crt-object" id="crt-object" aria-label="PADS CRT 모니터">
+        <div class="monitor-backdrop" aria-hidden="true"></div>
+        <div class="crt-case">
+          <div class="case-scratches" aria-hidden="true"></div>
+          <div class="screen-bezel">
+            <div class="crt-screen" id="crt-screen">
+              <div class="boot-signal" aria-hidden="true"></div>
+              <div class="screen-fx" aria-hidden="true"></div>
+              <section class="pads" id="pads-interface" aria-label="PADS 내부 위키 시스템">
+                <header class="pads-titlebar">
+                  <span>PADS v2.7 — PHENOMENON ARCHIVE &amp; DOCUMENTATION SYSTEM</span>
+                  <span class="pads-user">USER: <b id="user-id">?????</b></span>
+                </header>
+                <form class="pads-search" id="search-form">
+                  <label for="search-input">SEARCH:</label>
+                  <input id="search-input" autocomplete="off" spellcheck="false" />
+                  <button type="submit">ENTER</button>
+                  <span id="search-result" aria-live="polite"></span>
+                </form>
+                <div class="pads-main">
+                  <aside class="pads-index" aria-label="문서 색인">
+                    <div class="index-head">INDEX</div>
+                    <div class="index-types" id="index-types">
+                      <button type="button" data-filter="ALL" class="selected">ALL</button>
+                      <button type="button" data-filter="A">A</button>
+                      <button type="button" data-filter="E">E</button>
+                      <button type="button" data-filter="O">O</button>
+                      <button type="button" data-filter="L">L</button>
+                      <button type="button" data-filter="I">I</button>
+                      <button type="button" data-filter="P">P</button>
+                    </div>
+                    <div class="file-list" id="file-list"></div>
+                    <div class="recent-files">
+                      <span>RECENT</span>
+                      <div id="recent-list">—</div>
+                    </div>
+                  </aside>
+                  <article class="pads-document" id="document-view" aria-live="polite"></article>
+                </div>
+                <footer class="pads-statusbar">
+                  <span>CONNECTION: LOCAL</span>
+                  <span id="system-message">STATUS: AWAITING QUERY</span>
+                  <span id="clock">04:12:08</span>
+                </footer>
+              </section>
+            </div>
+          </div>
+          <div class="monitor-lower">
+            <span class="monitor-logo">NOVOTRON</span>
+            <div class="monitor-controls"><i id="power-led"></i><button type="button" id="power-button" aria-label="CRT 전원 켜기">POWER</button></div>
+          </div>
+          <div class="monitor-neck"></div>
+          <div class="monitor-stand"></div>
+        </div>
+      </section>
+
+      <button class="desk-phone object" id="phone-object" type="button" aria-label="휴대전화 확인">
+        <span class="phone-antenna" aria-hidden="true"></span>
+        <span class="phone-case">
+          <span class="phone-screen-small" id="phone-small-screen">NO SIGNAL</span>
+          <span class="phone-keys" aria-hidden="true">● ● ●<br />● ● ●<br />● ● ●</span>
+        </span>
+        <span class="phone-light" id="phone-light"></span>
+        <span class="phone-view" aria-hidden="true">
+          <span class="phone-head">UNKNOWN <b id="phone-time">—</b></span>
+          <span class="phone-text" id="phone-message">수신된 메시지가 없습니다.</span>
+          <span class="phone-close">ESC / 다시 내려놓기</span>
+        </span>
+      </button>
+
+      <div class="focus-shade" aria-hidden="true"></div>
+      <p class="ambient-caption" id="ambient-caption">불이 꺼진 제4관찰소. CRT 전원 LED만 희미하게 남아 있다.</p>
+      <div class="screen-reader-instructions">전원 버튼을 켜고, 쪽지를 확인해 PADS에서 답을 찾으세요.</div>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
 </html>
