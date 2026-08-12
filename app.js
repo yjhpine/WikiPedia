@@ -6,6 +6,7 @@ const state = {
   focus: "none",
   currentId: verticalSlice.startDocument,
   filter: "ALL",
+  activeTab: "archive",
   history: [verticalSlice.startDocument],
   historyIndex: 0,
   recent: [],
@@ -57,6 +58,16 @@ function renderFileList() {
   [...$("#index-types").querySelectorAll("button")].forEach((button) => button.classList.toggle("selected", button.dataset.filter === state.filter));
 }
 
+function renderTabs() {
+  ["archive", "case"].forEach((tab) => {
+    const button = $(`#${tab}-tab`);
+    const selected = state.activeTab === tab;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  });
+  $(".pads-main").classList.toggle("case-open", state.activeTab === "case");
+}
+
 function renderRecent() {
   $("#recent-list").innerHTML = state.recent.length
     ? state.recent.slice(0, 3).map((id) => `<button type="button" class="recent-button" data-document="${id}">${id}</button>`).join(" ")
@@ -64,6 +75,10 @@ function renderRecent() {
 }
 
 function renderDocument() {
+  if (state.activeTab === "case") {
+    renderCaseQuestion();
+    return;
+  }
   const document = documents[state.currentId];
   const meta = document.meta.map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join("");
   const sections = document.sections.map((section) => `
@@ -81,18 +96,37 @@ function renderDocument() {
     ${sections}
     ${anomaly}
     <div class="doc-related"><span>RELATED:</span> ${document.related.map(([id, label]) => `<button class="wiki-link" type="button" data-document="${id}">${label}</button>`).join(" / ")}</div>
-    ${renderAnswerTerminal()}
   `;
   renderFileList();
   renderRecent();
+  renderTabs();
 }
 
-function renderAnswerTerminal() {
+function renderCaseQuestion() {
   const puzzle = verticalSlice.puzzle;
   const result = state.solved
     ? `<span class="answer-result accepted" id="answer-result">ANSWER ACCEPTED</span>`
     : `<span class="answer-result" id="answer-result">${puzzle.prompt}</span>`;
-  return `<form class="answer-terminal" id="answer-form"><b>CASE QUESTION: ${puzzle.question}</b><div class="answer-row"><span>&gt;</span><input id="answer-input" autocomplete="off" spellcheck="false" aria-label="답 입력" ${state.solved ? "disabled" : ""}/><button type="submit" ${state.solved ? "disabled" : ""}>SUBMIT</button>${result}</div></form>`;
+  const recent = state.recent.length
+    ? state.recent.map((id) => `<button class="case-record" type="button" data-document="${id}">${id} / ${documents[id].title}</button>`).join("")
+    : "<span class=\"case-record muted\">기록을 열면 이곳에 최근 조회 문서가 남습니다.</span>";
+  $("#document-view").innerHTML = `
+    <section class="case-question-view" aria-labelledby="case-heading">
+      <div class="case-file-label">CASE FILE / 01 / ACTIVE</div>
+      <h2 id="case-heading">CASE QUESTION</h2>
+      <div class="case-paper-strip">DESK NOTE TRANSCRIPTION</div>
+      <blockquote>${puzzle.question}</blockquote>
+      <p class="case-instruction">답은 하나의 기록에 적혀 있지 않습니다. 최소 두 문서의 공통된 사실을 대조해 결론을 입력하세요.</p>
+      <div class="case-records"><span>RECENTLY OPENED RECORDS</span><div>${recent}</div></div>
+      <form class="case-answer-form" id="answer-form">
+        <label for="answer-input">ANSWER:</label>
+        <div class="case-answer-row"><span>&gt;</span><input id="answer-input" autocomplete="off" spellcheck="false" aria-label="답 입력" ${state.solved ? "disabled" : ""}/><button type="submit" ${state.solved ? "disabled" : ""}>SUBMIT</button></div>
+        <div class="answer-result-wrap">${result}</div>
+      </form>
+    </section>`;
+  renderFileList();
+  renderRecent();
+  renderTabs();
 }
 
 function trackRecent(id) {
@@ -101,6 +135,7 @@ function trackRecent(id) {
 
 function openDocument(id, useHistory = true) {
   if (!documents[id]) return;
+  state.activeTab = "archive";
   state.currentId = id;
   if (useHistory) {
     state.history = state.history.slice(0, state.historyIndex + 1);
@@ -110,6 +145,12 @@ function openDocument(id, useHistory = true) {
   trackRecent(id);
   renderDocument();
   setStatus(`OPEN ${id}`);
+}
+
+function openTab(tab) {
+  state.activeTab = tab;
+  renderDocument();
+  setStatus(tab === "case" ? "CASE QUESTION OPEN" : `OPEN ${state.currentId}`);
 }
 
 function handleAnswer(event) {
@@ -184,6 +225,8 @@ document.addEventListener("click", (event) => {
     state.filter = filterButton.dataset.filter;
     renderFileList();
   }
+  const tabButton = event.target.closest("[data-tab]");
+  if (tabButton) openTab(tabButton.dataset.tab);
   if (event.target.id === "history-back" && state.historyIndex > 0) {
     state.historyIndex -= 1;
     openDocument(state.history[state.historyIndex], false);

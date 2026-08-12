@@ -79,3 +79,43 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--phosphor); 
 
 @media (max-aspect-ratio: 3/2) { .game-scene { min-width: 780px; }.crt-object { width: min(71vw, 980px); top: 9vh; }.desk-note { left: 5.8vw; }.desk-phone { right: 6vw; }.window { width: 10vw; }.filing-cabinet { width: 10vw; } }
 @media (max-height: 700px) { .crt-object { top: 3vh; width: min(58vw, 910px); }.desk-note { top: 64vh; }.desk-phone { top: 65vh; }.game-scene[data-focus="note"] .desk-note { top: 17vh; min-height: 230px; }.game-scene[data-focus="phone"] .desk-phone { top: 11vh; height: min(390px, 72vh); } }
+
+/* Larger CRT: prioritize the usable archive screen over desk decoration. */
+.game-scene { perspective: none; }
+.crt-object { z-index: 20; top: 17vh; width: min(94vw, 1780px); aspect-ratio: 1.92; }
+.screen-bezel { inset: 3.1% 100px 15%; border-radius: 5% 5% 7% 7% / 8% 8% 9% 9%; }
+.pads { inset: 3.1%; font: clamp(10px, .9vw, 16px)/1.42 var(--mono); }
+.mode-MONITOR .pads, .mode-DESK .pads, .mode-NOTE .pads, .mode-PHONE .pads { grid-template-rows: auto auto auto minmax(0,1fr) auto; }
+.pads-tabs { display: flex; align-items: end; gap: 2px; padding: 4px 7px 0; border-bottom: 1px solid var(--line); background: #071009; }
+.pads-tab { border: 1px solid transparent; border-bottom: 0; padding: 3px 10px 4px; color: var(--terminal-dim); background: transparent; font: inherit; letter-spacing: .04em; }
+.pads-tab:hover { color: var(--phosphor); }
+.pads-tab.active { border-color: var(--line); color: #081009; background: var(--phosphor); text-shadow: none; }
+.pads-tab span { margin-left: 4px; color: inherit; font-size: .78em; }
+.pads-main { grid-template-columns: 18% 82%; }
+.pads-main.case-open { display: block; }
+.pads-main.case-open .pads-index { display: none; }
+.recent-files { width: 17.8%; }
+.pads-document { padding: 10px 14px; }
+.answer-result { display: block; min-height: 1.4em; margin-top: 8px; color: var(--terminal-dim); }
+.answer-result.accepted { color: var(--phosphor); }
+.answer-result.rejected { color: #d9a59c; }
+.case-question-view { width: min(860px, 100%); margin: 0 auto; padding: clamp(18px, 2.3vw, 34px) clamp(18px, 4vw, 68px); border-right: 1px solid rgba(174,212,151,.28); border-left: 1px solid rgba(174,212,151,.28); }
+.case-file-label { color: var(--terminal-dim); font-size: .84em; letter-spacing: .12em; }
+.case-question-view h2 { margin: .15em 0 .7em; color: var(--phosphor); font-size: 2em; font-weight: 400; letter-spacing: .04em; }
+.case-paper-strip { display: inline-block; padding: 3px 6px; color: #091109; background: #abc28f; font-size: .82em; text-shadow: none; }
+.case-question-view blockquote { margin: 11px 0; padding: 15px 18px; border-left: 3px solid var(--phosphor); color: #e2f6cd; background: rgba(191,241,146,.06); font-size: 1.32em; line-height: 1.55; }
+.case-instruction { margin: 12px 0 20px; color: #a8c19d; line-height: 1.65; }
+.case-records { padding: 12px 0; border-top: 1px solid rgba(174,212,151,.32); border-bottom: 1px solid rgba(174,212,151,.32); color: var(--terminal-dim); }
+.case-records > span { display: block; margin-bottom: 7px; font-size: .85em; }
+.case-records > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.case-record { border: 1px solid rgba(174,212,151,.42); padding: 4px 7px; color: var(--terminal); background: #0d1b0d; font: inherit; }
+.case-record:hover { color: #071007; background: var(--phosphor); }
+.case-record.muted { border: 0; padding: 0; color: var(--terminal-dim); background: transparent; }
+.case-answer-form { margin-top: 22px; }
+.case-answer-form label { color: var(--phosphor); }
+.case-answer-row { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
+.case-answer-row > span { color: var(--phosphor); font-size: 1.3em; }
+.case-answer-row input { min-width: 0; flex: 1; height: 2.2em; border: 1px solid var(--line); padding: 0 8px; color: var(--phosphor); background: #020702; font: inherit; }
+.case-answer-row button { height: 2.2em; border: 1px solid var(--line); padding: 0 13px; color: var(--terminal); background: #102111; font: inherit; }
+.case-answer-row button:hover:not(:disabled) { color: #061004; background: var(--phosphor); }
+.case-answer-row button:disabled { opacity: .45; }
