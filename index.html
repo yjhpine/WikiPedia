@@ -36,7 +36,7 @@
         <span class="note-fold" aria-hidden="true"></span>
         <span class="note-stamp">관찰석 B / 04:12</span>
         <strong id="note-question">OBS-14/B의<br />원래 담당자는 누구인가?</strong>
-        <span class="note-copy">기록은 남아 있을 거야.</span>
+        <span class="note-copy" id="note-copy">기록은 남아 있을 거야.</span>
         <span class="note-sign">— ?</span>
         <span class="note-anomaly" id="note-anomaly" hidden>그런데 네 자리는<br />왜 아직 그를 기다리지?</span>
       </button>
@@ -60,9 +60,10 @@
                   <button type="submit">ENTER</button>
                   <span id="search-result" aria-live="polite"></span>
                 </form>
-                <nav class="pads-tabs" aria-label="PADS 작업 탭" role="tablist">
-                  <button class="pads-tab active" id="archive-tab" type="button" role="tab" aria-selected="true" aria-controls="document-view" data-tab="archive">ARCHIVE</button>
-                  <button class="pads-tab" id="case-tab" type="button" role="tab" aria-selected="false" aria-controls="document-view" data-tab="case">CASE QUESTION <span>01</span></button>
+                <nav class="pads-tabs" aria-label="PADS 위키 경로">
+                  <button class="pads-tab active" id="case-home" type="button" data-document="C-001">CASE FILES</button>
+                  <span class="wiki-path">ARCHIVE / INTERNAL LINKS / BLANK RECORDS</span>
+                  <span class="case-progress" id="case-progress">CASE 01 / 03</span>
                 </nav>
                 <div class="pads-main">
                   <aside class="pads-index" aria-label="문서 색인">
@@ -70,6 +71,7 @@
                     <div class="index-types" id="index-types">
                       <button type="button" data-filter="ALL" class="selected">ALL</button>
                       <button type="button" data-filter="A">A</button>
+                      <button type="button" data-filter="C">C</button>
                       <button type="button" data-filter="E">E</button>
                       <button type="button" data-filter="O">O</button>
                       <button type="button" data-filter="L">L</button>

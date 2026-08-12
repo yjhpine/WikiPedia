@@ -119,3 +119,32 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--phosphor); 
 .case-answer-row button { height: 2.2em; border: 1px solid var(--line); padding: 0 13px; color: var(--terminal); background: #102111; font: inherit; }
 .case-answer-row button:hover:not(:disabled) { color: #061004; background: var(--phosphor); }
 .case-answer-row button:disabled { opacity: .45; }
+
+/* Wiki-case flow: blanks live inside archive records and require linked evidence. */
+.pads-tabs { min-width: 0; }
+.wiki-path { min-width: 0; flex: 1; overflow: hidden; padding: 3px 4px 5px; color: var(--terminal-dim); text-overflow: ellipsis; white-space: nowrap; }
+.case-progress { padding: 3px 2px 5px; color: var(--terminal); white-space: nowrap; }
+.case-file-button { color: #e4ffc4; }
+.case-file-button span { color: var(--phosphor); }
+.wiki-link-locked { color: #60705d; text-decoration: line-through; cursor: not-allowed; }
+.wiki-case-body { border-top: 1px solid rgba(174,212,151,.22); }
+.wiki-case-body h3 { margin: 12px 0 5px; color: var(--phosphor); font-size: 1em; font-weight: 400; }
+.case-prompt { margin: 0; padding: 13px 14px; border-left: 3px solid var(--phosphor); color: #e7fbcf; background: rgba(191,241,146,.07); font-size: 1.24em; line-height: 1.7; }
+.wiki-blank { display: inline-block; min-width: 13ch; margin: 0 2px; padding: 0 4px; color: var(--phosphor); border-bottom: 1px dashed var(--phosphor); letter-spacing: .08em; text-align: center; }
+.wiki-blank.filled { min-width: auto; color: #071007; border: 0; background: var(--phosphor); letter-spacing: 0; text-shadow: none; }
+.case-instruction { margin: 11px 0; color: #a8c19d; line-height: 1.65; }
+.case-trail { margin: 13px 0; padding: 7px 9px; border: 1px solid rgba(174,212,151,.29); background: rgba(7,17,8,.62); color: var(--terminal-dim); }
+.case-trail > span { color: #d1ecb5; font-size: .9em; }
+.case-trail p { margin: 4px 0 0; }
+.wiki-answer-form { margin-top: 15px; padding: 10px; border: 1px solid var(--line); background: #081409; }
+.wiki-answer-form label { color: var(--phosphor); }
+.wiki-answer-row { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
+.wiki-answer-row > span { color: var(--phosphor); font-size: 1.3em; }
+.wiki-answer-row input { min-width: 0; flex: 1; height: 2.2em; border: 1px solid var(--line); padding: 0 8px; color: var(--phosphor); background: #020702; font: inherit; }
+.wiki-answer-row button { height: 2.2em; border: 1px solid var(--line); padding: 0 13px; color: var(--terminal); background: #102111; font: inherit; }
+.wiki-answer-row button:hover { color: #061004; background: var(--phosphor); }
+.case-success { margin-top: 15px; padding: 10px; border-left: 3px solid var(--phosphor); background: rgba(191,241,146,.08); color: #cde5b7; }
+.case-success > b { color: var(--phosphor); font-weight: 400; }
+.case-success p { margin: 5px 0; }
+.case-next-link { margin-top: 4px; }
+.record-amendment { border-color: var(--phosphor); color: var(--phosphor); }
