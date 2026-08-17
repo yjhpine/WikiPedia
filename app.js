@@ -292,7 +292,9 @@ document.addEventListener("click", (event) => {
   }
   const tocButton = event.target.closest("[data-scroll-section]");
   if (tocButton) {
-    document.getElementById(tocButton.dataset.scrollSection)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    const documentView = $("#document-view");
+    const section = documentView.querySelector(`#${tocButton.dataset.scrollSection}`);
+    if (section) documentView.scrollTo({ top: Math.max(0, section.offsetTop - 8), behavior: "smooth" });
     return;
   }
   if (event.target.id === "history-back" && state.historyIndex > 0) {
