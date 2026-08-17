@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050607" />
     <title>열한 번째 관찰석</title>
-    <link rel="stylesheet" href="styles.css?v=20260813-answer-input" />
+    <link rel="stylesheet" href="styles.css?v=20260817-wiki-ui" />
   </head>
   <body>
     <main class="game-scene" id="game-scene" data-mode="BOOT" data-focus="none">
@@ -51,23 +51,28 @@
               <div class="screen-fx" aria-hidden="true"></div>
               <section class="pads" id="pads-interface" aria-label="PADS 내부 위키 시스템">
                 <header class="pads-titlebar">
-                  <span>PADS v2.7 — PHENOMENON ARCHIVE &amp; DOCUMENTATION SYSTEM</span>
+                  <button class="wiki-brand" type="button" data-document="C-001" aria-label="PADS 위키 첫 문서로 이동"><b>PADS 위키</b><span>열한 번째 관찰석</span></button>
+                  <nav class="wiki-topnav" aria-label="위키 메뉴">
+                    <button type="button" data-document="C-001">문서</button>
+                    <button type="button" data-document="L-017">둘러보기</button>
+                    <button type="button" data-document="I-014">최근 변경</button>
+                  </nav>
                   <span class="pads-user">USER: <b id="user-id">?????</b></span>
                 </header>
                 <form class="pads-search" id="search-form">
-                  <label for="search-input">SEARCH:</label>
-                  <input id="search-input" autocomplete="off" spellcheck="false" />
-                  <button type="submit">ENTER</button>
+                  <label for="search-input">문서 검색</label>
+                  <input id="search-input" autocomplete="off" spellcheck="false" placeholder="문서 제목 또는 키워드" />
+                  <button type="submit">검색</button>
                   <span id="search-result" aria-live="polite"></span>
                 </form>
                 <nav class="pads-tabs" aria-label="PADS 위키 경로">
-                  <button class="pads-tab active" id="case-home" type="button" data-document="C-001">CASE FILES</button>
-                  <span class="wiki-path">ARCHIVE / INTERNAL LINKS / BLANK RECORDS</span>
-                  <span class="case-progress" id="case-progress">CASE 01 / 03</span>
+                  <button class="pads-tab active" id="case-home" type="button" data-document="C-001">사건 문서</button>
+                  <span class="wiki-path">PADS 위키 <b>›</b> <span id="wiki-current-title">관찰석 B 배치 기록</span></span>
+                  <span class="case-progress" id="case-progress">해금 01 / 03</span>
                 </nav>
                 <div class="pads-main">
                   <aside class="pads-index" aria-label="문서 색인">
-                    <div class="index-head">INDEX</div>
+                    <div class="index-head">문서 분류</div>
                     <div class="index-types" id="index-types">
                       <button type="button" data-filter="ALL" class="selected">ALL</button>
                       <button type="button" data-filter="A">A</button>
@@ -80,15 +85,15 @@
                     </div>
                     <div class="file-list" id="file-list"></div>
                     <div class="recent-files">
-                      <span>RECENT</span>
+                      <span>최근 본 문서</span>
                       <div id="recent-list">—</div>
                     </div>
                   </aside>
                   <article class="pads-document" id="document-view" aria-live="polite"></article>
                 </div>
                 <footer class="pads-statusbar">
-                  <span>CONNECTION: LOCAL</span>
-                  <span id="system-message">STATUS: AWAITING QUERY</span>
+                  <span>PADS WIKI · LOCAL</span>
+                  <span id="system-message">문서를 불러오는 중입니다.</span>
                   <span id="clock">04:12:08</span>
                 </footer>
               </section>
@@ -122,6 +127,6 @@
       <div class="screen-reader-instructions">전원 버튼을 켜고, 쪽지를 확인해 PADS에서 답을 찾으세요.</div>
     </main>
 
-    <script type="module" src="app.js?v=20260813-answer-input"></script>
+    <script type="module" src="app.js?v=20260817-wiki-ui"></script>
   </body>
 </html>

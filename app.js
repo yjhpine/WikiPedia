@@ -42,9 +42,44 @@ function setStatus(message) {
 function renderMarkup(text) {
   return text.replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, (_, id, label) => {
     const record = records[id];
-    if (!canOpen(record)) return `<span class="wiki-link-locked">${label} [LOCKED]</span>`;
+    if (!canOpen(record)) return `<span class="wiki-link-locked" title="사건 문서를 해결하면 열립니다.">${label} 🔒</span>`;
     return `<button class="wiki-link" type="button" data-document="${id}">${label}</button>`;
   });
+}
+
+function renderArticleToc(sections) {
+  if (!sections.length) return "";
+  return `<nav class="article-toc" aria-label="문서 목차"><b>목차</b><ol>${sections.map((section, index) => `<li><button type="button" data-scroll-section="section-${index + 1}">${index + 1}. ${section.heading}</button></li>`).join("")}</ol></nav>`;
+}
+
+function renderAnswerForm(puzzle, label = "빈칸 답안") {
+  return `<form class="answer-form" data-case="${puzzle.id}">
+    <label for="answer-input-${puzzle.id}">${label}</label>
+    <div class="wiki-answer-row"><input id="answer-input-${puzzle.id}" class="answer-input" autocomplete="off" spellcheck="false" placeholder="${puzzle.answerLabel.includes("세션") ? "세션 식별자 입력" : "이름 또는 문서 ID 입력"}" aria-label="${label}" /><button type="submit">완료</button></div>
+    <div class="answer-result" aria-live="polite">연결된 문서를 읽고 공통 사실을 확인한 뒤 입력하세요.</div>
+  </form>`;
+}
+
+function renderUnlockList(puzzle) {
+  const unlocked = allRecords.filter((record) => record.access === puzzle.unlocks && record.type !== "C");
+  if (!unlocked.length) return "";
+  return `<div class="unlock-list"><b>새로 해금된 문서</b><div>${unlocked.map((record) => `<button type="button" data-document="${record.id}">${record.id} · ${record.title}</button>`).join("")}</div></div>`;
+}
+
+function renderCloze(cloze) {
+  const puzzle = records[cloze.caseId];
+  if (!canOpen(puzzle)) {
+    return `<aside class="wiki-cloze locked"><b>해석 보류</b><span>앞선 사건 문서를 해결하면 이 빈칸을 확인할 수 있습니다.</span></aside>`;
+  }
+  if (isComplete(puzzle.id)) {
+    return `<aside class="wiki-cloze completed"><div>${cloze.before} <mark>${puzzle.answerLabel}</mark> ${cloze.after}</div><small>✓ 문서 교차 검증 완료</small>${renderUnlockList(puzzle)}</aside>`;
+  }
+  const verified = puzzle.evidence.filter((id) => state.visited.has(id)).length;
+  return `<aside class="wiki-cloze">
+    <div class="cloze-sentence">${cloze.before} <span class="wiki-blank">${cloze.placeholder}</span> ${cloze.after}</div>
+    ${renderAnswerForm(puzzle, "빈칸 채우기")}
+    <small>교차 확인: ${verified}/${puzzle.evidence.length}개 문서 읽음</small>
+  </aside>`;
 }
 
 function visibleRecords() {
@@ -75,7 +110,8 @@ function renderRecent() {
 
 function renderArchiveHeader() {
   const currentCase = Math.min(progress() + 1, verticalSlice.cases.length);
-  $("#case-progress").textContent = `CASE ${String(currentCase).padStart(2, "0")} / ${String(verticalSlice.cases.length).padStart(2, "0")}`;
+  $("#case-progress").textContent = `해금 ${String(currentCase).padStart(2, "0")} / ${String(verticalSlice.cases.length).padStart(2, "0")}`;
+  $("#wiki-current-title").textContent = records[state.currentId]?.title ?? "문서";
 }
 
 function renderHistoryControls() {
@@ -84,22 +120,24 @@ function renderHistoryControls() {
 
 function renderStandardDocument(document) {
   const meta = document.meta.map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join("");
-  const sections = document.sections.map((section) => `
-    <section class="doc-section">
-      <h3>${section.heading}</h3>
+  const sections = document.sections.map((section, index) => `
+    <section class="doc-section" id="section-${index + 1}">
+      <h3><span>${index + 1}.</span> ${section.heading}</h3>
       ${section.quote ? `<div class="record-quote">${renderMarkup(section.text)}</div>` : `<p>${renderMarkup(section.text)}</p>`}
+      ${section.cloze ? renderCloze(section.cloze) : ""}
     </section>`).join("");
   const anomaly = progress() === verticalSlice.cases.length && document.id === "I-014"
-    ? "<div class=\"record-quote record-amendment\">LAST MODIFIED: <b>2027.03.14</b> / EDITOR: [UNRESOLVED]</div>"
+    ? "<div class=\"record-quote record-amendment\">최근 변경: <b>2027.03.14</b> / 편집자: [UNRESOLVED]</div>"
     : "";
   return `
     ${renderHistoryControls()}
-    <div class="doc-document-id">${document.id} / ${document.typeName}</div>
+    <div class="doc-breadcrumb">PADS 위키 / ${document.typeName} / ${document.id}</div>
     <h2 class="doc-heading">${document.title}</h2>
-    <div class="doc-meta">${meta}</div>
-    ${sections}
+    <div class="doc-meta wiki-infobox">${meta}</div>
+    ${renderArticleToc(document.sections)}
+    <div class="doc-body">${sections}</div>
     ${anomaly}
-    <div class="doc-related"><span>RELATED:</span> ${document.related.map(([id, label]) => renderMarkup(`[[${id}|${label}]]`)).join(" / ")}</div>`;
+    <div class="doc-related"><b>관련 문서</b><div>${document.related.map(([id, label]) => renderMarkup(`[[${id}|${label}]]`)).join(" · ")}</div></div>`;
 }
 
 function renderCasePrompt(puzzle) {
@@ -115,24 +153,20 @@ function renderCaseDocument(puzzle) {
   const nextCase = verticalSlice.cases.find((caseFile) => caseFile.access === puzzle.unlocks);
   const leads = puzzle.leads.map(([id, label]) => renderMarkup(`[[${id}|${label}]]`)).join(" / ");
   const form = complete
-    ? `<div class="case-success"><b>RECORD AMENDED</b><p>${puzzle.success}</p>${nextCase ? `<button class="wiki-link case-next-link" type="button" data-document="${nextCase.id}">→ ${nextCase.id} ${nextCase.title}</button>` : "<p>CHAPTER 1 CASE FILES COMPLETE.</p>"}</div>`
-    : `<form class="wiki-answer-form" id="answer-form" data-case="${puzzle.id}">
-        <label for="answer-input">FILL BLANK:</label>
-        <div class="wiki-answer-row"><span>&gt;</span><input id="answer-input" autocomplete="off" spellcheck="false" aria-label="빈칸 답 입력" /><button type="submit">COMMIT</button></div>
-        <div class="answer-result" id="answer-result" aria-live="polite">연결된 기록을 읽은 뒤 답을 입력하세요.</div>
-      </form>`;
+    ? `<div class="case-success"><b>문서 해금 완료</b><p>${puzzle.success}</p>${renderUnlockList(puzzle)}${nextCase ? `<button class="case-next-link" type="button" data-document="${nextCase.id}">다음 사건 문서: ${nextCase.title} →</button>` : "<p>Chapter 1의 모든 사건 문서가 해금되었습니다.</p>"}</div>`
+    : renderAnswerForm(puzzle, "정답 입력");
   return `
-    <header class="case-document-head">
-      <div class="doc-document-id">${puzzle.id} / ${puzzle.typeName}</div>
-      <span>CASE ${puzzle.meta[0][1]} · ${puzzle.meta[1][1]}</span>
+    <header class="case-document-head wiki-case-header">
+      <div class="doc-breadcrumb">PADS 위키 / 사건 문서 / ${puzzle.id}</div>
+      <span>사건 ${puzzle.meta[0][1]} · ${puzzle.meta[1][1]}</span>
       <h2 class="doc-heading">${puzzle.title}</h2>
     </header>
     <section class="wiki-case-body">
-      <h3>미완성 기록</h3>
+      <h3>미완성 문장</h3>
       <p class="case-prompt">${renderCasePrompt(puzzle)}</p>
       ${form}
       <p class="case-instruction">${puzzle.instruction}</p>
-      <div class="case-trail"><span>CROSS-REFERENCES VERIFIED: ${verified}/${puzzle.evidence.length}</span><p>첫 기록: ${leads}</p></div>
+      <div class="case-trail"><b>문서 교차 확인</b><span>${verified}/${puzzle.evidence.length}개 기록을 읽었습니다.</span><p>탐색 시작: ${leads}</p></div>
     </section>`;
 }
 
@@ -153,7 +187,7 @@ function openDocument(id, useHistory = true) {
   const record = records[id];
   if (!record) return;
   if (!canOpen(record)) {
-    setStatus(`ACCESS LOCKED — COMPLETE CASE ${String(record.access).padStart(2, "0")}`);
+    setStatus(`잠긴 문서입니다. 사건 ${String(record.access).padStart(2, "0")}을 먼저 해결하세요.`);
     return;
   }
   state.currentId = id;
@@ -165,7 +199,8 @@ function openDocument(id, useHistory = true) {
   if (record.type !== "C") state.visited.add(id);
   trackRecent(id);
   renderDocument();
-  setStatus(record.type === "C" ? `OPEN ${id} — COMPLETE THE BLANK` : `OPEN ${id}`);
+  $("#document-view").scrollTop = 0;
+  setStatus(record.type === "C" ? `${record.title} 문서를 열었습니다.` : `${record.id} 문서를 열었습니다.`);
 }
 
 function updateStoryAfterCase(puzzle) {
@@ -181,35 +216,35 @@ function updateStoryAfterCase(puzzle) {
 
 function handleAnswer(event) {
   event.preventDefault();
-  const form = event.target.closest("#answer-form");
+  const form = event.target.closest(".answer-form");
   const puzzle = records[form?.dataset.case];
   if (!puzzle || isComplete(puzzle.id)) return;
-  const result = $("#answer-result");
-  const answer = normalise($("#answer-input").value);
+  const result = form.querySelector(".answer-result");
+  const answer = normalise(form.querySelector(".answer-input").value);
   const evidenceVerified = puzzle.evidence.every((id) => state.visited.has(id));
   if (!answer) {
-    result.textContent = "BLANK REQUIRED";
+    result.textContent = "빈칸에 답을 입력하세요.";
     result.className = "answer-result rejected";
     return;
   }
   if (!evidenceVerified) {
-    result.textContent = `EVIDENCE INCOMPLETE — ${puzzle.evidence.length}개의 연결 기록을 확인하세요.`;
+    result.textContent = `아직 근거가 부족합니다. 연결된 ${puzzle.evidence.length}개 문서를 모두 읽어보세요.`;
     result.className = "answer-result rejected";
-    setStatus("CROSS-REFERENCE REQUIRED");
+    setStatus("연결 문서 교차 확인이 필요합니다.");
     return;
   }
   const accepted = puzzle.answers.map(normalise).some((expected) => answer.includes(expected));
   if (!accepted) {
-    result.textContent = "ENTRY REJECTED — 기록의 공통 사실을 다시 대조하세요.";
+    result.textContent = "답이 일치하지 않습니다. 문서의 공통 사실을 다시 대조하세요.";
     result.className = "answer-result rejected";
-    setStatus("QUERY INCONSISTENT");
+    setStatus("입력한 답이 기록과 일치하지 않습니다.");
     return;
   }
   state.completedCases.push(puzzle.id);
   $("#game-scene").classList.add("anomaly");
   $("#user-id").textContent = puzzle.id === "C-003" ? "R-14" : "P-???";
   updateStoryAfterCase(puzzle);
-  setStatus(`CASE ${puzzle.id.slice(-2)} VERIFIED — NEW RECORDS UNLOCKED`);
+  setStatus(`사건 ${puzzle.id.slice(-2)} 해결 — 새 문서가 해금되었습니다.`);
   window.setTimeout(() => {
     $("#game-scene").classList.remove("anomaly");
     $("#user-id").textContent = "?????";
@@ -228,8 +263,8 @@ function powerOn() {
     setMode("MONITOR");
     trackRecent(state.currentId);
     renderDocument();
-    $("#ambient-caption").textContent = "PADS 로컬 위키가 열렸다. 빈칸은 연결된 기록을 읽어야만 채울 수 있다.";
-    setStatus("LOCAL WIKI READY — OPEN CASE FILE");
+    $("#ambient-caption").textContent = "PADS 위키가 열렸다. 파란 링크를 따라 기록을 대조하고 빈칸을 채우세요.";
+    setStatus("첫 사건 문서가 열렸습니다.");
   }, 1080);
 }
 
@@ -255,6 +290,11 @@ document.addEventListener("click", (event) => {
     renderFileList();
     return;
   }
+  const tocButton = event.target.closest("[data-scroll-section]");
+  if (tocButton) {
+    document.getElementById(tocButton.dataset.scrollSection)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    return;
+  }
   if (event.target.id === "history-back" && state.historyIndex > 0) {
     state.historyIndex -= 1;
     openDocument(state.history[state.historyIndex], false);
@@ -273,7 +313,7 @@ $("#search-input").addEventListener("input", renderFileList);
 $("#search-input").addEventListener("keydown", (event) => {
   if (event.key === "Escape") { event.currentTarget.value = ""; renderFileList(); event.currentTarget.blur(); }
 });
-$("#document-view").addEventListener("submit", (event) => { if (event.target.id === "answer-form") handleAnswer(event); });
+$("#document-view").addEventListener("submit", (event) => { if (event.target.matches(".answer-form")) handleAnswer(event); });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && state.focus !== "none") setFocus("none");
 });
