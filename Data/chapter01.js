@@ -41,8 +41,9 @@ export const verticalSlice = {
       searchTerms: ["해석", "지침", "교차 확인", "추리"],
       meta: [["CLASS", "INCIDENT"], ["STATUS", "REFERENCE"], ["METHOD", "CROSS-CHECK"]],
       sections: [
-        { heading: "기본 원칙", text: "사건 문서의 정답은 한 문장에 완성되어 있지 않다. 문서 교차 확인에 표시된 기록을 모두 읽고, 같은 표기·시간·역할을 연결해야 한다." },
-        { heading: "난이도 안내", text: "하 단계는 두 조각을 잇고, 중 단계는 서로 다른 기록의 서명과 명찰을 대조한다. 상 단계는 세 문서가 같은 인물을 가리키는지 확인한다." }
+        { heading: "기본 원칙", text: "금색 ‘재현’ 표식이 붙은 사건은 멈춘 환경 안으로 직접 들어갈 수 있다. 공간의 신호 지점을 조사해 필드 노트를 만들고, 현장에서 내린 결론이 PADS 문서의 빈칸을 채운다." },
+        { heading: "두 가지 조사", text: "재현 사건에서는 직접 본 사물과 잔향을 연결한다. 일반 사건에서는 재현으로 복원된 기록과 새 문서를 교차 확인한다. 두 방식은 번갈아 이어진다." },
+        { heading: "난이도 안내", text: "하 단계는 눈앞의 조각을 잇고, 중 단계는 명찰·음성·서명을 대조한다. 상 단계는 세 기록이 같은 인물과 시각을 가리키는지 검증해야 한다." }
       ],
       related: [["L-017", "제4관찰소 교대표"], ["A-013", "적색 안개"]]
     },
@@ -131,7 +132,7 @@ export const verticalSlice = {
       searchTerms: ["완료", "편집자", "기록", "Chapter 1"],
       meta: [["CLASS", "ENTITY"], ["STATUS", "FINAL NOTE"]],
       sections: [
-        { heading: "Chapter 1 완료", text: "여섯 개의 빈칸은 기록을 베껴 쓰는 문제가 아니었다. 서로 다른 문서에 흩어진 조각을 같은 사건으로 묶어, 스스로 결론을 만든 기록이다." },
+        { heading: "Chapter 1 완료", text: "세 번의 재현에서 직접 겪은 순간과 세 번의 문서 추리가 하나의 기록으로 이어졌다. PADS의 빈칸은 발견한 사실이 아니라, 플레이어가 현장에서 만든 결론으로 채워졌다." },
         { heading: "다음 기록", text: "R-14의 편집 흔적은 아직 남아 있다. 다음 장에서는 누가 기록을 고쳤는지 추적한다." }
       ],
       related: [["A-027", "13초 로그"]]
@@ -144,12 +145,24 @@ export const verticalSlice = {
       searchTerms: ["B-17", "전임자", "B석", "첫 번째"],
       meta: [["CASE", "01 / 06"], ["STATUS", "OPEN"], ["EVIDENCE", "2 RECORDS"], ["METHOD", "COMBINE"]],
       prompt: "B-17 인계 묶음의 전임 관찰자 이름은 [blank]이다.",
-      instruction: "교대표의 첫 글자와 인계 카드의 뒤 두 글자를, B-17 순서대로 이어 읽으세요.",
+      instruction: "사건 재현에 진입해 B석 주변의 시각·명패·찢긴 카드를 직접 조사하고 이름을 복원하세요.",
       answerLabel: "정수민", answers: ["정수민"], evidence: ["L-017", "P-003"],
       leads: [["L-017", "제4관찰소 교대표"], ["P-003", "B-17 인계 카드"]], unlocks: 1,
       success: "B-17의 이름을 복원했습니다. 이제 좌표 조각을 표준 보관함 표기로 바꿔야 합니다.",
       phoneTime: "04:13", phone: "첫 번째 조각은 맞았습니다. 다음엔 표기 규칙까지 대조하세요.",
-      retry: "두 기록의 글자 순서와 인계 묶음 표기를 다시 확인하세요."
+      retry: "현장에서 확보한 첫 카드와 찢긴 카드의 글자 순서를 다시 확인하세요.",
+      reconstruction: {
+        scene: "handover", time: "03:00:13", title: "B석 인계 직전", location: "제4관찰소 · 관찰실",
+        objective: "멈춘 순간을 돌아다니며 B-17 전임자의 이름 조각을 찾으세요.",
+        inference: "같은 B-17 묶음에 속한 이름 조각을 현장에서 본 순서대로 연결하세요.",
+        entry: "형광등이 두 번 깜빡인다. 시간은 03:00에 멈췄고, 누군가 막 자리를 비운 온기가 남아 있다.",
+        clues: [
+          { id: "clock", label: "멈춘 벽시계", x: 78, y: 18, stamp: "시간 고정", fragment: "03:00 / B-17", text: "초침이 13초 앞에서 떨린다. 이 방의 모든 카드는 03:00 교대 묶음 B-17에 속한다." },
+          { id: "seat", label: "B석 명패", x: 58, y: 55, stamp: "첫 카드", fragment: "정", text: "금속 명패 아래에 첫 카드가 끼워져 있다. 번지지 않은 글자는 ‘정’ 하나뿐이다." },
+          { id: "card", label: "바닥의 찢긴 카드", x: 30, y: 74, stamp: "뒤쪽 카드", fragment: "수 · 민", text: "책상 아래로 밀린 카드 조각 두 장. 화살표가 ‘수’에서 ‘민’으로 이어져 있다." },
+          { id: "door", label: "반쯤 열린 문", x: 11, y: 39, kind: "echo", stamp: "잔향", fragment: "발소리", text: "복도 끝에서 세 걸음이 들리다 끊긴다. 방금 전까지 누군가 이 자리에 있었다." }
+        ]
+      }
     },
     {
       id: "C-002", type: "C", typeName: "CASE FILE", title: "02. 찢어진 명찰의 좌표", access: 1,
@@ -170,12 +183,24 @@ export const verticalSlice = {
       searchTerms: ["S.N.", "명찰", "발신자", "세 번째"],
       meta: [["CASE", "03 / 06"], ["STATUS", "OPEN"], ["EVIDENCE", "2 RECORDS"], ["METHOD", "CROSS-CHECK"]],
       prompt: "N-04 명찰의 S.N.은 [blank]이다.",
-      instruction: "명찰에 남은 첫 음절과 현장 메모에서 판독된 나머지 이름을, 같은 N-04 주인으로 묶으세요.",
+      instruction: "03:17의 보관실로 들어가 명찰·음성·현장 메모가 같은 사람을 가리키는지 직접 확인하세요.",
       answerLabel: "서나리", answers: ["서나리"], evidence: ["P-004", "I-014"],
       leads: [["P-004", "보관함 배정 메모"], ["I-014", "03:17 현장 메모"]], unlocks: 3,
       success: "발신자의 실명을 확인했습니다. 다음은 번진 1차 보고서의 작성자입니다.",
       phoneTime: "04:15", phone: "이니셜 하나만 보고 결론 내리지 마세요. 명찰과 메모가 같은 사람을 가리키는지 확인해야 합니다.",
-      retry: "첫 음절은 명찰, 나머지 이름은 현장 메모에 남아 있습니다."
+      retry: "N-04 명찰의 첫 음절과 녹음 속 호명, 메모의 이니셜을 함께 대조하세요.",
+      reconstruction: {
+        scene: "locker", time: "03:17:04", title: "N행 보관실", location: "제4관찰소 · 폐쇄 보관실",
+        objective: "적색 경보가 번지기 전, N-04의 주인이 남긴 흔적 세 가지를 확보하세요.",
+        inference: "명찰의 첫 음절과 녹음 속 호명을 이어 붙이고, 현장 메모의 이니셜로 검증하세요.",
+        entry: "경보등이 방을 붉게 훑는다. N행 보관함 하나만 열려 있고, 수화기에서는 짧은 녹음이 반복된다.",
+        clues: [
+          { id: "locker", label: "열린 N-04 보관함", x: 76, y: 46, stamp: "훼손 명찰", fragment: "N-04 / 서", text: "뜯긴 명찰의 첫 음절만 남았다. 보관함 좌표는 분명히 N-04다." },
+          { id: "memo", label: "젖은 현장 메모", x: 48, y: 73, stamp: "본문 조각", fragment: "…나리에게 보관함을…", text: "물에 젖은 문장 가운데 ‘나리에게 보관함을 넘긴다’는 부분만 읽힌다." },
+          { id: "receiver", label: "재생 중인 수화기", x: 24, y: 63, stamp: "발신 표기", fragment: "S.N. / 03:17", text: "잡음 뒤로 발신 표기 S.N.과 시각 03:17이 반복된다. 명찰의 주인이 남긴 통화다." },
+          { id: "fog", label: "문틈의 적색 안개", x: 9, y: 28, kind: "echo", stamp: "이상 현상", fragment: "온도 -4°C", text: "문틈의 안개에 손을 대자 기억의 화면이 한 프레임 뒤로 밀린다." }
+        ]
+      }
     },
     {
       id: "C-004", type: "C", typeName: "CASE FILE", title: "04. 번진 보고서의 작성자", access: 3,
@@ -196,12 +221,24 @@ export const verticalSlice = {
       searchTerms: ["보존", "감사관", "수신자", "다섯 번째"],
       meta: [["CASE", "05 / 06"], ["STATUS", "OPEN"], ["EVIDENCE", "3 RECORDS"], ["METHOD", "TRIANGULATE"]],
       prompt: "03:17 보존 채널을 수신한 감사관의 이름은 [blank]이다.",
-      instruction: "서명지의 첫·끝 글자, 전화의 가운데 호출명, 수신대장의 세 글자 이니셜이 한 사람을 가리키는지 대조하세요.",
+      instruction: "보존 채널이 열린 순간으로 들어가 서명지·전화·수신 단말을 직접 조사하고 감사관을 특정하세요.",
       answerLabel: "유해진", answers: ["유해진"], evidence: ["P-009", "O-004", "L-003"],
       leads: [["P-009", "보존 담당 서명지"], ["O-004", "보존 전화 녹취"], ["L-003", "폐쇄 층 수신대장"]], unlocks: 5,
       success: "보존 감사관을 특정했습니다. 마지막으로 누락된 세션 식별자를 복원할 수 있습니다.",
       phoneTime: "04:17", phone: "이름 세 글자는 서로 다른 기록에 흩어져 있습니다. 이니셜은 순서 검증용입니다.",
-      retry: "첫 글자와 끝 글자만으로 확정하지 말고, 가운데 호출명과 세 글자 이니셜까지 대조하세요."
+      retry: "서명의 양끝, 전화 호출명, 수신 단말의 이니셜이 모두 일치하는지 확인하세요.",
+      reconstruction: {
+        scene: "archive", time: "03:17:13", title: "보존 채널 개방", location: "색인 밖 · 보존 기록실",
+        objective: "13초 동안 열린 보존 채널에서 감사관의 신원을 입증할 세 기록을 찾으세요.",
+        inference: "서명의 첫·끝 글자 사이에 한 글자 호출명을 넣고, 수신 단말의 이니셜 순서로 검증하세요.",
+        entry: "엘리베이터 문이 열리지만 층수 표시는 없다. 보존 단말, 낡은 전화, 서명지만 13초 동안 작동한다.",
+        clues: [
+          { id: "signature", label: "감사 서명지", x: 31, y: 71, stamp: "훼손 서명", fragment: "유 · □ · 진", text: "먹물이 번진 서명. 성 칸의 ‘유’와 이름 끝의 ‘진’만 선명하게 남았다." },
+          { id: "archive-phone", label: "보존 전화", x: 51, y: 51, stamp: "한 글자 호출", fragment: "호출명: 해", text: "수화기를 들자 ‘해, 수신 확인’이라는 짧은 호출이 재생된다. 이 부서는 본명 가운데 글자를 호출명으로 쓴다." },
+          { id: "terminal", label: "수신 단말", x: 78, y: 32, stamp: "수신자 로그", fragment: "Y.H.J. / 보존 감사", text: "03:17:13 수신자는 Y.H.J. 세 글자. 역할 칸에는 보존 감사라고 표시돼 있다." },
+          { id: "elevator", label: "층수 없는 승강기", x: 8, y: 44, kind: "echo", stamp: "공간 오류", fragment: "층수 --", text: "문 너머에는 같은 기록실이 좌우가 뒤집힌 채 한 번 더 이어진다." }
+        ]
+      }
     },
     {
       id: "C-006", type: "C", typeName: "CASE FILE", title: "06. 13초 세션 복원", access: 5,

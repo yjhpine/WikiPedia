@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050607" />
     <title>열한 번째 관찰석</title>
-    <link rel="stylesheet" href="styles.css?v=20260817-inline-answers" />
+    <link rel="stylesheet" href="styles.css?v=20260817-incident-replay-v2" />
   </head>
   <body>
     <main class="game-scene" id="game-scene" data-mode="BOOT" data-focus="none">
@@ -124,9 +124,58 @@
 
       <div class="focus-shade" aria-hidden="true"></div>
       <p class="ambient-caption" id="ambient-caption">불이 꺼진 제4관찰소. CRT 전원 LED만 희미하게 남아 있다.</p>
-      <div class="screen-reader-instructions">전원 버튼을 켜고, 쪽지를 확인해 PADS에서 답을 찾으세요.</div>
+      <div class="screen-reader-instructions">전원 버튼을 켜고, 사건 문서의 재현 표식으로 현장에 진입해 단서를 조사하세요.</div>
     </main>
 
-    <script type="module" src="app.js?v=20260817-deduction-tiers"></script>
+    <section class="reconstruction" id="reconstruction" hidden aria-label="사건 재현 환경">
+      <div class="reconstruction-noise" aria-hidden="true"></div>
+      <div class="reconstruction-shell">
+        <header class="reconstruction-header">
+          <div>
+            <span class="reconstruction-kicker">PADS · INCIDENT RECONSTRUCTION</span>
+            <h1 id="reconstruction-title">사건 재현</h1>
+            <p><span id="reconstruction-location">위치 불명</span><b id="reconstruction-time">--:--:--</b></p>
+          </div>
+          <button type="button" id="reconstruction-exit" aria-label="기록실로 돌아가기">기록실로 돌아가기 <kbd>ESC</kbd></button>
+        </header>
+
+        <div class="reconstruction-grid">
+          <section class="memory-stage" id="memory-stage" data-scene="handover" aria-label="재현된 사건 현장">
+            <div class="memory-wall" aria-hidden="true"></div>
+            <div class="memory-window" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="memory-clock" aria-hidden="true"><i></i><b></b></div>
+            <div class="memory-door" aria-hidden="true"></div>
+            <div class="memory-cabinet" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="memory-desk" aria-hidden="true"><i></i><b></b></div>
+            <div class="memory-terminal" aria-hidden="true"><i></i></div>
+            <div class="memory-phone" aria-hidden="true"><i></i></div>
+            <div class="memory-fog" aria-hidden="true"></div>
+            <div class="memory-hotspots" id="memory-hotspots"></div>
+            <div class="memory-scanline" aria-hidden="true"></div>
+            <p class="memory-caption" id="memory-caption">신호를 동기화하는 중입니다.</p>
+          </section>
+
+          <aside class="memory-journal" aria-label="현장 추리 기록">
+            <span class="memory-journal-label">FIELD NOTES</span>
+            <h2>현장 목표</h2>
+            <p class="memory-objective" id="memory-objective"></p>
+            <div class="memory-feed" id="memory-feed" aria-live="polite"></div>
+            <div class="memory-progress"><span>필수 단서</span><b id="memory-progress">0 / 0</b></div>
+            <ol class="memory-ledger" id="memory-ledger"></ol>
+            <form class="memory-inference" id="memory-inference-form">
+              <label for="memory-answer">현장 추론</label>
+              <p id="memory-inference-prompt"></p>
+              <div>
+                <input id="memory-answer" autocomplete="off" spellcheck="false" placeholder="수집한 단서로 결론 입력" />
+                <button type="submit" id="memory-submit">문서에 기록</button>
+              </div>
+              <span id="memory-feedback" aria-live="polite"></span>
+            </form>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="app.js?v=20260817-incident-replay-v2"></script>
   </body>
 </html>

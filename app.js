@@ -1,4 +1,4 @@
-import { verticalSlice } from "./Data/chapter01.js?v=20260817-deduction-tiers";
+import { verticalSlice } from "./Data/chapter01.js?v=20260817-incident-replay-v2";
 
 const $ = (selector) => document.querySelector(selector);
 const allRecords = [...verticalSlice.documents, ...verticalSlice.cases];
@@ -16,12 +16,21 @@ const state = {
   recent: [],
   visited: new Set(),
   completedCases: [],
-  phoneRead: false
+  phoneRead: false,
+  reconstructionClues: new Map(),
+  activeReconstruction: null,
+  activeMemoryText: ""
 };
 
 const progress = () => state.completedCases.length;
 const isComplete = (caseId) => state.completedCases.includes(caseId);
 const canOpen = (record) => record && record.access <= progress();
+const requiredMemoryClues = (puzzle) => puzzle.reconstruction?.clues.filter((clue) => clue.kind !== "echo") || [];
+
+function memoryCluesFor(caseId) {
+  if (!state.reconstructionClues.has(caseId)) state.reconstructionClues.set(caseId, new Set());
+  return state.reconstructionClues.get(caseId);
+}
 
 function setMode(mode) {
   state.mode = mode;
@@ -108,7 +117,12 @@ function visibleRecords() {
 function renderFileList() {
   const entries = visibleRecords();
   $("#file-list").innerHTML = entries.length
-    ? entries.map((record) => `<button class="file-button ${record.id === state.currentId ? "current" : ""} ${record.type === "C" ? "case-file-button" : ""}" type="button" data-document="${record.id}"><span>${record.type}</span> ${record.id} ${record.title}</button>`).join("")
+    ? entries.map((record) => {
+      const reconstructionShortcut = record.reconstruction
+        ? `<button class="reconstruction-shortcut ${isComplete(record.id) ? "replay" : ""}" type="button" data-enter-reconstruction="${record.id}" aria-label="${record.title} 사건 재현 진입">${isComplete(record.id) ? "REPLAY" : "재현"}</button>`
+        : "";
+      return `<div class="file-entry ${record.reconstruction ? "has-reconstruction" : ""}"><button class="file-button ${record.id === state.currentId ? "current" : ""} ${record.type === "C" ? "case-file-button" : ""}" type="button" data-document="${record.id}"><span>${record.type}</span> ${record.id} ${record.title}</button>${reconstructionShortcut}</div>`;
+    }).join("")
     : "<div class=\"file-button\">NO MATCH</div>";
   $("#search-result").textContent = $("#search-input").value.trim() ? `${entries.length} FILE(S)` : "";
   [...$("#index-types").querySelectorAll("button")].forEach((button) => button.classList.toggle("selected", button.dataset.filter === state.filter));
@@ -156,15 +170,32 @@ function renderStandardDocument(document) {
 function renderCasePrompt(puzzle) {
   const fill = isComplete(puzzle.id)
     ? renderResolvedAnswer(puzzle)
-    : renderInlineAnswer(puzzle);
+    : puzzle.reconstruction
+      ? `<span class="wiki-blank memory-pending">현장 재현 대기</span>`
+      : renderInlineAnswer(puzzle);
   return puzzle.prompt.replace("[blank]", fill);
 }
 
 function renderCaseDocument(puzzle) {
-  const verified = puzzle.evidence.filter((id) => state.visited.has(id)).length;
+  const reconstruction = puzzle.reconstruction;
+  const foundMemory = reconstruction ? memoryCluesFor(puzzle.id) : null;
+  const requiredMemory = reconstruction ? requiredMemoryClues(puzzle) : [];
+  const verified = reconstruction
+    ? requiredMemory.filter((clue) => foundMemory.has(clue.id)).length
+    : puzzle.evidence.filter((id) => state.visited.has(id)).length;
   const complete = isComplete(puzzle.id);
   const nextCase = verticalSlice.cases.find((caseFile) => caseFile.access === puzzle.unlocks);
   const leads = puzzle.leads.map(([id, label]) => renderMarkup(`[[${id}|${label}]]`)).join(" / ");
+  const reconstructionCard = reconstruction
+    ? `<section class="reconstruction-card ${complete ? "completed" : ""}">
+        <div><span>INCIDENT RECONSTRUCTION</span><h3>${reconstruction.time} · ${reconstruction.title}</h3><p>${reconstruction.objective}</p></div>
+        <button type="button" data-enter-reconstruction="${puzzle.id}">${complete ? "사건 다시 체험" : verified ? "재현 계속하기" : "사건 속으로 들어가기"}<small>${reconstruction.location}</small></button>
+        <div class="reconstruction-card-progress"><i style="--memory-progress:${requiredMemory.length ? (verified / requiredMemory.length) * 100 : 0}%"></i><span>현장 단서 ${verified}/${requiredMemory.length}</span></div>
+      </section>`
+    : "";
+  const investigationTrail = reconstruction
+    ? `<div class="case-trail reconstruction-trail"><b>현장 조사 기록</b><span>${verified}/${requiredMemory.length}개 필수 단서를 확보했습니다.</span><p><strong>체험 방식:</strong> 공간의 강조 지점을 직접 조사한 뒤 현장에서 추론을 제출합니다.</p><p>보조 기록: ${leads}</p></div>`
+    : `<div class="case-trail"><b>문서 교차 확인</b><span>${verified}/${puzzle.evidence.length}개 근거를 읽었습니다.</span><p><strong>추리 방식:</strong> ${puzzle.difficultyDetail || "기록 대조"}</p><p>탐색 시작: ${leads}</p></div>`;
   const completion = complete
     ? `<div class="case-success"><b>문서 해금 완료</b><p>${puzzle.success}</p>${renderUnlockList(puzzle)}${nextCase ? `<button class="case-next-link" type="button" data-document="${nextCase.id}">다음 사건 문서: ${nextCase.title} →</button>` : "<p>Chapter 1의 모든 사건 문서가 해금되었습니다.</p>"}</div>`
     : "";
@@ -178,8 +209,9 @@ function renderCaseDocument(puzzle) {
       <h3>미완성 문장</h3>
       <div class="case-prompt">${renderCasePrompt(puzzle)}</div>
       ${completion}
+      ${reconstructionCard}
       <p class="case-instruction">${puzzle.instruction}</p>
-      <div class="case-trail"><b>문서 교차 확인</b><span>${verified}/${puzzle.evidence.length}개 근거를 읽었습니다.</span><p><strong>추리 방식:</strong> ${puzzle.difficultyDetail || "기록 대조"}</p><p>탐색 시작: ${leads}</p></div>
+      ${investigationTrail}
     </section>`;
 }
 
@@ -214,6 +246,125 @@ function openDocument(id, useHistory = true) {
   renderDocument();
   $("#document-view").scrollTop = 0;
   setStatus(record.type === "C" ? `${record.title} 문서를 열었습니다.` : `${record.id} 문서를 열었습니다.`);
+}
+
+function renderReconstruction() {
+  const puzzle = records[state.activeReconstruction];
+  const reconstruction = puzzle?.reconstruction;
+  if (!reconstruction) return;
+  const found = memoryCluesFor(puzzle.id);
+  const required = requiredMemoryClues(puzzle);
+  const verified = required.filter((clue) => found.has(clue.id)).length;
+  const complete = isComplete(puzzle.id);
+
+  $("#reconstruction-title").textContent = reconstruction.title;
+  $("#reconstruction-location").textContent = reconstruction.location;
+  $("#reconstruction-time").textContent = reconstruction.time;
+  $("#memory-stage").dataset.scene = reconstruction.scene;
+  $("#memory-objective").textContent = reconstruction.objective;
+  $("#memory-inference-prompt").textContent = reconstruction.inference;
+  $("#memory-caption").textContent = complete
+    ? "복원 완료된 사건입니다. 현장 단서를 다시 조사할 수 있습니다."
+    : "주변의 신호 지점을 눌러 멈춘 순간을 조사하세요.";
+  $("#memory-progress").textContent = `${verified} / ${required.length}`;
+  $("#memory-feed").innerHTML = `<span>MEMORY FEED</span><p>${state.activeMemoryText || reconstruction.entry}</p>`;
+  $("#memory-hotspots").innerHTML = reconstruction.clues.map((clue, index) => {
+    const discovered = found.has(clue.id);
+    return `<button class="memory-hotspot ${discovered ? "found" : ""} ${clue.kind === "echo" ? "echo" : "evidence"}" type="button" data-memory-clue="${clue.id}" style="--hotspot-x:${clue.x}%;--hotspot-y:${clue.y}%;--hotspot-delay:${index * 0.14}s" aria-label="${clue.label}"><span>${discovered ? "✓" : "+"}</span><b>${clue.label}</b></button>`;
+  }).join("");
+  $("#memory-ledger").innerHTML = required.map((clue, index) => found.has(clue.id)
+    ? `<li class="found"><span>${String(index + 1).padStart(2, "0")} · ${clue.stamp}</span><b>${clue.fragment}</b></li>`
+    : `<li><span>${String(index + 1).padStart(2, "0")} · 미확인</span><b>단서 신호 없음</b></li>`).join("");
+
+  $("#memory-answer").disabled = complete;
+  $("#memory-submit").disabled = complete || verified !== required.length;
+  if (complete) $("#memory-feedback").textContent = "✓ 이 추론은 이미 PADS 문서에 반영되었습니다.";
+}
+
+function openReconstruction(caseId) {
+  const puzzle = records[caseId];
+  if (!puzzle?.reconstruction || !canOpen(puzzle)) {
+    setStatus("아직 진입할 수 없는 사건 재현입니다.");
+    return;
+  }
+  state.activeReconstruction = caseId;
+  state.activeMemoryText = puzzle.reconstruction.entry;
+  $("#memory-answer").value = "";
+  $("#memory-feedback").textContent = "";
+  $("#memory-inference-form").classList.remove("accepted", "rejected");
+  $("#reconstruction").classList.remove("resolved");
+  $("#reconstruction").hidden = false;
+  $("#game-scene").classList.add("inside-memory");
+  renderReconstruction();
+  window.requestAnimationFrame(() => $("#reconstruction").classList.add("open"));
+  setStatus(`${puzzle.id} 사건 재현에 진입했습니다.`);
+}
+
+function closeReconstruction() {
+  const overlay = $("#reconstruction");
+  overlay.classList.remove("open", "resolved");
+  $("#game-scene").classList.remove("inside-memory");
+  state.activeReconstruction = null;
+  renderDocument();
+  window.setTimeout(() => {
+    if (!state.activeReconstruction) overlay.hidden = true;
+  }, 260);
+}
+
+function discoverMemoryClue(clueId) {
+  const puzzle = records[state.activeReconstruction];
+  const clue = puzzle?.reconstruction?.clues.find((item) => item.id === clueId);
+  if (!puzzle || !clue) return;
+  const found = memoryCluesFor(puzzle.id);
+  found.add(clue.id);
+  state.activeMemoryText = `${clue.stamp} — ${clue.text}`;
+  $("#memory-feedback").textContent = "";
+  $("#memory-inference-form").classList.remove("rejected");
+  renderReconstruction();
+}
+
+function handleMemoryInference(event) {
+  event.preventDefault();
+  const puzzle = records[state.activeReconstruction];
+  if (!puzzle?.reconstruction || isComplete(puzzle.id)) return;
+  const required = requiredMemoryClues(puzzle);
+  const found = memoryCluesFor(puzzle.id);
+  const feedback = $("#memory-feedback");
+  if (!required.every((clue) => found.has(clue.id))) {
+    feedback.textContent = "필수 단서를 모두 직접 확인해야 추론을 기록할 수 있습니다.";
+    $("#memory-inference-form").classList.add("rejected");
+    return;
+  }
+  const answer = normalise($("#memory-answer").value);
+  if (!answer) {
+    feedback.textContent = "현장에서 얻은 결론을 입력하세요.";
+    $("#memory-inference-form").classList.add("rejected");
+    return;
+  }
+  const accepted = puzzle.answers.map(normalise).some((expected) => answer === expected);
+  if (!accepted) {
+    feedback.textContent = puzzle.retry || "현장 단서의 순서와 관계를 다시 확인하세요.";
+    $("#memory-inference-form").classList.add("rejected");
+    setStatus("현장 추론이 수집한 단서와 일치하지 않습니다.");
+    return;
+  }
+
+  $("#memory-inference-form").classList.remove("rejected");
+  $("#memory-inference-form").classList.add("accepted");
+  feedback.textContent = "추론 확인. 현장 기억을 PADS 문서에 동기화합니다…";
+  $("#memory-answer").disabled = true;
+  $("#memory-submit").disabled = true;
+  $("#reconstruction").classList.add("resolved");
+  window.setTimeout(() => {
+    state.currentId = puzzle.id;
+    if (state.history[state.historyIndex] !== puzzle.id) {
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push(puzzle.id);
+      state.historyIndex = state.history.length - 1;
+    }
+    completeAnswer(puzzle);
+    closeReconstruction();
+  }, 850);
 }
 
 function updateStoryAfterCase(puzzle) {
@@ -263,6 +414,7 @@ function handleInlineAnswer(event) {
 }
 
 function completeAnswer(puzzle) {
+  if (isComplete(puzzle.id)) return;
   state.completedCases.push(puzzle.id);
   $("#game-scene").classList.add("anomaly");
   $("#user-id").textContent = puzzle.id === verticalSlice.cases.at(-1)?.id ? "R-14" : "P-???";
@@ -286,7 +438,7 @@ function powerOn() {
     setMode("MONITOR");
     trackRecent(state.currentId);
     renderDocument();
-    $("#ambient-caption").textContent = "PADS 위키가 열렸다. 파란 링크를 따라 기록을 대조하고 빈칸을 채우세요.";
+    $("#ambient-caption").textContent = "금색 재현 표식으로 사건 속에 들어가고, 직접 찾은 단서로 PADS 기록을 채우세요.";
     setStatus("첫 사건 문서가 열렸습니다.");
   }, 1080);
 }
@@ -302,6 +454,11 @@ function toggleFocus(object) {
 }
 
 document.addEventListener("click", (event) => {
+  const reconstructionButton = event.target.closest("[data-enter-reconstruction]");
+  if (reconstructionButton) {
+    openReconstruction(reconstructionButton.dataset.enterReconstruction);
+    return;
+  }
   const documentButton = event.target.closest("[data-document]");
   if (documentButton) {
     openDocument(documentButton.dataset.document);
@@ -333,6 +490,12 @@ document.addEventListener("click", (event) => {
 $("#power-button").addEventListener("click", powerOn);
 $("#note-object").addEventListener("click", () => toggleFocus("note"));
 $("#phone-object").addEventListener("click", () => toggleFocus("phone"));
+$("#reconstruction-exit").addEventListener("click", closeReconstruction);
+$("#reconstruction").addEventListener("click", (event) => {
+  const clueButton = event.target.closest("[data-memory-clue]");
+  if (clueButton) discoverMemoryClue(clueButton.dataset.memoryClue);
+});
+$("#memory-inference-form").addEventListener("submit", handleMemoryInference);
 $("#search-form").addEventListener("submit", (event) => { event.preventDefault(); renderFileList(); setStatus("SEARCH COMPLETE"); });
 $("#search-input").addEventListener("input", renderFileList);
 $("#search-input").addEventListener("keydown", (event) => {
@@ -346,6 +509,10 @@ $("#document-view").addEventListener("input", (event) => {
   if (form?.dataset.state === "wrong") showInlineFeedback(form, "", "");
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.activeReconstruction) {
+    closeReconstruction();
+    return;
+  }
   if (event.key === "Escape" && state.focus !== "none") setFocus("none");
 });
 
