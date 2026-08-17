@@ -1,4 +1,4 @@
-import { verticalSlice } from "./Data/chapter01.js";
+import { verticalSlice } from "./Data/chapter01.js?v=20260817-six-cases";
 
 const $ = (selector) => document.querySelector(selector);
 const allRecords = [...verticalSlice.documents, ...verticalSlice.cases];
@@ -116,7 +116,8 @@ function renderRecent() {
 
 function renderArchiveHeader() {
   const currentCase = Math.min(progress() + 1, verticalSlice.cases.length);
-  $("#case-progress").textContent = `해금 ${String(currentCase).padStart(2, "0")} / ${String(verticalSlice.cases.length).padStart(2, "0")}`;
+  const progressLabel = progress() === verticalSlice.cases.length ? "완료" : "진행";
+  $("#case-progress").textContent = `${progressLabel} ${String(currentCase).padStart(2, "0")} / ${String(verticalSlice.cases.length).padStart(2, "0")}`;
   $("#wiki-current-title").textContent = records[state.currentId]?.title ?? "문서";
 }
 
@@ -213,7 +214,7 @@ function updateStoryAfterCase(puzzle) {
   const nextCase = verticalSlice.cases.find((caseFile) => caseFile.access === puzzle.unlocks);
   $("#phone-small-screen").textContent = "1 MESSAGE";
   $("#phone-light").closest(".desk-phone").classList.add("phone-alert");
-  $("#phone-time").textContent = puzzle.id === "C-003" ? "04:17" : "04:13";
+  $("#phone-time").textContent = puzzle.phoneTime ?? "04:13";
   $("#phone-message").textContent = puzzle.phone;
   $("#note-question").innerHTML = nextCase ? nextCase.prompt.replace("[blank]", "<br />________") : "기록은<br />사람보다 먼저였다.";
   $("#note-copy").textContent = nextCase ? "다음 빈칸은 위키 안에 있다." : "기록은 아직 끝나지 않았다.";
@@ -258,7 +259,7 @@ function handleInlineAnswer(event) {
 function completeAnswer(puzzle) {
   state.completedCases.push(puzzle.id);
   $("#game-scene").classList.add("anomaly");
-  $("#user-id").textContent = puzzle.id === "C-003" ? "R-14" : "P-???";
+  $("#user-id").textContent = puzzle.id === verticalSlice.cases.at(-1)?.id ? "R-14" : "P-???";
   updateStoryAfterCase(puzzle);
   setStatus(`사건 ${puzzle.id.slice(-2)} 해결 — 새 문서가 해금되었습니다.`);
   window.setTimeout(() => {
