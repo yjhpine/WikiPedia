@@ -52,11 +52,18 @@ function renderArticleToc(sections) {
   return `<nav class="article-toc" aria-label="문서 목차"><b>목차</b><ol>${sections.map((section, index) => `<li><button type="button" data-scroll-section="section-${index + 1}">${index + 1}. ${section.heading}</button></li>`).join("")}</ol></nav>`;
 }
 
-function renderAnswerForm(puzzle, label = "빈칸 답안") {
-  return `<form class="answer-form" data-case="${puzzle.id}">
-    <label for="answer-input-${puzzle.id}">${label}</label>
-    <div class="wiki-answer-row"><input id="answer-input-${puzzle.id}" class="answer-input" autocomplete="off" spellcheck="false" placeholder="${puzzle.answerLabel.includes("세션") ? "세션 식별자 입력" : "이름 또는 문서 ID 입력"}" aria-label="${label}" /><button type="submit">완료</button></div>
-    <div class="answer-result" aria-live="polite">연결된 문서를 읽고 공통 사실을 확인한 뒤 입력하세요.</div>
+function renderResolvedAnswer(puzzle) {
+  const answerRecord = allRecords.find((record) => puzzle.answers.some((answer) => normalise(answer) === normalise(record.id)));
+  if (!answerRecord) return `<span class="resolved-answer">${puzzle.answerLabel}</span>`;
+  return `<button class="resolved-answer" type="button" data-document="${answerRecord.id}" aria-label="${answerRecord.title} 문서 열기">${puzzle.answerLabel}</button>`;
+}
+
+function renderInlineAnswer(puzzle) {
+  const placeholder = puzzle.answerLabel.includes("세션") ? "세션 식별자" : "답 입력";
+  return `<form class="inline-answer-form" data-case="${puzzle.id}">
+    <input class="inline-answer-input" autocomplete="off" spellcheck="false" placeholder="${placeholder}" aria-label="${puzzle.title} 빈칸 답안" />
+    <button class="inline-answer-submit" type="submit" aria-label="답안 확인">↵</button>
+    <span class="inline-answer-feedback" aria-live="polite"></span>
   </form>`;
 }
 
@@ -72,12 +79,11 @@ function renderCloze(cloze) {
     return `<aside class="wiki-cloze locked"><b>해석 보류</b><span>앞선 사건 문서를 해결하면 이 빈칸을 확인할 수 있습니다.</span></aside>`;
   }
   if (isComplete(puzzle.id)) {
-    return `<aside class="wiki-cloze completed"><div>${cloze.before} <mark>${puzzle.answerLabel}</mark> ${cloze.after}</div><small>✓ 문서 교차 검증 완료</small>${renderUnlockList(puzzle)}</aside>`;
+    return `<aside class="wiki-cloze completed"><div>${cloze.before} ${renderResolvedAnswer(puzzle)} ${cloze.after}</div><small>✓ 문서 교차 검증 완료</small>${renderUnlockList(puzzle)}</aside>`;
   }
   const verified = puzzle.evidence.filter((id) => state.visited.has(id)).length;
   return `<aside class="wiki-cloze">
-    <div class="cloze-sentence">${cloze.before} <span class="wiki-blank">${cloze.placeholder}</span> ${cloze.after}</div>
-    ${renderAnswerForm(puzzle, "빈칸 채우기")}
+    <div class="cloze-sentence">${cloze.before} ${renderInlineAnswer(puzzle)} ${cloze.after}</div>
     <small>교차 확인: ${verified}/${puzzle.evidence.length}개 문서 읽음</small>
   </aside>`;
 }
@@ -142,8 +148,8 @@ function renderStandardDocument(document) {
 
 function renderCasePrompt(puzzle) {
   const fill = isComplete(puzzle.id)
-    ? `<span class="wiki-blank filled">${puzzle.answerLabel}</span>`
-    : "<span class=\"wiki-blank\" aria-label=\"채워야 하는 빈칸\">____________</span>";
+    ? renderResolvedAnswer(puzzle)
+    : renderInlineAnswer(puzzle);
   return puzzle.prompt.replace("[blank]", fill);
 }
 
@@ -152,9 +158,9 @@ function renderCaseDocument(puzzle) {
   const complete = isComplete(puzzle.id);
   const nextCase = verticalSlice.cases.find((caseFile) => caseFile.access === puzzle.unlocks);
   const leads = puzzle.leads.map(([id, label]) => renderMarkup(`[[${id}|${label}]]`)).join(" / ");
-  const form = complete
+  const completion = complete
     ? `<div class="case-success"><b>문서 해금 완료</b><p>${puzzle.success}</p>${renderUnlockList(puzzle)}${nextCase ? `<button class="case-next-link" type="button" data-document="${nextCase.id}">다음 사건 문서: ${nextCase.title} →</button>` : "<p>Chapter 1의 모든 사건 문서가 해금되었습니다.</p>"}</div>`
-    : renderAnswerForm(puzzle, "정답 입력");
+    : "";
   return `
     <header class="case-document-head wiki-case-header">
       <div class="doc-breadcrumb">PADS 위키 / 사건 문서 / ${puzzle.id}</div>
@@ -163,8 +169,8 @@ function renderCaseDocument(puzzle) {
     </header>
     <section class="wiki-case-body">
       <h3>미완성 문장</h3>
-      <p class="case-prompt">${renderCasePrompt(puzzle)}</p>
-      ${form}
+      <div class="case-prompt">${renderCasePrompt(puzzle)}</div>
+      ${completion}
       <p class="case-instruction">${puzzle.instruction}</p>
       <div class="case-trail"><b>문서 교차 확인</b><span>${verified}/${puzzle.evidence.length}개 기록을 읽었습니다.</span><p>탐색 시작: ${leads}</p></div>
     </section>`;
@@ -214,32 +220,42 @@ function updateStoryAfterCase(puzzle) {
   if (!nextCase) $("#note-anomaly").hidden = false;
 }
 
-function handleAnswer(event) {
+function showInlineFeedback(form, message, state) {
+  form.dataset.state = state;
+  form.querySelector(".inline-answer-feedback").textContent = message;
+}
+
+function handleInlineAnswer(event) {
   event.preventDefault();
-  const form = event.target.closest(".answer-form");
+  const form = event.target.closest(".inline-answer-form");
   const puzzle = records[form?.dataset.case];
-  if (!puzzle || isComplete(puzzle.id)) return;
-  const result = form.querySelector(".answer-result");
-  const answer = normalise(form.querySelector(".answer-input").value);
+  if (!puzzle || isComplete(puzzle.id) || form.dataset.submitting === "true") return;
+  const input = form.querySelector(".inline-answer-input");
+  const answer = normalise(input.value);
   const evidenceVerified = puzzle.evidence.every((id) => state.visited.has(id));
   if (!answer) {
-    result.textContent = "빈칸에 답을 입력하세요.";
-    result.className = "answer-result rejected";
+    showInlineFeedback(form, "답을 입력하세요.", "wrong");
+    input.focus();
     return;
   }
   if (!evidenceVerified) {
-    result.textContent = `아직 근거가 부족합니다. 연결된 ${puzzle.evidence.length}개 문서를 모두 읽어보세요.`;
-    result.className = "answer-result rejected";
+    showInlineFeedback(form, `근거 ${puzzle.evidence.length}개를 모두 확인하세요.`, "wrong");
     setStatus("연결 문서 교차 확인이 필요합니다.");
     return;
   }
   const accepted = puzzle.answers.map(normalise).some((expected) => answer.includes(expected));
   if (!accepted) {
-    result.textContent = "답이 일치하지 않습니다. 문서의 공통 사실을 다시 대조하세요.";
-    result.className = "answer-result rejected";
+    showInlineFeedback(form, "기록과 일치하지 않습니다.", "wrong");
     setStatus("입력한 답이 기록과 일치하지 않습니다.");
     return;
   }
+  form.dataset.submitting = "true";
+  input.disabled = true;
+  showInlineFeedback(form, "기록 일치", "correct");
+  window.setTimeout(() => completeAnswer(puzzle), 650);
+}
+
+function completeAnswer(puzzle) {
   state.completedCases.push(puzzle.id);
   $("#game-scene").classList.add("anomaly");
   $("#user-id").textContent = puzzle.id === "C-003" ? "R-14" : "P-???";
@@ -315,7 +331,13 @@ $("#search-input").addEventListener("input", renderFileList);
 $("#search-input").addEventListener("keydown", (event) => {
   if (event.key === "Escape") { event.currentTarget.value = ""; renderFileList(); event.currentTarget.blur(); }
 });
-$("#document-view").addEventListener("submit", (event) => { if (event.target.matches(".answer-form")) handleAnswer(event); });
+$("#document-view").addEventListener("submit", (event) => { if (event.target.matches(".inline-answer-form")) handleInlineAnswer(event); });
+$("#document-view").addEventListener("input", (event) => {
+  const input = event.target.closest(".inline-answer-input");
+  if (!input) return;
+  const form = input.closest(".inline-answer-form");
+  if (form?.dataset.state === "wrong") showInlineFeedback(form, "", "");
+});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && state.focus !== "none") setFocus("none");
 });
