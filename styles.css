@@ -82,9 +82,28 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--phosphor); 
 
 /* Larger CRT: prioritize the usable archive screen over desk decoration. */
 .game-scene { perspective: none; }
-.crt-object { z-index: 20; top: 17vh; width: min(94vw, 1780px); aspect-ratio: 1.92; }
-.screen-bezel { inset: 3.1% 100px 15%; border-radius: 5% 5% 7% 7% / 8% 8% 9% 9%; }
-.pads { inset: 3.1%; font: clamp(10px, .9vw, 16px)/1.42 var(--mono); }
+.crt-object {
+  z-index: 20;
+  top: clamp(12px, 2vh, 30px);
+  width: min(94vw, 1900px, calc(95vh * 1.6));
+  aspect-ratio: 1.6;
+}
+.screen-bezel {
+  top: 3%;
+  right: clamp(52px, 4.8vw, 92px);
+  bottom: auto;
+  left: clamp(52px, 4.8vw, 92px);
+  aspect-ratio: 16 / 9;
+  border-radius: 5% 5% 7% 7% / 8% 8% 9% 9%;
+}
+.pads { inset: 2.6%; font: clamp(10px, .9vw, 16px)/1.42 var(--mono); }
+
+/* A 16:9 archive viewport gives the enlarged CRT an HD-era display shape. */
+@media (max-height: 780px) {
+  .crt-object { width: min(96vw, calc(94vh * 1.6)); }
+  .screen-bezel { right: clamp(38px, 4.4vw, 70px); left: clamp(38px, 4.4vw, 70px); }
+  .pads { inset: 2.3%; }
+}
 .mode-MONITOR .pads, .mode-DESK .pads, .mode-NOTE .pads, .mode-PHONE .pads { grid-template-rows: auto auto auto minmax(0,1fr) auto; }
 .pads-tabs { display: flex; align-items: end; gap: 2px; padding: 4px 7px 0; border-bottom: 1px solid var(--line); background: #071009; }
 .pads-tab { border: 1px solid transparent; border-bottom: 0; padding: 3px 10px 4px; color: var(--terminal-dim); background: transparent; font: inherit; letter-spacing: .04em; }
