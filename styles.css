@@ -388,6 +388,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--phosphor); 
 }
 button.resolved-answer { cursor: pointer; }
 button.resolved-answer:hover { color: #005da9; }
+.case-meta-line { display: inline-flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.difficulty-badge { display: inline-flex; align-items: baseline; gap: 5px; border: 1px solid currentColor; border-radius: 999px; padding: 2px 7px; font-size: .78em; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+.difficulty-badge small { color: inherit; font-size: .92em; font-weight: 500; opacity: .82; }
+.difficulty-low { color: #427064; background: #edf7f3; }
+.difficulty-middle { color: #956b0c; background: #fff7dd; }
+.difficulty-high { color: #a0443e; background: #fff0ef; }
 @keyframes answer-confirm {
   0% { box-shadow: 0 0 0 rgba(0,164,149,0); }
   38% { box-shadow: 0 0 0 3px rgba(0,164,149,.18), 0 0 16px rgba(0,164,149,.42); }

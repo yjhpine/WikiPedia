@@ -1,9 +1,10 @@
-import { verticalSlice } from "./Data/chapter01.js?v=20260817-six-cases";
+import { verticalSlice } from "./Data/chapter01.js?v=20260817-deduction-tiers";
 
 const $ = (selector) => document.querySelector(selector);
 const allRecords = [...verticalSlice.documents, ...verticalSlice.cases];
 const records = Object.fromEntries(allRecords.map((record) => [record.id, record]));
 const normalise = (text) => text.toLowerCase().replace(/[\s_-]/g, "").replace(/[^\p{L}\p{N}]/gu, "");
+const difficultyClass = (difficulty) => ({ 하: "low", 중: "middle", 상: "high" }[difficulty] || "low");
 
 const state = {
   mode: "BOOT",
@@ -50,6 +51,11 @@ function renderMarkup(text) {
 function renderArticleToc(sections) {
   if (!sections.length) return "";
   return `<nav class="article-toc" aria-label="문서 목차"><b>목차</b><ol>${sections.map((section, index) => `<li><button type="button" data-scroll-section="section-${index + 1}">${index + 1}. ${section.heading}</button></li>`).join("")}</ol></nav>`;
+}
+
+function renderDifficultyBadge(puzzle) {
+  const detail = puzzle.difficultyDetail ? `<small>${puzzle.difficultyDetail}</small>` : "";
+  return `<b class="difficulty-badge difficulty-${difficultyClass(puzzle.difficulty)}">난이도 ${puzzle.difficulty || "하"}${detail}</b>`;
 }
 
 function renderResolvedAnswer(puzzle) {
@@ -165,7 +171,7 @@ function renderCaseDocument(puzzle) {
   return `
     <header class="case-document-head wiki-case-header">
       <div class="doc-breadcrumb">PADS 위키 / 사건 문서 / ${puzzle.id}</div>
-      <span>사건 ${puzzle.meta[0][1]} · ${puzzle.meta[1][1]}</span>
+      <span class="case-meta-line">사건 ${puzzle.meta[0][1]} · ${puzzle.meta[1][1]} ${renderDifficultyBadge(puzzle)}</span>
       <h2 class="doc-heading">${puzzle.title}</h2>
     </header>
     <section class="wiki-case-body">
@@ -173,7 +179,7 @@ function renderCaseDocument(puzzle) {
       <div class="case-prompt">${renderCasePrompt(puzzle)}</div>
       ${completion}
       <p class="case-instruction">${puzzle.instruction}</p>
-      <div class="case-trail"><b>문서 교차 확인</b><span>${verified}/${puzzle.evidence.length}개 기록을 읽었습니다.</span><p>탐색 시작: ${leads}</p></div>
+      <div class="case-trail"><b>문서 교차 확인</b><span>${verified}/${puzzle.evidence.length}개 근거를 읽었습니다.</span><p><strong>추리 방식:</strong> ${puzzle.difficultyDetail || "기록 대조"}</p><p>탐색 시작: ${leads}</p></div>
     </section>`;
 }
 
@@ -244,10 +250,10 @@ function handleInlineAnswer(event) {
     setStatus("연결 문서 교차 확인이 필요합니다.");
     return;
   }
-  const accepted = puzzle.answers.map(normalise).some((expected) => answer.includes(expected));
+  const accepted = puzzle.answers.map(normalise).some((expected) => answer === expected);
   if (!accepted) {
-    showInlineFeedback(form, "기록과 일치하지 않습니다.", "wrong");
-    setStatus("입력한 답이 기록과 일치하지 않습니다.");
+    showInlineFeedback(form, puzzle.retry || "근거 문서를 다시 대조하세요.", "wrong");
+    setStatus("입력한 답이 근거 조합과 일치하지 않습니다.");
     return;
   }
   form.dataset.submitting = "true";
