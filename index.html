@@ -3,179 +3,192 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#050607" />
-    <title>열한 번째 관찰석</title>
-    <link rel="stylesheet" href="styles.css?v=20260817-incident-replay-v2" />
+    <meta name="theme-color" content="#080b0c" />
+    <title>증강 라인 — 던전 크롤러 프로토타입</title>
+    <link rel="stylesheet" href="styles.css?v=prototype-03" />
   </head>
   <body>
-    <main class="game-scene" id="game-scene" data-mode="BOOT" data-focus="none">
-      <div class="room" aria-hidden="true">
-        <div class="ceiling-light"></div>
-        <div class="window"><span></span></div>
-        <div class="wall-stain stain-one"></div>
-        <div class="wall-stain stain-two"></div>
-        <div class="filing-cabinet"><i></i><i></i><i></i></div>
-        <div class="archive-box box-a"></div>
-        <div class="archive-box box-b"></div>
-        <div class="doorway"></div>
-        <div class="floor-shadow"></div>
-      </div>
+    <main class="game" id="game">
+      <canvas id="game-canvas" aria-label="증강 라인 전투 화면"></canvas>
+      <div class="screen-noise" aria-hidden="true"></div>
+      <div class="damage-flash" id="damage-flash" aria-hidden="true"></div>
 
-      <div class="desk" aria-label="제4관찰소 책상">
-        <div class="desk-grain"></div>
-        <div class="desk-edge"></div>
-        <div class="keyboard" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="mouse" aria-hidden="true"><i></i></div>
-        <div class="coffee" aria-hidden="true"><i></i></div>
-        <div class="pencil" aria-hidden="true"></div>
-        <div class="paper-stack" aria-hidden="true"></div>
-        <div class="desk-lamp" aria-hidden="true"><i></i><b></b><em></em></div>
-      </div>
+      <header class="hud hud-left" aria-label="플레이어 상태">
+        <div class="hud-brand"><span id="frame-code">NO FRAME</span><b>AUGMENT LINE</b></div>
+        <div class="bar health-bar"><i id="health-fill"></i><span>내구도 <b id="health-text">100 / 100</b></span></div>
+        <div class="bar xp-bar"><i id="xp-fill"></i><span>LV.<b id="level-text">1</b> 생산 경험치 <b id="xp-text">0 / 28</b></span></div>
+      </header>
 
-      <button class="desk-note object" id="note-object" type="button" aria-label="책상 위 쪽지 확인">
-        <span class="note-fold" aria-hidden="true"></span>
-        <span class="note-stamp">관찰석 B / 04:12</span>
-        <strong id="note-question">OBS-14/B의<br />원래 담당자는 누구인가?</strong>
-        <span class="note-copy" id="note-copy">기록은 남아 있을 거야.</span>
-        <span class="note-sign">— ?</span>
-        <span class="note-anomaly" id="note-anomaly" hidden>그런데 네 자리는<br />왜 아직 그를 기다리지?</span>
+      <aside class="hud hud-right" aria-label="작전 정보">
+        <div><span>던전 구역</span><b id="time-text">B1-01</b></div>
+        <div><span>폐기 수</span><b id="kill-text">0</b></div>
+        <div><span>방 상태</span><b id="danger-text">교전</b></div>
+      </aside>
+
+      <section class="combat-objective" id="combat-objective" aria-live="polite">
+        <span>ROOM OBJECTIVE</span>
+        <b id="objective-text">적 전멸</b>
+        <em id="objective-count">4 TARGETS</em>
+      </section>
+
+      <section class="combat-readout" aria-label="현재 무기 출력">
+        <span class="readout-label" id="readout-label">CLASS OUTPUT</span>
+        <div id="lane-readout"><b>횡베기 MK-I</b><span>DMG 18 · ARC 112°</span></div>
+        <div class="synergy-readout" id="synergy-readout">시너지 없음</div>
+      </section>
+
+      <button class="factory-toggle" id="factory-toggle" type="button">
+        <span>생산 라인</span><b>공장 보드 열기</b><kbd>TAB</kbd>
+        <div class="mini-board" id="mini-board" aria-hidden="true"></div>
       </button>
 
-      <section class="crt-object" id="crt-object" aria-label="PADS CRT 모니터">
-        <div class="monitor-backdrop" aria-hidden="true"></div>
-        <div class="crt-case">
-          <div class="case-scratches" aria-hidden="true"></div>
-          <div class="screen-bezel">
-            <div class="crt-screen" id="crt-screen">
-              <div class="boot-signal" aria-hidden="true"></div>
-              <div class="screen-fx" aria-hidden="true"></div>
-              <section class="pads" id="pads-interface" aria-label="PADS 내부 위키 시스템">
-                <header class="pads-titlebar">
-                  <button class="wiki-brand" type="button" data-document="C-001" aria-label="PADS 위키 첫 문서로 이동"><b>PADS 위키</b><span>열한 번째 관찰석</span></button>
-                  <nav class="wiki-topnav" aria-label="위키 메뉴">
-                    <button type="button" data-document="C-001">문서</button>
-                    <button type="button" data-document="L-017">둘러보기</button>
-                    <button type="button" data-document="I-014">최근 변경</button>
-                  </nav>
-                  <span class="pads-user">USER: <b id="user-id">?????</b></span>
-                </header>
-                <form class="pads-search" id="search-form">
-                  <label for="search-input">문서 검색</label>
-                  <input id="search-input" autocomplete="off" spellcheck="false" placeholder="문서 제목 또는 키워드" />
-                  <button type="submit">검색</button>
-                  <span id="search-result" aria-live="polite"></span>
-                </form>
-                <nav class="pads-tabs" aria-label="PADS 위키 경로">
-                  <button class="pads-tab active" id="case-home" type="button" data-document="C-001">사건 문서</button>
-                  <span class="wiki-path">PADS 위키 <b>›</b> <span id="wiki-current-title">관찰석 B 배치 기록</span></span>
-                  <span class="case-progress" id="case-progress">진행 01 / 06</span>
-                </nav>
-                <div class="pads-main">
-                  <aside class="pads-index" aria-label="문서 색인">
-                    <div class="index-head">문서 분류</div>
-                    <div class="index-types" id="index-types">
-                      <button type="button" data-filter="ALL" class="selected">ALL</button>
-                      <button type="button" data-filter="A">A</button>
-                      <button type="button" data-filter="C">C</button>
-                      <button type="button" data-filter="E">E</button>
-                      <button type="button" data-filter="O">O</button>
-                      <button type="button" data-filter="L">L</button>
-                      <button type="button" data-filter="I">I</button>
-                      <button type="button" data-filter="P">P</button>
-                    </div>
-                    <div class="file-list" id="file-list"></div>
-                    <div class="recent-files">
-                      <span>최근 본 문서</span>
-                      <div id="recent-list">—</div>
-                    </div>
-                  </aside>
-                  <article class="pads-document" id="document-view" aria-live="polite"></article>
-                </div>
-                <footer class="pads-statusbar">
-                  <span>PADS WIKI · LOCAL</span>
-                  <span id="system-message">문서를 불러오는 중입니다.</span>
-                  <span id="clock">04:12:08</span>
-                </footer>
-              </section>
+      <div class="control-hint" id="control-hint">
+        <span><kbd>WASD</kbd> 이동</span><span><kbd>클릭/J</kbd> <b id="attack-control-name">공격</b></span><span><kbd>SPACE</kbd> 대시</span><span><kbd>E</kbd> 문 진입</span><span><kbd>TAB</kbd> 공장</span>
+      </div>
+
+      <section class="ability-rack" aria-label="전투 행동 준비 상태">
+        <article class="ability ready" id="attack-ability">
+          <span>CLICK / J</span><b id="attack-name">공격</b><em id="attack-status">READY</em><i><u id="attack-ready-fill"></u></i>
+        </article>
+        <article class="ability ready" id="dash-ability">
+          <span>SPACE</span><b>대시</b><em id="dash-status">READY</em><i><u id="dash-ready-fill"></u></i>
+        </article>
+      </section>
+
+      <div class="system-toast" id="system-toast" role="status" aria-live="polite">
+        <span id="toast-label">SYSTEM</span><b id="toast-message">라인 준비 완료</b>
+      </div>
+
+      <section class="overlay start-overlay" id="start-overlay">
+        <div class="start-card">
+          <span class="eyebrow">ROOM-BASED ACTION ROGUELITE / FACTORY BUILD</span>
+          <div class="start-layout">
+            <section class="start-intro">
+              <h1>증강<br /><em>라인</em></h1>
+              <p>전투 방식을 먼저 선택하세요. 각 클래스는 전용 증강 10개와 독립적인 조합 시너지를 사용합니다.</p>
+              <div class="loop-preview">
+                <div><i>01</i><b>클래스</b><span>기본 공격과 전투 거리 결정</span></div>
+                <div><i>02</i><b>증강 조합</b><span>수치 대신 새 행동과 트리거 해금</span></div>
+                <div><i>03</i><b>공장 배치</b><span>인접 모듈로 전용 시너지 완성</span></div>
+              </div>
+            </section>
+
+            <section class="class-picker" aria-label="전투 클래스 선택">
+              <header><span>SELECT COMBAT FRAME</span><b>시작 클래스 선택</b><small>숫자키 1–3으로도 선택할 수 있습니다.</small></header>
+              <div class="class-cards">
+                <button class="class-card" type="button" data-class="melee" aria-pressed="false" style="--class-color:#58d7d3">
+                  <kbd>1</kbd><i>刃</i><span><b>근접 클래스</b><em>절단 집행자</em><small>좌우 콤보 · 표식 · 반격 · 점멸</small></span><strong>10 AUGMENTS</strong>
+                </button>
+                <button class="class-card" type="button" data-class="sniper" aria-pressed="false" style="--class-color:#f6dc66">
+                  <kbd>2</kbd><i>◎</i><span><b>원거리 저격 클래스</b><em>레일 관측자</em><small>관통 · 도탄 · 표식 · 정지 충전</small></span><strong>10 AUGMENTS</strong>
+                </button>
+                <button class="class-card" type="button" data-class="artillery" aria-pressed="false" style="--class-color:#ff714f">
+                  <kbd>3</kbd><i>✹</i><span><b>광역 공격 클래스</b><em>폭발 설계자</em><small>흡입 · 분열 · 지대 · 연쇄 기폭</small></span><strong>10 AUGMENTS</strong>
+                </button>
+              </div>
+            </section>
+          </div>
+          <footer class="start-footer">
+            <div class="start-controls" aria-label="핵심 조작">
+              <span><kbd>WASD</kbd><b>이동</b></span><span><kbd>MOUSE</kbd><b>조준</b></span><span><kbd>CLICK / J</kbd><b>공격</b></span><span><kbd>SPACE</kbd><b>대시</b></span>
             </div>
-          </div>
-          <div class="monitor-lower">
-            <span class="monitor-logo">NOVOTRON</span>
-            <div class="monitor-controls"><i id="power-led"></i><button type="button" id="power-button" aria-label="CRT 전원 켜기">POWER</button></div>
-          </div>
-          <div class="monitor-neck"></div>
-          <div class="monitor-stand"></div>
+            <div class="start-action"><small id="selected-class-copy">클래스를 먼저 선택하세요.</small><button id="start-button" type="button" disabled>선택한 클래스 가동 <kbd>ENTER</kbd></button></div>
+          </footer>
         </div>
       </section>
 
-      <button class="desk-phone object" id="phone-object" type="button" aria-label="휴대전화 확인">
-        <span class="phone-antenna" aria-hidden="true"></span>
-        <span class="phone-case">
-          <span class="phone-screen-small" id="phone-small-screen">NO SIGNAL</span>
-          <span class="phone-keys" aria-hidden="true">● ● ●<br />● ● ●<br />● ● ●</span>
-        </span>
-        <span class="phone-light" id="phone-light"></span>
-        <span class="phone-view" aria-hidden="true">
-          <span class="phone-head">UNKNOWN <b id="phone-time">—</b></span>
-          <span class="phone-text" id="phone-message">수신된 메시지가 없습니다.</span>
-          <span class="phone-close">ESC / 다시 내려놓기</span>
-        </span>
-      </button>
+      <section class="overlay choice-overlay" id="choice-overlay" hidden>
+        <div class="choice-shell">
+          <header>
+            <span>LEVEL UP / PART DELIVERY</span>
+            <h2>신규 증강 1개를 선택하세요</h2>
+            <p>선택한 모듈은 아직 작동하지 않습니다. 다음 화면에서 생산 라인에 배치해야 합니다.</p>
+          </header>
+          <div class="choice-cards" id="choice-cards"></div>
+          <footer class="choice-confirm-bar">
+            <span id="choice-status" aria-live="polite">증강 카드를 선택하세요. <kbd>1–3</kbd> 선택 · <kbd>ENTER</kbd> 확정</span>
+            <button id="choice-confirm" type="button" disabled>선택 확정 <kbd>ENTER</kbd></button>
+          </footer>
+        </div>
+      </section>
 
-      <div class="focus-shade" aria-hidden="true"></div>
-      <p class="ambient-caption" id="ambient-caption">불이 꺼진 제4관찰소. CRT 전원 LED만 희미하게 남아 있다.</p>
-      <div class="screen-reader-instructions">전원 버튼을 켜고, 사건 문서의 재현 표식으로 현장에 진입해 단서를 조사하세요.</div>
+      <section class="overlay factory-overlay" id="factory-overlay" hidden>
+        <div class="factory-shell">
+          <header class="factory-header">
+            <div>
+              <span>WEAPON PRODUCTION BOARD</span>
+              <h2>증강 생산 라인</h2>
+            </div>
+            <div class="factory-legend">
+              <span><i class="legend-main"></i>행동 증강</span>
+              <span><i class="legend-branch"></i>조합 연결</span>
+              <span><i class="legend-service"></i>확장 셀</span>
+            </div>
+          </header>
+
+          <div class="factory-layout">
+            <aside class="part-shelf">
+              <span class="panel-label">NEW PART</span>
+              <div class="pending-part" id="pending-part"></div>
+              <div class="factory-help">
+                <b>배치 규칙</b>
+                <p>부품을 드래그하거나 빈 셀을 눌러 배치하세요. 기존 부품도 이동할 수 있습니다.</p>
+                <ul>
+                  <li>어느 셀에 놓아도 해당 행동이 즉시 해금</li>
+                  <li>상하좌우로 맞닿은 지정 부품: 조합 시너지</li>
+                  <li>오른쪽 끝 배치: 조립 레일 자동 확장</li>
+                </ul>
+              </div>
+            </aside>
+
+            <section class="board-panel" aria-label="가로로 무한 확장되는 5행 증강 배치 보드">
+              <div class="board-column-labels"><span>INPUT CORE</span><span>INFINITE ASSEMBLY RAIL →</span></div>
+              <div class="factory-board" id="factory-board"></div>
+              <p class="board-message" id="board-message" aria-live="polite">신규 부품을 빈 셀에 배치하세요.</p>
+            </section>
+
+            <aside class="output-panel">
+              <span class="panel-label">LIVE SIMULATION</span>
+              <div class="factory-summary" id="factory-summary"></div>
+              <div class="factory-synergies">
+                <b>활성 시너지</b>
+                <div id="factory-synergy-list">없음</div>
+              </div>
+              <button id="factory-commit" type="button" disabled>라인 적용 · 전투 복귀</button>
+              <small id="factory-warning">신규 부품을 배치해야 전투로 돌아갈 수 있습니다.</small>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <div class="door-prompt" id="door-prompt" hidden><b>NORTH GATE OPEN</b><span>북쪽 문 근처에서 <kbd>E</kbd> — 다음 방</span></div>
+
+      <section class="overlay pause-overlay" id="pause-overlay" hidden>
+        <div class="pause-card">
+          <span>SYSTEM HOLD</span><h2>일시정지</h2>
+          <button id="resume-button" type="button">전투 계속 <kbd>ESC</kbd></button>
+          <button id="pause-factory-button" type="button">공장 보드 열기</button>
+        </div>
+      </section>
+
+      <section class="overlay gameover-overlay" id="gameover-overlay" hidden>
+        <div class="gameover-card">
+          <span>PRODUCTION HALTED</span><h2>라인 정지</h2>
+          <div><p>최종 구역<b id="final-time">B1-01</b></p><p>폐기 수<b id="final-kills">0</b></p><p>도달 레벨<b id="final-level">1</b></p></div>
+          <button id="restart-button" type="button">같은 클래스 재시작 <kbd>R</kbd></button>
+          <button id="change-class-button" type="button">클래스 다시 선택</button>
+        </div>
+      </section>
+
+      <aside class="test-panel" id="test-panel" hidden aria-label="프로토타입 테스트 도구">
+        <span>TEST MODE</span>
+        <button id="test-scrap" type="button">방 즉시 정리</button>
+        <button id="test-level" type="button">레벨업 배송</button>
+        <button id="test-next-room" type="button">다음 방</button>
+        <div id="test-module-buttons" aria-label="테스트 모듈 배송"></div>
+      </aside>
     </main>
 
-    <section class="reconstruction" id="reconstruction" hidden aria-label="사건 재현 환경">
-      <div class="reconstruction-noise" aria-hidden="true"></div>
-      <div class="reconstruction-shell">
-        <header class="reconstruction-header">
-          <div>
-            <span class="reconstruction-kicker">PADS · INCIDENT RECONSTRUCTION</span>
-            <h1 id="reconstruction-title">사건 재현</h1>
-            <p><span id="reconstruction-location">위치 불명</span><b id="reconstruction-time">--:--:--</b></p>
-          </div>
-          <button type="button" id="reconstruction-exit" aria-label="기록실로 돌아가기">기록실로 돌아가기 <kbd>ESC</kbd></button>
-        </header>
-
-        <div class="reconstruction-grid">
-          <section class="memory-stage" id="memory-stage" data-scene="handover" aria-label="재현된 사건 현장">
-            <div class="memory-wall" aria-hidden="true"></div>
-            <div class="memory-window" aria-hidden="true"><i></i><i></i><i></i></div>
-            <div class="memory-clock" aria-hidden="true"><i></i><b></b></div>
-            <div class="memory-door" aria-hidden="true"></div>
-            <div class="memory-cabinet" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-            <div class="memory-desk" aria-hidden="true"><i></i><b></b></div>
-            <div class="memory-terminal" aria-hidden="true"><i></i></div>
-            <div class="memory-phone" aria-hidden="true"><i></i></div>
-            <div class="memory-fog" aria-hidden="true"></div>
-            <div class="memory-hotspots" id="memory-hotspots"></div>
-            <div class="memory-scanline" aria-hidden="true"></div>
-            <p class="memory-caption" id="memory-caption">신호를 동기화하는 중입니다.</p>
-          </section>
-
-          <aside class="memory-journal" aria-label="현장 추리 기록">
-            <span class="memory-journal-label">FIELD NOTES</span>
-            <h2>현장 목표</h2>
-            <p class="memory-objective" id="memory-objective"></p>
-            <div class="memory-feed" id="memory-feed" aria-live="polite"></div>
-            <div class="memory-progress"><span>필수 단서</span><b id="memory-progress">0 / 0</b></div>
-            <ol class="memory-ledger" id="memory-ledger"></ol>
-            <form class="memory-inference" id="memory-inference-form">
-              <label for="memory-answer">현장 추론</label>
-              <p id="memory-inference-prompt"></p>
-              <div>
-                <input id="memory-answer" autocomplete="off" spellcheck="false" placeholder="수집한 단서로 결론 입력" />
-                <button type="submit" id="memory-submit">문서에 기록</button>
-              </div>
-              <span id="memory-feedback" aria-live="polite"></span>
-            </form>
-          </aside>
-        </div>
-      </div>
-    </section>
-
-    <script type="module" src="app.js?v=20260817-incident-replay-v2"></script>
+    <script type="module" src="game.js?v=prototype-03"></script>
   </body>
 </html>
