@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-05" />
+    <link rel="stylesheet" href="styles.css?v=prototype-07" />
   </head>
   <body>
     <main class="game" id="game">
@@ -22,6 +22,10 @@
         <span id="time-text">B1-01</span>
         <b id="objective-text">적 전멸</b>
         <em id="objective-count">4 TARGETS</em>
+      </section>
+
+      <section class="build-signature" id="build-signature" hidden aria-live="polite">
+        <span id="build-tier">LINE REACTOR</span><b id="build-name">기본 전투</b><em id="build-effect">프로토콜 연결 대기</em>
       </section>
 
       <button class="factory-toggle" id="factory-toggle" type="button" aria-label="공장 보드 열기, Tab">
@@ -46,7 +50,7 @@
           <div class="start-layout">
             <section class="start-intro">
               <h1>증강<br /><em>라인</em></h1>
-              <p>전투 방식을 먼저 선택하세요. 각 클래스는 전용 증강 10개를 좌→우 순서로 연결해 독립적인 전투 프로토콜을 만듭니다.</p>
+              <p>전투 방식을 고르고 한정된 FRAME RAM 안에서 증강을 조립하세요. 가장 긴 좌→우 라인이 기본 공격과 이동 규칙을 바꿉니다.</p>
             </section>
 
             <section class="class-picker" aria-label="전투 클래스 선택">
@@ -78,7 +82,7 @@
           <header>
             <span>LEVEL UP / PART DELIVERY</span>
             <h2>신규 증강 1개를 선택하세요</h2>
-            <p>선택한 모듈은 아직 작동하지 않습니다. 다음 화면에서 생산 라인에 배치해야 합니다.</p>
+            <p>RAM 비용과 빌드 태그를 비교하세요. 다음 화면에서 장착하거나 0 RAM 보관함에 저장할 수 있습니다.</p>
           </header>
           <div class="choice-cards" id="choice-cards"></div>
           <footer class="choice-confirm-bar">
@@ -98,12 +102,17 @@
             <aside class="part-shelf">
               <span class="panel-label">NEW PART</span>
               <div class="pending-part" id="pending-part"></div>
+              <button class="pending-archive" id="pending-archive" type="button" hidden>장착하지 않고 보관</button>
+              <section class="reserve-shelf" aria-label="비활성 증강 보관함">
+                <header><b>STORAGE</b><span>0 RAM</span></header>
+                <div id="reserve-parts"><span class="reserve-empty">비어 있음</span></div>
+              </section>
               <div class="factory-help">
                 <b>배치 규칙</b>
-                <p>부품을 빈 셀에 놓거나 기존 부품을 이동하세요.</p>
+                <p>모듈과 활성 링크가 RAM을 소비합니다. 장착·보관을 바꿔 용량 안에서 빌드를 깎으세요.</p>
                 <ul>
                   <li>배치한 부품의 행동이 즉시 해금됩니다.</li>
-                  <li>같은 행의 좌→우 연결이 순서 프로토콜을 만듭니다.</li>
+                  <li>좌→우 링크는 1 RAM을 추가로 쓰지만 주력 플레이스타일을 강화합니다.</li>
                 </ul>
               </div>
             </aside>
@@ -121,7 +130,7 @@
                 <div id="factory-synergy-list">없음</div>
               </div>
               <button id="factory-commit" type="button" disabled>라인 적용 · 전투 복귀</button>
-              <small id="factory-warning">신규 부품을 배치해야 전투로 돌아갈 수 있습니다.</small>
+              <small id="factory-warning">장착하거나 보관한 뒤 전투로 돌아갈 수 있습니다.</small>
             </aside>
           </div>
         </div>
@@ -151,12 +160,12 @@
         <button id="test-scrap" type="button">방 즉시 정리</button>
         <button id="test-level" type="button">레벨업 배송</button>
         <button id="test-next-room" type="button">다음 방</button>
-        <button id="test-audit" type="button">30 증강 진단</button>
+        <button id="test-audit" type="button">전체 빌드 진단</button>
         <output id="test-audit-result" role="status"></output>
         <div id="test-module-buttons" aria-label="테스트 모듈 배송"></div>
       </aside>
     </main>
 
-    <script type="module" src="game.js?v=prototype-06"></script>
+    <script type="module" src="game.js?v=prototype-07"></script>
   </body>
 </html>

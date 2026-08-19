@@ -98,6 +98,82 @@ const SYNERGY_DEFINITIONS = {
   ]
 };
 
+const PLAYSTYLES = {
+  melee: [
+    {
+      id: "pursuit", name: "추적 처형", color: "#ff7c6b", attackName: "추적 횡베기",
+      protocols: ["first_mark", "blood_loop", "harvester", "execution_wheel"],
+      identity: "표적 사이를 점멸하며 교차 절단과 처형으로 끊임없이 전진합니다.",
+      tiers: ["공격마다 먼 표적에게 돌진", "교차 절단이 추격 잔상을 생성", "처치 시 다음 표적으로 자동 사냥 베기"]
+    },
+    {
+      id: "maelstrom", name: "자력 회오리", color: "#b88cff", attackName: "광역 회오리",
+      protocols: ["vortex", "compression_break", "aftershock"],
+      identity: "넓은 칼날과 자력으로 적 무리를 한 점에 모아 연속 회전으로 분쇄합니다.",
+      tiers: ["모든 베기가 넓은 부채꼴로 확장", "두 번째 공격마다 전방위 회전", "회전 뒤 거대한 잔류 칼날 폭풍"]
+    },
+    {
+      id: "counter", name: "반격 방벽", color: "#71efad", attackName: "방벽 반격",
+      protocols: ["phantom_guard", "perfect_counter", "vengeance_step"],
+      identity: "베기와 대시를 방어 타이밍으로 바꾸고 막아낸 탄환을 즉시 반격으로 전환합니다.",
+      tiers: ["모든 베기가 주변 탄환을 소거", "대시가 방벽 잔상과 반격 충전을 생성", "반격 베기가 추적 파편 세 발을 방출"]
+    }
+  ],
+  sniper: [
+    {
+      id: "deadeye", name: "관통 데드아이", color: "#f6dc66", attackName: "중관통 광선",
+      protocols: ["dead_center", "rupture_line", "prism_rail"],
+      identity: "연사 대신 매 발을 굵은 관통 광선으로 바꾸고 정렬된 적과 표식을 한꺼번에 파열합니다.",
+      tiers: ["모든 사격이 굵은 관통 광선", "광선 적중이 파열 폭발을 연쇄", "광선이 전장의 모든 표식을 동시 기폭"]
+    },
+    {
+      id: "hunter", name: "하운드 탄막", color: "#69a9ff", attackName: "추적 쌍열",
+      protocols: ["smart_rebound", "hound_pair", "crossfire_mine"],
+      identity: "한 발을 여러 추적탄으로 분할해 흩어진 표적을 자동으로 물고 늘어집니다.",
+      tiers: ["모든 공격이 서로 다른 표적을 노리는 쌍열", "세 번째 추적탄과 추가 도탄", "처치마다 하운드 드론이 후속 광선 발사"]
+    },
+    {
+      id: "ranger", name: "빙결 유격대", color: "#57d8ee", attackName: "기동 냉각탄",
+      protocols: ["escape_route", "cold_escape", "cold_observer", "spectral_observer"],
+      identity: "대시와 사격 자리에 지뢰·냉각 지대를 남기며 계속 이동하는 구역 통제형 저격수입니다.",
+      tiers: ["모든 탄착점에 냉각 지대", "대시가 지뢰와 보조탄을 동시 전개", "대시 후 다음 공격이 세 갈래 유령 사격"]
+    }
+  ],
+  artillery: [
+    {
+      id: "inferno", name: "중력 화염로", color: "#ff714f", attackName: "중력 소이탄",
+      protocols: ["inferno_vortex", "wildfire_chain", "living_fuse"],
+      identity: "모든 폭발이 적을 끌어당기는 화염 지대를 만들고 불붙은 적을 연쇄 기폭합니다.",
+      tiers: ["모든 폭발이 흡인 화염 지대 생성", "화염 처치가 연쇄 폭발", "화염 지대가 커지고 오래 지속"]
+    },
+    {
+      id: "cascade", name: "파편 캐스케이드", color: "#d9ef59", attackName: "분열 파편탄",
+      protocols: ["parasite_cluster", "cascade", "echo_shrapnel"],
+      identity: "한 번의 착탄을 분열탄·잔향·방사 파편으로 여러 차례 재생산합니다.",
+      tiers: ["모든 폭발이 세 개의 분열탄 생성", "분열탄도 잔향 폭발", "모든 잔향이 방사 파편을 재생산"]
+    },
+    {
+      id: "orbital", name: "기동 궤도포", color: "#71efad", attackName: "궤도 유도탄",
+      protocols: ["breach_field", "nova_mine", "planetary", "gravity_satellite"],
+      identity: "대시 폭탄과 자동 궤도탄을 쌓아 직접 조준보다 이동 경로로 전장을 포격합니다.",
+      tiers: ["모든 폭발이 궤도탄 한 발 충전", "대시마다 초신성 지뢰 투하", "폭발마다 궤도탄 세 발 자동 추적"]
+    }
+  ]
+};
+
+const PLAYSTYLE_BY_PROTOCOL = Object.fromEntries(Object.values(PLAYSTYLES).flat()
+  .flatMap((style) => style.protocols.map((kind) => [kind, style])));
+
+const MODULE_RAM = {
+  m_mark: 2, m_spin: 3, m_hook: 2, m_echo: 3, m_guard: 2,
+  m_execute: 3, m_shock: 3, m_blood: 2, m_step: 3, m_riposte: 2,
+  s_pierce: 2, s_ricochet: 3, s_mark: 2, s_homing: 2, s_mine: 2,
+  s_dashload: 3, s_twin: 3, s_freeze: 2, s_ghost: 4, s_drone: 3,
+  a_sticky: 2, a_fire: 2, a_chain: 3, a_vacuum: 3, a_shrapnel: 3,
+  a_recursive: 4, a_dashbomb: 2, a_super: 4, a_cluster: 3, a_orbit: 3
+};
+const PROTOCOL_RAM = 1;
+
 const ROWS = 5;
 const INITIAL_COLS = 9;
 const EXTEND_BY = 4;
@@ -120,6 +196,27 @@ const isPlaceable = (index) => {
   const position = positionOf(index);
   return position.col > 0 && position.col < boardCols && position.row >= 0 && position.row < ROWS;
 };
+
+function ramCapacity() {
+  const level = game.player?.level || 1;
+  return Math.min(16, 6 + Math.max(0, level - 2) * 2);
+}
+
+function ramUsage(output) {
+  const moduleCost = modulesOnBoard().reduce((total, module) => total + (MODULE_RAM[module.type] || 1), 0);
+  return moduleCost + (output || evaluateClassFactory()).protocolRoutes.length * PROTOCOL_RAM;
+}
+
+function pendingPlacementUsage(index, type, currentOutput) {
+  if (!isPlaceable(index) || board[index]) return Infinity;
+  const position = positionOf(index);
+  let extraLinks = 0;
+  const left = position.col > 1 ? board[indexOf(position.col - 1, position.row)] : null;
+  const right = position.col < boardCols - 1 ? board[indexOf(position.col + 1, position.row)] : null;
+  if (left && findClassSynergy(left.type, type, game.selectedClass)) extraLinks += 1;
+  if (right && findClassSynergy(type, right.type, game.selectedClass)) extraLinks += 1;
+  return ramUsage(currentOutput) + (MODULE_RAM[type] || 1) + extraLinks * PROTOCOL_RAM;
+}
 
 function showSystemToast(label, message, tone, duration) {
   const toast = $("#system-toast");
@@ -166,7 +263,7 @@ function renderTestModuleButtons() {
 
 const factory = {
   pending: null, selectedIndex: null, dragged: null, manual: false,
-  choiceSelection: null, lastPlacedId: null, placementNotice: null, nextId: 1
+  choiceSelection: null, lastPlacedId: null, placementNotice: null, reserve: [], nextId: 1
 };
 const game = {
   mode: "start", selectedClass: null, width: innerWidth, height: innerHeight, time: 0, room: 1,
@@ -213,8 +310,51 @@ function classModuleTypes(classId) {
   return moduleTypes.filter((type) => MODULES[type].classId === classId);
 }
 
+function playstylesForModule(type, classId) {
+  const kinds = (SYNERGY_DEFINITIONS[classId] || [])
+    .filter((protocol) => protocol.types.includes(type)).map((protocol) => protocol.kind);
+  return [...new Map(kinds.map((kind) => {
+    const style = PLAYSTYLE_BY_PROTOCOL[kind];
+    return style ? [style.id, style] : null;
+  }).filter(Boolean)).values()];
+}
+
 function findClassSynergy(typeA, typeB, classId) {
   return (SYNERGY_DEFINITIONS[classId] || []).find((item) => item.types[0] === typeA && item.types[1] === typeB) || null;
+}
+
+function evaluateLineReactors(protocolRoutes) {
+  const chains = [];
+  for (let row = 0; row < ROWS; row += 1) {
+    const routes = protocolRoutes.filter((route) => route.row === row).sort((a, b) => a.col - b.col);
+    let current = [];
+    for (const route of routes) {
+      if (current.length && route.col !== current[current.length - 1].col + 1) {
+        chains.push(current);
+        current = [];
+      }
+      current.push(route);
+    }
+    if (current.length) chains.push(current);
+  }
+  const reactors = chains.map((routes) => {
+    const styleScores = new Map();
+    for (const route of routes) {
+      const style = PLAYSTYLE_BY_PROTOCOL[route.kind];
+      if (style) styleScores.set(style.id, (styleScores.get(style.id) || 0) + 1);
+    }
+    const firstStyle = PLAYSTYLE_BY_PROTOCOL[routes[0].kind];
+    const style = [...styleScores.entries()].sort((a, b) => b[1] - a[1])[0];
+    const resolvedStyle = Object.values(PLAYSTYLES).flat().find((item) => item.id === style?.[0]) || firstStyle;
+    return {
+      row: routes[0].row, startCol: routes[0].col, endCol: routes[routes.length - 1].col + 1,
+      links: routes.length, depth: routes.length + 1, tier: Math.min(3, routes.length),
+      cohesion: style?.[1] || 0, routes, style: resolvedStyle,
+      moduleIds: new Set(routes.flatMap((route) => [route.fromId, route.toId]))
+    };
+  });
+  reactors.sort((a, b) => b.links - a.links || b.cohesion - a.cohesion || a.row - b.row || a.startCol - b.startCol);
+  return { reactors, dominant: reactors[0] || null };
 }
 
 function evaluateClassFactory() {
@@ -265,35 +405,66 @@ function evaluateClassFactory() {
       } else links = 0;
     }
   }
+  const lineReactors = evaluateLineReactors(protocolRoutes);
+  const build = lineReactors.dominant ? {
+    id: lineReactors.dominant.style.id,
+    name: lineReactors.dominant.style.name,
+    color: lineReactors.dominant.style.color,
+    attackName: lineReactors.dominant.style.attackName,
+    identity: lineReactors.dominant.style.identity,
+    tiers: lineReactors.dominant.style.tiers,
+    tier: lineReactors.dominant.tier,
+    depth: lineReactors.dominant.depth,
+    row: lineReactors.dominant.row,
+    moduleIds: lineReactors.dominant.moduleIds
+  } : null;
   return {
     primary, echo, guard, classId, classProfile, traits: activeTypes, synergyKinds, synergyModuleIds, outgoingModuleIds,
-    statuses, synergies, protocolRoutes, sequenceDepth,
+    statuses, synergies, protocolRoutes, sequenceDepth, reactors: lineReactors.reactors, build,
     activeCount: activeIds.size, inactiveCount: 0
   };
 }
 
-function moduleToken(module, status) {
+function moduleToken(module, status, index) {
   const def = MODULES[module.type];
   const isNew = module.id === factory.lastPlacedId ? " is-new" : "";
   return '<div class="module-token module-' + module.type + ' ' + status + isNew + '" draggable="true" data-module-id="' +
-    module.id + '" data-label="' + def.name + '" style="--module-color:' + def.color + '">' + def.code + '</div>';
+    module.id + '" data-label="' + def.name + '" style="--module-color:' + def.color + '">' + def.code + '<span class="module-ram">' + MODULE_RAM[module.type] + 'R</span></div>' +
+    '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' 보관함으로 이동">보관</button>';
 }
 
 function renderPendingPart() {
   const target = $("#pending-part");
   if (!factory.pending) {
-    target.innerHTML = '<div class="pending-empty">신규 부품 없음<br />기존 모듈을 재배치할 수 있습니다.</div>';
+    target.innerHTML = '<div class="pending-empty">신규 부품 없음<br />보관함 부품을 다시 장착할 수 있습니다.</div>';
+    $("#pending-archive").hidden = true;
     return;
   }
   const def = MODULES[factory.pending.type];
   target.innerHTML = '<div class="pending-module module-' + factory.pending.type +
     '" draggable="true" data-pending-module="true" style="--module-color:' + def.color +
-    '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name +
+    '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name + ' · ' + MODULE_RAM[factory.pending.type] + ' RAM' +
     '</b><span>' + def.description + '</span><span>' + def.hint + '</span></div>';
+  $("#pending-archive").hidden = false;
+}
+
+function renderReserveParts() {
+  const target = $("#reserve-parts");
+  $(".reserve-shelf > header span").textContent = factory.reserve.length + " PART · 0 RAM";
+  target.innerHTML = factory.reserve.length
+    ? factory.reserve.map((module) => {
+      const def = MODULES[module.type];
+      return '<button type="button" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '"><b>' + def.code + '</b><span>' + def.name + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
+    }).join("")
+    : '<span class="reserve-empty">비어 있음</span>';
 }
 
 function outputChangeSummary(previous, next) {
   if (!previous) return "새 생산 라인이 적용되었습니다.";
+  if (previous.build?.id !== next.build?.id || previous.build?.tier !== next.build?.tier) {
+    if (!next.build) return "주력 리액터가 해제되어 기본 전투 규칙으로 복귀합니다.";
+    return next.build.name + " TIER " + ["0", "I", "II", "III"][next.build.tier] + " · " + next.build.tiers[next.build.tier - 1];
+  }
   const mechanics = [...next.traits].filter((type) => !previous.traits?.has(type)).map((type) => MODULES[type].name);
   const combos = next.synergies.filter((item) => !previous.synergyKinds?.has(item.kind)).map((item) => item.name);
   if (combos.length) return "순서 프로토콜 · " + combos.join(" + ");
@@ -306,6 +477,7 @@ function renderFactoryBoard() {
   const boardElement = $("#factory-board");
   const labelsElement = $(".board-column-labels");
   boardElement.style.setProperty("--board-cols", boardCols);
+  boardElement.style.setProperty("--reactor-color", output.build?.color || CLASS_PROFILES[game.selectedClass].color);
   labelsElement.style.setProperty("--board-cols", boardCols);
   boardElement.innerHTML = Array.from({ length: ROWS * boardCols }, (_, order) => {
     const position = { col: order % boardCols, row: Math.floor(order / boardCols) };
@@ -315,21 +487,34 @@ function renderFactoryBoard() {
       position.row === ECHO_ROW || position.row === GUARD_ROW ? "branch-lane" : "service-lane";
     const powered = Boolean(board[index] && output.synergyModuleIds.has(board[index].id));
     const sequenceOut = Boolean(board[index] && output.outgoingModuleIds.has(board[index].id));
+    const reactorCore = Boolean(board[index] && output.build?.moduleIds.has(board[index].id));
     const selected = factory.selectedIndex === index;
-    const validTarget = Boolean(factory.pending) && !fixed && !board[index];
-    const invalidTarget = false;
+    const projectedRam = factory.pending ? pendingPlacementUsage(index, factory.pending.type, output) : 0;
+    const validTarget = Boolean(factory.pending) && !fixed && !board[index] && projectedRam <= ramCapacity();
+    const invalidTarget = Boolean(factory.pending) && !fixed && (!validTarget || Boolean(board[index]));
     const fixedText = position.col === 0 ? LANE_CODES[position.row] : "";
     const status = board[index] ? output.statuses.get(board[index].id) : "";
     return '<div class="factory-cell ' + laneClass + (powered ? " powered" : "") + (sequenceOut ? " sequence-out" : "") +
+      (reactorCore ? " reactor-core" : "") +
       (fixed ? " fixed" : "") + (selected ? " selected" : "") + (validTarget ? " valid-target" : "") +
       (invalidTarget ? " invalid-target" : "") + '" data-cell-index="' + index + '" aria-label="' +
       LANE_NAMES[position.row] + ' ' + (position.col + 1) + '열">' +
       (fixedText ? '<span class="fixed-node">' + fixedText + '</span>' : "") +
-      (board[index] ? moduleToken(board[index], status) : "") + (sequenceOut ? '<span class="sequence-arrow">→</span>' : "") + '</div>';
+      (board[index] ? moduleToken(board[index], status, index) : "") + (sequenceOut ? '<span class="sequence-arrow">→</span>' : "") + '</div>';
   }).join("");
   renderPendingPart();
+  renderReserveParts();
   const mechanicNames = [...output.traits].map((type) => MODULES[type].name);
+  const build = output.build;
+  const usedRam = ramUsage(output);
+  const capacity = ramCapacity();
+  const freeRam = capacity - usedRam;
+  const buildSummary = build
+    ? '<article class="lane-summary build-summary" style="--lane-color:' + build.color + '"><header><b>' + build.name + '</b><span>TIER ' + ["0", "I", "II", "III"][build.tier] + ' · ' + build.depth + ' MODULE</span></header><p>' + build.identity + '</p><strong>' + build.tiers[build.tier - 1] + '</strong></article>'
+    : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>정의된 순서의 모듈 2개를 같은 행에 붙이면 기본 공격 규칙이 바뀝니다.</p></article>';
   $("#factory-summary").innerHTML =
+    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + (usedRam / capacity * 100) + '%"></i></div><p>모듈 비용 ' + (usedRam - output.protocolRoutes.length * PROTOCOL_RAM) + ' · 활성 링크 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
+    buildSummary +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' +
       (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
     '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' +
@@ -340,10 +525,10 @@ function renderFactoryBoard() {
   const commit = $("#factory-commit");
   commit.disabled = Boolean(factory.pending);
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "라인 적용 · 전투 복귀";
-  $("#factory-warning").textContent = factory.pending ? "신규 부품을 배치해야 전투로 돌아갈 수 있습니다." : "모든 배치가 정상 가동됩니다.";
-  $("#board-message").textContent = factory.pending ? MODULES[factory.pending.type].name + " 배치 위치를 선택하세요. 밝게 점멸하는 셀에 놓을 수 있습니다." :
+  $("#factory-warning").textContent = factory.pending ? "장착하거나 보관해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 모든 배치가 정상 가동됩니다.";
+  $("#board-message").textContent = factory.pending ? MODULES[factory.pending.type].name + "(" + MODULE_RAM[factory.pending.type] + " RAM) 배치 · 남은 RAM " + freeRam + ". 어두운 셀은 링크 비용까지 포함해 초과합니다." :
     factory.selectedIndex !== null ? "이동할 셀을 선택하세요. 같은 셀을 다시 누르면 선택이 해제됩니다." :
-      factory.placementNotice || "종점 없이 오른쪽으로 계속 확장되는 무한 조립 레일입니다.";
+      factory.placementNotice || (build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " 가동 · 가장 긴 연속 라인이 전투 방식을 결정합니다." : "정의된 순서의 모듈을 같은 행에 붙여 주력 플레이스타일을 가동하세요.");
   $("#board-message").className = "board-message " + (factory.pending ? "warning" : "ok");
 }
 
@@ -352,6 +537,12 @@ function placePending(index) {
   const position = positionOf(index);
   if (board[index]) {
     $("#board-message").textContent = "해당 셀에 부품이 있습니다. 먼저 기존 부품을 옮기세요.";
+    $("#board-message").className = "board-message warning";
+    return;
+  }
+  const projectedRam = pendingPlacementUsage(index, factory.pending.type, evaluateClassFactory());
+  if (projectedRam > ramCapacity()) {
+    $("#board-message").textContent = "RAM 부족 · 이 위치는 링크 비용을 포함해 " + projectedRam + "/" + ramCapacity() + " RAM입니다. 기존 모듈을 보관하거나 다른 셀을 선택하세요.";
     $("#board-message").className = "board-message warning";
     return;
   }
@@ -374,10 +565,52 @@ function moveBoardModule(from, to) {
   }
   const moving = board[from];
   [board[from], board[to]] = [board[to], board[from]];
+  const projectedOutput = evaluateClassFactory();
+  if (ramUsage(projectedOutput) > ramCapacity()) {
+    [board[from], board[to]] = [board[to], board[from]];
+    factory.selectedIndex = null;
+    factory.placementNotice = "이 이동은 새 링크 비용 때문에 RAM을 초과합니다. 다른 행이나 보관함을 사용하세요.";
+    renderFactoryBoard();
+    return;
+  }
   factory.selectedIndex = null;
   factory.lastPlacedId = moving ? moving.id : null;
   factory.placementNotice = moving ? MODULES[moving.type].name + " · " + LANE_NAMES[positionOf(to).row] + "로 이동했습니다." : null;
   ensureBoardSpace(positionOf(to).col);
+  renderFactoryBoard();
+}
+
+function storeBoardModule(index) {
+  if (!isPlaceable(index) || !board[index]) return;
+  const stored = board[index];
+  board[index] = null;
+  factory.reserve.push(stored);
+  factory.selectedIndex = null;
+  factory.lastPlacedId = null;
+  factory.placementNotice = MODULES[stored.type].name + "을 보관했습니다. RAM이 반환되었습니다.";
+  renderFactoryBoard();
+}
+
+function archivePending() {
+  if (!factory.pending) return;
+  const stored = factory.pending;
+  factory.reserve.push(stored);
+  factory.pending = null;
+  factory.placementNotice = MODULES[stored.type].name + "을 장착하지 않고 보관했습니다.";
+  renderFactoryBoard();
+}
+
+function activateReserve(moduleId) {
+  if (factory.pending) {
+    factory.placementNotice = "현재 신규 부품을 먼저 장착하거나 보관하세요.";
+    renderFactoryBoard();
+    return;
+  }
+  const index = factory.reserve.findIndex((module) => module.id === moduleId);
+  if (index < 0) return;
+  factory.pending = factory.reserve.splice(index, 1)[0];
+  factory.selectedIndex = null;
+  factory.placementNotice = null;
   renderFactoryBoard();
 }
 
@@ -409,6 +642,11 @@ function commitFactory() {
   const previousMax = game.player ? game.player.maxHp : 100;
   const previousOutput = game.output;
   const nextOutput = evaluateClassFactory();
+  if (ramUsage(nextOutput) > ramCapacity()) {
+    factory.placementNotice = "RAM 용량을 초과한 라인은 적용할 수 없습니다. 모듈을 보관함으로 옮기세요.";
+    renderFactoryBoard();
+    return;
+  }
   game.output = nextOutput;
   syncPlayerDerivedStats(previousMax);
   factory.selectedIndex = null;
@@ -422,12 +660,13 @@ function commitFactory() {
 
 function ownedCount(type) {
   return board.filter((module) => module && module.type === type).length +
+    factory.reserve.filter((module) => module.type === type).length +
     (factory.pending && factory.pending.type === type ? 1 : 0);
 }
 
 function generateChoices() {
   const classTypes = classModuleTypes(game.selectedClass);
-  const owned = new Set(modulesOnBoard().map((module) => module.type));
+  const owned = new Set([...modulesOnBoard().map((module) => module.type), ...factory.reserve.map((module) => module.type)]);
   const unowned = classTypes.filter((type) => !owned.has(type)).sort(() => Math.random() - .5);
   const pool = [...unowned, ...classTypes.filter((type) => owned.has(type)).sort(() => Math.random() - .5)];
   const choices = pool.slice(0, 3);
@@ -440,17 +679,19 @@ function showLevelChoices() {
   const choices = generateChoices();
   const classProfile = CLASS_PROFILES[game.selectedClass];
   factory.choiceSelection = null;
-  $(".choice-shell > header span").textContent = classProfile.code + " / CLASS AUGMENT DELIVERY";
+  $(".choice-shell > header span").textContent = classProfile.code + " / FRAME RAM " + ramUsage(evaluateClassFactory()) + " / " + ramCapacity();
   $(".choice-shell h2").textContent = classProfile.name + " 전용 증강 선택";
-  $(".choice-shell header p").textContent = "10개 전용 증강은 수치 누적 대신 새로운 행동을 해금합니다. 같은 행에서 좌→우로 이어 순서 프로토콜을 완성하세요.";
+  $(".choice-shell header p").textContent = "카드의 RAM 비용과 플레이스타일 태그를 비교하세요. 장착하지 않은 부품은 0 RAM 보관함에 둘 수 있습니다.";
   $("#choice-cards").innerHTML = choices.map((type, index) => {
     const def = MODULES[type];
+    const affinities = playstylesForModule(type, game.selectedClass);
     return '<button class="augment-card" type="button" data-choice="' + type +
       '" data-choice-index="' + index + '" aria-pressed="false" style="--module-color:' + def.color +
       '"><span class="card-shortcut">' + (index + 1) + '</span><div class="card-top"><span>MODULE / ' +
-      def.code + '</span><span>보유 ' + ownedCount(type) + '</span></div><div class="card-icon">' +
+      def.code + '</span><span>' + MODULE_RAM[type] + ' RAM · 보유 ' + ownedCount(type) + '</span></div><div class="card-icon">' +
       def.code + '</div><h3>' + def.name + '</h3><p>' + def.description +
-      '</p><div class="placement-hint">' + def.hint + '</div></button>';
+      '</p><div class="build-affinity">' + affinities.map((style) => '<span style="--affinity-color:' + style.color + '">' + style.name + '</span>').join("") +
+      '</div><div class="placement-hint">' + def.hint + '</div></button>';
   }).join("");
   $("#choice-status").innerHTML = '증강 카드를 선택하세요. <kbd>1–3</kbd> 선택 · <kbd>ENTER</kbd> 확정';
   $("#choice-confirm").innerHTML = '선택 확정 <kbd>ENTER</kbd>';
@@ -467,7 +708,8 @@ function previewAugmentChoice(type) {
     card.setAttribute("aria-pressed", String(selected));
   }
   const def = MODULES[type];
-  $("#choice-status").innerHTML = def.name + ' 선택됨 · 확정 전 변경 가능 · <kbd>ENTER</kbd> 확정';
+  const styles = playstylesForModule(type, game.selectedClass).map((style) => style.name).join(" / ");
+  $("#choice-status").innerHTML = def.name + ' · ' + MODULE_RAM[type] + ' RAM · ' + styles + ' · <kbd>ENTER</kbd> 확정';
   $("#choice-confirm").innerHTML = def.name + ' 선택 확정 <kbd>ENTER</kbd>';
   $("#choice-confirm").disabled = false;
 }
@@ -509,6 +751,7 @@ function resetGame() {
   factory.choiceSelection = null;
   factory.lastPlacedId = null;
   factory.placementNotice = null;
+  factory.reserve = [];
   factory.nextId = 1;
   game.time = 0;
   game.room = 1;
@@ -535,7 +778,7 @@ function resetGame() {
     renderX: game.width * .5, renderY: game.height - 145, aimHold: 0, bufferedAim: null,
     attackCooldown: 0, dashCooldown: 0, dashTime: 0,
     invulnerable: 0, combo: 0, slash: null, nextSwingDirection: 1, swingCount: 0,
-    attackBuffer: 0, shotCount: 0, dashBombCount: 0, stillTime: 0, attackFlash: 0, riposteReady: false,
+    attackBuffer: 0, shotCount: 0, dashBombCount: 0, rangerVolley: 0, stillTime: 0, attackFlash: 0, riposteReady: false,
     riposteTargetId: null,
     lastMoveX: 0, lastMoveY: -1
   };
@@ -775,6 +1018,14 @@ function hasSynergy(kind) {
   return Boolean(game.output?.synergyKinds?.has(kind));
 }
 
+function hasPlaystyle(id, tier) {
+  return game.output?.build?.id === id && game.output.build.tier >= (tier || 1);
+}
+
+function playstyleTier(id) {
+  return game.output?.build?.id === id ? game.output.build.tier : 0;
+}
+
 function recordDiagnostic(bucket, key) {
   if (!TEST_MODE) return;
   bucket[key] = (bucket[key] || 0) + 1;
@@ -819,6 +1070,7 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
   const originX = context.x ?? player.x;
   const originY = context.y ?? player.y;
   const hitEnemies = [];
+  let huntQueued = false;
   for (const enemy of game.enemies) {
     if (enemy.dead) continue;
     const dx = enemy.x - originX;
@@ -826,10 +1078,11 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
     const distance = Math.hypot(dx, dy);
     if (distance > profile.range + enemy.radius) continue;
     if (Math.abs(angleDelta(Math.atan2(dy, dx), angle)) > profile.arc * Math.PI / 360) continue;
-    if (game.selectedClass === "melee" && hasTrait("m_hook")) {
-      enemy.x += (originX - enemy.x) * .24;
-      enemy.y += (originY - enemy.y) * .24;
-      noteAugment("m_hook");
+    if (game.selectedClass === "melee" && (hasTrait("m_hook") || hasPlaystyle("maelstrom"))) {
+      const pull = hasPlaystyle("maelstrom") ? .32 + playstyleTier("maelstrom") * .06 : .24;
+      enemy.x += (originX - enemy.x) * pull;
+      enemy.y += (originY - enemy.y) * pull;
+      if (hasTrait("m_hook")) noteAugment("m_hook");
     }
     let strikeScale = damageScale;
     let consumedMark = false;
@@ -852,6 +1105,11 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
       player.hp = Math.min(player.maxHp, player.hp + 3);
       noteAugment("m_blood");
     }
+    if (aliveBeforeStrike && enemy.dead && hasPlaystyle("pursuit", 3) && !context.synthetic && !huntQueued) {
+      game.delayedAttacks.push({ delay: .08, kind: "hunt", x: enemy.x, y: enemy.y, damageScale: .82 });
+      huntQueued = true;
+      addFloater(enemy.x, enemy.y - enemy.radius - 16, "HUNT CONTINUES", game.output.build.color);
+    }
     if (game.selectedClass === "melee" && hasTrait("m_execute") && !enemy.dead && enemy.hp / enemy.maxHp <= .22) {
       addFloater(enemy.x, enemy.y - enemy.radius - 10, "EXECUTE", "#f08080");
       noteAugment("m_execute");
@@ -873,9 +1131,9 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
       player.hp = Math.min(player.maxHp, player.hp + 4);
       noteAugment("m_blood");
     }
-    if (consumedMark && hasSynergy("blood_loop")) {
+    if (consumedMark && (hasSynergy("blood_loop") || hasPlaystyle("pursuit", 2))) {
       game.delayedAttacks.push({ delay: .11, kind: "slash", angle, damageScale: .65, synthetic: true });
-      noteProtocol("blood_loop");
+      if (hasSynergy("blood_loop")) noteProtocol("blood_loop");
     }
     hitEnemies.push(enemy);
     applyAreaExplosion(enemy.x, enemy.y, profile.explosion, profile.damage, enemy.id);
@@ -911,6 +1169,10 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
     game.delayedAttacks.push({ delay: .14, kind: "spin", angle, damageScale: .7, synthetic: true });
     noteProtocol("vortex");
   }
+  if (context.finisher && hasPlaystyle("maelstrom", 3) && !context.synthetic) {
+    game.zones.push({ kind: "blade", x: originX, y: originY, radius: 128, life: 2.1, tick: 0, color: game.output.build.color });
+    addFloater(originX, originY - 42, "BLADE STORM", game.output.build.color);
+  }
 }
 
 function spawnRailShot(angle, options) {
@@ -934,31 +1196,56 @@ function spawnRailShot(angle, options) {
 function fireSniperAttack(angle) {
   const player = game.player;
   player.shotCount += 1;
-  const charged = hasTrait("s_ghost") && player.stillTime >= 1.05;
-  const twin = hasTrait("s_twin") && player.shotCount % 2 === 0;
+  const deadeyeTier = playstyleTier("deadeye");
+  const hunterTier = playstyleTier("hunter");
+  const rangerTier = playstyleTier("ranger");
+  const charged = Boolean(deadeyeTier) || (hasTrait("s_ghost") && player.stillTime >= 1.05);
+  const twin = Boolean(hunterTier) || (hasTrait("s_twin") && player.shotCount % 2 === 0);
   if (charged) {
     canvas.dataset.lastSpecial = "charged-rail";
-    noteAugment("s_ghost");
+    if (hasTrait("s_ghost")) noteAugment("s_ghost");
   }
   if (twin) {
-    canvas.dataset.lastSpecial = hasSynergy("hound_pair") ? "hound-pair" : "twin-rail";
-    noteAugment("s_twin");
+    canvas.dataset.lastSpecial = hunterTier ? "hunter-pack" : hasSynergy("hound_pair") ? "hound-pair" : "twin-rail";
+    if (hasTrait("s_twin")) noteAugment("s_twin");
   }
   if (twin) {
-    const splitTargets = hasSynergy("hound_pair")
-      ? game.enemies.filter((enemy) => !enemy.dead).sort((a, b) => distanceSquared(a, player) - distanceSquared(b, player)).slice(0, 2)
+    const shotCount = hunterTier >= 2 ? 3 : 2;
+    const splitTargets = (hasSynergy("hound_pair") || hunterTier)
+      ? game.enemies.filter((enemy) => !enemy.dead).sort((a, b) => distanceSquared(a, player) - distanceSquared(b, player)).slice(0, shotCount)
       : [];
-    const leftAngle = splitTargets[0] ? Math.atan2(splitTargets[0].y - player.y, splitTargets[0].x - player.x) : angle - .075;
-    const rightAngle = splitTargets[1] ? Math.atan2(splitTargets[1].y - player.y, splitTargets[1].x - player.x) : angle + .075;
-    spawnRailShot(leftAngle, { charged, homingTargetId: splitTargets[0]?.id });
-    spawnRailShot(rightAngle, { charged, homingTargetId: splitTargets[1]?.id });
+    for (let index = 0; index < shotCount; index += 1) {
+      const target = splitTargets[index];
+      const spread = (index - (shotCount - 1) / 2) * .1;
+      const shotAngle = target ? Math.atan2(target.y - player.y, target.x - player.x) : angle + spread;
+      spawnRailShot(shotAngle, {
+        charged, homing: Boolean(hunterTier) || undefined, homingTargetId: target?.id,
+        damage: hunterTier ? game.output.primary.damage * (shotCount === 3 ? .72 : .82) : undefined,
+        color: hunterTier ? game.output.build.color : undefined
+      });
+    }
     if (hasSynergy("hound_pair")) noteProtocol("hound_pair");
   } else {
-    spawnRailShot(angle, { charged, radius: charged ? 8 : 4, pierce: charged ? 99 : undefined });
+    const rangerVolley = rangerTier >= 3 && player.rangerVolley > 0;
+    const volleyCount = rangerVolley ? 3 : 1;
+    for (let index = 0; index < volleyCount; index += 1) {
+      const spread = (index - (volleyCount - 1) / 2) * .12;
+      spawnRailShot(angle + spread, {
+        charged, radius: deadeyeTier ? 7 + deadeyeTier * 2 : charged ? 8 : 4,
+        pierce: deadeyeTier || charged ? 99 : undefined,
+        damage: deadeyeTier ? game.output.primary.damage * (1.18 + deadeyeTier * .1) : undefined,
+        homing: rangerVolley || undefined,
+        color: deadeyeTier || rangerVolley ? game.output.build.color : undefined
+      });
+    }
+    if (rangerVolley) {
+      player.rangerVolley = 0;
+      addFloater(player.x, player.y - 38, "GHOST VOLLEY", game.output.build.color);
+    }
   }
-  if (hasTrait("s_mine") && player.shotCount % 3 === 0) {
+  if ((hasTrait("s_mine") && player.shotCount % 3 === 0) || (rangerTier >= 2 && player.shotCount % 2 === 0)) {
     game.zones.push({ kind: "mine", x: player.x, y: player.y, radius: 48, life: 12, tick: 0, color: "#ff9b4a", crossfire: hasSynergy("crossfire_mine") });
-    noteAugment("s_mine");
+    if (hasTrait("s_mine")) noteAugment("s_mine");
   }
   player.stillTime = 0;
   player.attackFlash = .12;
@@ -986,12 +1273,19 @@ function launchGrenade(angle, options) {
 function fireArtilleryAttack(angle) {
   const player = game.player;
   player.shotCount += 1;
-  const supernova = hasTrait("a_super") && player.shotCount % 3 === 0;
+  const orbitalTier = playstyleTier("orbital");
+  const orbitalNova = orbitalTier >= 2 && player.shotCount % (orbitalTier >= 3 ? 2 : 3) === 0;
+  const supernova = orbitalNova || (hasTrait("a_super") && player.shotCount % 3 === 0);
   if (supernova) {
     canvas.dataset.lastSpecial = hasSynergy("planetary") ? "planetary-supernova" : "supernova";
-    noteAugment("a_super");
+    if (hasTrait("a_super")) noteAugment("a_super");
   }
-  launchGrenade(angle, { supernova, blastRadius: supernova ? 148 : game.output.primary.blastRadius, damage: supernova ? 34 : game.output.primary.damage, color: supernova ? "#f6dc66" : "#ff9b4a" });
+  launchGrenade(angle, {
+    supernova,
+    blastRadius: supernova ? 148 : game.output.primary.blastRadius,
+    damage: supernova ? 34 : game.output.primary.damage,
+    color: game.output.build?.color || (supernova ? "#f6dc66" : "#ff9b4a")
+  });
   player.attackFlash = .14;
 }
 
@@ -1003,7 +1297,7 @@ function startSlash(attackAngle) {
   player.aim = Number.isFinite(attackAngle) ? attackAngle : fallbackAim;
   player.weaponFacing = player.aim;
   player.aimHold = .24;
-  player.attackCooldown = output.primary.cooldown;
+  player.attackCooldown = output.primary.cooldown * (hasPlaystyle("deadeye") ? 1.32 : 1);
   player.swingCount += 1;
   canvas.dataset.swingCount = String(player.swingCount);
   if (game.selectedClass === "sniper") {
@@ -1016,14 +1310,17 @@ function startSlash(attackAngle) {
     fireArtilleryAttack(player.aim);
     return true;
   }
-  player.combo = (player.combo + 1) % 3;
+  const maelstromTier = playstyleTier("maelstrom");
+  const comboLength = maelstromTier >= 2 ? 2 : 3;
+  player.combo = (player.combo + 1) % comboLength;
   const finisher = player.combo === 0;
   const direction = player.nextSwingDirection;
-  if (hasTrait("m_step")) {
+  const pursuitTier = playstyleTier("pursuit");
+  if (hasTrait("m_step") || pursuitTier) {
     const revengeTarget = player.riposteReady && hasSynergy("vengeance_step")
       ? game.enemies.find((enemy) => enemy.id === player.riposteTargetId && !enemy.dead)
       : null;
-    const target = revengeTarget || nearestEnemyInDirection(player.aim, 230, .5);
+    const target = revengeTarget || nearestEnemyInDirection(player.aim, pursuitTier ? 250 + pursuitTier * 45 : 230, pursuitTier ? .72 : .5);
     if (target) {
       const targetAngle = Math.atan2(target.y - player.y, target.x - player.x);
       const advance = Math.max(0, Math.hypot(target.x - player.x, target.y - player.y) - 62);
@@ -1039,11 +1336,21 @@ function startSlash(attackAngle) {
       if (revengeTarget) noteProtocol("vengeance_step");
     }
   }
+  const counterTier = playstyleTier("counter");
+  if (counterTier) {
+    const cleared = clearEnemyBulletsNear(player.x, player.y, 110 + counterTier * 18);
+    if (cleared) {
+      player.riposteReady = true;
+      addFloater(player.x, player.y - 38, "GUARD ×" + cleared, game.output.build.color);
+    }
+  }
   player.nextSwingDirection *= -1;
   canvas.dataset.swingDirection = direction > 0 ? "left-to-right" : "right-to-left";
   const swingDuration = Math.min(finisher ? .46 : .42, output.primary.cooldown * .92);
   player.aimHold = swingDuration;
-  const slashArc = finisher && hasTrait("m_spin") ? 360 : output.primary.arc;
+  const slashArc = maelstromTier
+    ? (finisher ? 360 : 190 + maelstromTier * 25)
+    : finisher && hasTrait("m_spin") ? 360 : output.primary.arc;
   if (finisher && hasTrait("m_spin")) {
     canvas.dataset.lastSpecial = hasSynergy("vortex") ? "magnetic-vortex" : "spin-finisher";
     noteAugment("m_spin");
@@ -1054,12 +1361,19 @@ function startSlash(attackAngle) {
     arc: slashArc, range: output.primary.range, echo: false
   };
   const meleeProfile = { ...output.primary, arc: slashArc, phase: player.riposteReady };
-  const riposteScale = player.riposteReady ? 1.8 : 1;
-  if (player.riposteReady) player.invulnerable = Math.max(player.invulnerable, .24);
-  if (player.riposteReady) noteAugment("m_riposte");
+  const riposteActive = player.riposteReady;
+  const riposteScale = riposteActive ? 1.8 : 1;
+  if (riposteActive) player.invulnerable = Math.max(player.invulnerable, .24);
+  if (riposteActive && hasTrait("m_riposte")) noteAugment("m_riposte");
   player.riposteReady = false;
   player.riposteTargetId = null;
   executeSlash(meleeProfile, player.aim, (finisher ? 1.28 : 1) * riposteScale, false, { direction, finisher });
+  if (riposteActive && counterTier >= 3) {
+    for (const offset of [-.22, 0, .22]) {
+      spawnRailShot(player.aim + offset, { damage: 16, homing: true, pierce: 1, ricochet: 0, color: game.output.build.color });
+    }
+    addFloater(player.x, player.y - 44, "COUNTER SALVO", game.output.build.color);
+  }
   return true;
 }
 
@@ -1141,30 +1455,38 @@ function updatePlayer(dt) {
       game.delayedAttacks.push({ delay: .18, kind: "slash", angle: dashAngle, damageScale: .72, x: player.x, y: player.y, synthetic: true, aftershock: hasSynergy("aftershock"), guardPulse: hasSynergy("phantom_guard") });
       noteAugment("m_echo");
     }
-    if (game.selectedClass === "sniper" && hasTrait("s_dashload")) {
+    if (game.selectedClass === "melee" && hasPlaystyle("counter", 2)) {
+      game.delayedAttacks.push({ delay: .16, kind: "guard", x: player.x, y: player.y, radius: 150 });
+      player.riposteReady = true;
+      addFloater(player.x, player.y - 34, "GUARD ECHO", game.output.build.color);
+    }
+    const rangerTier = playstyleTier("ranger");
+    if (game.selectedClass === "sniper" && (hasTrait("s_dashload") || rangerTier >= 2)) {
       player.attackCooldown = 0;
       player.aim = cursorAim;
       player.weaponFacing = cursorAim;
       player.aimHold = .22;
-      spawnRailShot(cursorAim, { damage: 22, color: "#d9ef59", pierce: 0, ricochet: 0 });
-      noteAugment("s_dashload");
-      if (hasSynergy("escape_route")) {
+      spawnRailShot(cursorAim, { damage: 22, color: rangerTier ? game.output.build.color : "#d9ef59", pierce: 0, ricochet: 0, homing: Boolean(rangerTier) });
+      if (hasTrait("s_dashload")) noteAugment("s_dashload");
+      if (hasSynergy("escape_route") || rangerTier >= 2) {
         game.zones.push({ kind: "mine", x: player.x, y: player.y, radius: 52, life: 12, tick: 0, color: "#ff9b4a", crossfire: hasSynergy("crossfire_mine") });
-        noteProtocol("escape_route");
+        if (hasSynergy("escape_route")) noteProtocol("escape_route");
       }
-      if (hasSynergy("cold_escape")) {
+      if (hasSynergy("cold_escape") || rangerTier >= 2) {
         game.zones.push({ kind: "slow", x: player.x, y: player.y, radius: 76, life: 2.8, tick: 0, color: "#57d8ee" });
-        noteProtocol("cold_escape");
+        if (hasSynergy("cold_escape")) noteProtocol("cold_escape");
       }
+      if (rangerTier >= 3) player.rangerVolley = 1;
     }
-    if (game.selectedClass === "artillery" && hasTrait("a_dashbomb")) {
+    const orbitalTier = playstyleTier("orbital");
+    if (game.selectedClass === "artillery" && (hasTrait("a_dashbomb") || orbitalTier >= 2)) {
       player.dashBombCount += 1;
-      const novaMine = hasSynergy("nova_mine") && player.dashBombCount % 3 === 0;
+      const novaMine = orbitalTier >= 2 || (hasSynergy("nova_mine") && player.dashBombCount % 3 === 0);
       launchGrenade(dashAngle + Math.PI, { x: player.x, y: player.y, targetX: player.x, targetY: player.y, speed: 1, damage: novaMine ? 30 : 17, blastRadius: novaMine ? 132 : 74, dashBomb: true, dashAngle, supernova: novaMine, color: novaMine ? "#f6dc66" : "#69a9ff" });
-      noteAugment("a_dashbomb");
+      if (hasTrait("a_dashbomb")) noteAugment("a_dashbomb");
       if (novaMine) {
-        noteAugment("a_super");
-        noteProtocol("nova_mine");
+        if (hasTrait("a_super")) noteAugment("a_super");
+        if (hasSynergy("nova_mine")) noteProtocol("nova_mine");
       }
     }
     player.dashTime = .17;
@@ -1357,6 +1679,9 @@ function createPlayerExplosion(x, y, damage, radius, options) {
   const settings = options || {};
   const augmented = game.selectedClass === "artillery" && !settings.noAugments;
   const primaryExplosion = !settings.chain && !settings.recursive && !settings.fragment && !settings.dashBomb && !settings.orbital;
+  const infernoTier = playstyleTier("inferno");
+  const cascadeTier = playstyleTier("cascade");
+  const orbitalTier = playstyleTier("orbital");
   const color = settings.supernova ? "#f6dc66" : settings.color || (game.selectedClass === "artillery" ? "#ff714f" : "#58d7d3");
   addPulse(x, y, color, radius, settings.supernova ? .58 : .4);
   addParticles(x, y, color, settings.supernova ? 34 : 20, settings.supernova ? 250 : 185);
@@ -1372,9 +1697,10 @@ function createPlayerExplosion(x, y, damage, radius, options) {
   for (const enemy of game.enemies) {
     if (enemy.dead) continue;
     const distance = Math.hypot(enemy.x - x, enemy.y - y);
-    if (augmented && hasTrait("a_vacuum") && vacuumAllowed && distance <= radius * 1.55) {
-      enemy.x += (x - enemy.x) * .34;
-      enemy.y += (y - enemy.y) * .34;
+    if (augmented && (hasTrait("a_vacuum") || infernoTier) && vacuumAllowed && distance <= radius * (infernoTier ? 1.85 : 1.55)) {
+      const pull = infernoTier ? .38 + infernoTier * .06 : .34;
+      enemy.x += (x - enemy.x) * pull;
+      enemy.y += (y - enemy.y) * pull;
       vacuumed = true;
     }
     if (distance > radius + enemy.radius) continue;
@@ -1387,13 +1713,20 @@ function createPlayerExplosion(x, y, damage, radius, options) {
     noteAugment("a_vacuum");
     if (settings.orbital && hasSynergy("gravity_satellite")) noteProtocol("gravity_satellite");
   }
-  if (augmented && primaryExplosion && hasTrait("a_fire")) {
-    game.zones.push({ kind: "fire", x, y, radius: radius * .72, life: 3.2, tick: 0, color: "#ff714f", vortex: hasSynergy("inferno_vortex"), wildfire: hasSynergy("wildfire_chain") });
-    noteAugment("a_fire");
+  if (augmented && primaryExplosion && (hasTrait("a_fire") || infernoTier)) {
+    game.zones.push({
+      kind: "fire", x, y,
+      radius: radius * (infernoTier >= 3 ? 1.05 : infernoTier ? .88 : .72),
+      life: infernoTier >= 3 ? 5.4 : infernoTier ? 4.1 : 3.2,
+      tick: 0, color: infernoTier ? game.output.build.color : "#ff714f",
+      vortex: Boolean(infernoTier) || hasSynergy("inferno_vortex"),
+      wildfire: infernoTier >= 2 || hasSynergy("wildfire_chain")
+    });
+    if (hasTrait("a_fire")) noteAugment("a_fire");
     if (hasSynergy("inferno_vortex")) noteProtocol("inferno_vortex");
   }
-  const shrapnelAllowed = primaryExplosion || (settings.recursive && hasSynergy("echo_shrapnel")) || (settings.dashBomb && hasSynergy("breach_field"));
-  if (augmented && hasTrait("a_shrapnel") && !settings.shrapnel && shrapnelAllowed) {
+  const shrapnelAllowed = primaryExplosion || (settings.recursive && (hasSynergy("echo_shrapnel") || cascadeTier >= 3)) || (settings.dashBomb && hasSynergy("breach_field"));
+  if (augmented && (hasTrait("a_shrapnel") || cascadeTier >= 3) && !settings.shrapnel && shrapnelAllowed) {
     const amount = settings.dashBomb && hasSynergy("breach_field") ? 6 : 10;
     const baseAngle = settings.dashAngle || 0;
     for (let index = 0; index < amount; index += 1) {
@@ -1402,19 +1735,19 @@ function createPlayerExplosion(x, y, damage, radius, options) {
         : index / amount * Math.PI * 2;
       spawnRailShot(angle, { kind: "shrapnel", x, y, speed: 520, damage: 8, life: .65, pierce: 1, ricochet: 0, homing: false, color: "#ffd6a0" });
     }
-    noteAugment("a_shrapnel");
+    if (hasTrait("a_shrapnel")) noteAugment("a_shrapnel");
     if (settings.recursive && hasSynergy("echo_shrapnel")) noteProtocol("echo_shrapnel");
     if (settings.dashBomb && hasSynergy("breach_field")) noteProtocol("breach_field");
   }
-  const recursiveAllowed = augmented && hasTrait("a_recursive") && (
-    primaryExplosion || (settings.fragment && !settings.orbital && hasSynergy("cascade"))
+  const recursiveAllowed = augmented && (hasTrait("a_recursive") || cascadeTier >= 2) && (
+    primaryExplosion || (settings.fragment && !settings.orbital && (hasSynergy("cascade") || cascadeTier >= 2))
   );
   if (recursiveAllowed) {
     game.delayedAttacks.push({ delay: .42, kind: "explosion", x, y, damage: damage * .62, radius: radius * .72, options: { recursive: true, color: "#a48cff" } });
-    noteAugment("a_recursive");
+    if (hasTrait("a_recursive")) noteAugment("a_recursive");
     if (settings.fragment && hasSynergy("cascade")) noteProtocol("cascade");
   }
-  if (augmented && primaryExplosion && hasTrait("a_cluster")) {
+  if (augmented && primaryExplosion && (hasTrait("a_cluster") || cascadeTier)) {
     const parasiteTargets = settings.fromSticky && hasSynergy("parasite_cluster")
       ? game.enemies.filter((enemy) => !enemy.dead).sort((a, b) => distanceSquared(a, { x, y }) - distanceSquared(b, { x, y })).slice(0, 3)
       : [];
@@ -1423,19 +1756,19 @@ function createPlayerExplosion(x, y, damage, radius, options) {
       const angle = target ? Math.atan2(target.y - y, target.x - x) : index / 3 * Math.PI * 2 + .35;
       launchGrenade(angle, { x, y, targetX: target?.x ?? x + Math.cos(angle) * 105, targetY: target?.y ?? y + Math.sin(angle) * 105, speed: 360, damage: damage * .52, blastRadius: radius * .55, fragment: true, color: "#d9ef59" });
     }
-    noteAugment("a_cluster");
+    if (hasTrait("a_cluster")) noteAugment("a_cluster");
     if (parasiteTargets.length) noteProtocol("parasite_cluster");
   }
-  if (augmented && hasTrait("a_chain") && !settings.chain) {
+  if (augmented && (hasTrait("a_chain") || infernoTier >= 2) && !settings.chain) {
     for (const enemy of killed.slice(0, 3)) {
       game.delayedAttacks.push({ delay: .12, kind: "explosion", x: enemy.x, y: enemy.y, damage: damage * .5, radius: radius * .58, options: { chain: true, noAugments: true, color: "#f08080" } });
     }
-    if (killed.length) noteAugment("a_chain");
+    if (killed.length && hasTrait("a_chain")) noteAugment("a_chain");
   }
-  if (augmented && primaryExplosion && hasTrait("a_orbit") && game.orbitals.length < 6) {
-    const count = settings.supernova && hasSynergy("planetary") ? 3 : 1;
+  if (augmented && primaryExplosion && (hasTrait("a_orbit") || orbitalTier) && game.orbitals.length < 12) {
+    const count = orbitalTier >= 3 || (settings.supernova && hasSynergy("planetary")) ? 3 : orbitalTier >= 2 ? 2 : 1;
     for (let index = 0; index < count; index += 1) game.orbitals.push({ x, y, angle: index / count * Math.PI * 2, delay: .35 + index * .14, color: "#71efad" });
-    noteAugment("a_orbit");
+    if (hasTrait("a_orbit")) noteAugment("a_orbit");
     if (count === 3) noteProtocol("planetary");
   }
 }
@@ -1535,9 +1868,12 @@ function updatePlayerShots(dt) {
         noteAugment("s_mark");
       }
       damageEnemy(enemy, shot.damage, game.output.primary, shot.angle, shot.kind === "rail");
-      if (game.selectedClass === "sniper" && hasTrait("s_freeze")) {
+      if (game.selectedClass === "sniper" && hasPlaystyle("deadeye", 2) && shot.kind === "rail") {
+        createPlayerExplosion(enemy.x, enemy.y, 10 + playstyleTier("deadeye") * 3, 48 + playstyleTier("deadeye") * 8, { source: "deadeye", noAugments: true, color: game.output.build.color });
+      }
+      if (game.selectedClass === "sniper" && (hasTrait("s_freeze") || hasPlaystyle("ranger"))) {
         game.zones.push({ kind: "slow", x: enemy.x, y: enemy.y, radius: 70, life: 2.8, tick: 0, color: "#57d8ee" });
-        noteAugment("s_freeze");
+        if (hasTrait("s_freeze")) noteAugment("s_freeze");
       }
       if (shot.charged && hasSynergy("dead_center")) {
         for (const marked of game.enemies.filter((item) => !item.dead && item.sniperMark > 0)) {
@@ -1546,7 +1882,7 @@ function updatePlayerShots(dt) {
         }
         noteProtocol("dead_center");
       }
-      if (wasAlive && enemy.dead && game.selectedClass === "sniper" && hasTrait("s_drone")) {
+      if (wasAlive && enemy.dead && game.selectedClass === "sniper" && (hasTrait("s_drone") || hasPlaystyle("hunter", 3))) {
         game.delayedAttacks.push({ delay: .22, kind: "drone", x: enemy.x, y: enemy.y, cold: hasSynergy("cold_observer") });
       }
       if (shot.pierce > 0) {
@@ -1607,6 +1943,16 @@ function updateZones(dt) {
         }
       }
     }
+    if (zone.kind === "blade" && zone.tick <= 0) {
+      zone.tick = .24;
+      for (const enemy of game.enemies) {
+        if (enemy.dead || distanceSquared(enemy, zone) > (zone.radius + enemy.radius) ** 2) continue;
+        enemy.x += (zone.x - enemy.x) * .12;
+        enemy.y += (zone.y - enemy.y) * .12;
+        damageEnemy(enemy, 7, { ...game.output.primary, knockback: 0, stun: .04 }, Math.atan2(enemy.y - zone.y, enemy.x - zone.x), false);
+      }
+      addPulse(zone.x, zone.y, zone.color, zone.radius, .22);
+    }
   }
   game.zones = game.zones.filter((zone) => zone.life > 0);
 }
@@ -1617,6 +1963,21 @@ function updateDelayedAttacks(dt) {
     if (attack.delay > 0 || attack.fired) continue;
     attack.fired = true;
     if (attack.kind === "explosion") createPlayerExplosion(attack.x, attack.y, attack.damage, attack.radius, attack.options);
+    if (attack.kind === "guard") {
+      const cleared = clearEnemyBulletsNear(attack.x, attack.y, attack.radius || 140);
+      if (cleared) addFloater(attack.x, attack.y - 28, "ECHO GUARD ×" + cleared, game.output.build?.color || "#71efad");
+      addPulse(attack.x, attack.y, game.output.build?.color || "#71efad", attack.radius || 140, .34);
+    }
+    if (attack.kind === "hunt") {
+      const target = game.enemies.filter((enemy) => !enemy.dead)
+        .sort((a, b) => distanceSquared(a, attack) - distanceSquared(b, attack))[0];
+      if (target) {
+        const angle = Math.atan2(target.y - attack.y, target.x - attack.x);
+        const profile = { ...game.output.primary, range: Math.max(game.output.primary.range, 150), arc: 104 };
+        executeSlash(profile, angle, attack.damageScale || .82, true, { synthetic: true, x: attack.x, y: attack.y, direction: 0 });
+        addPulse(attack.x, attack.y, game.output.build?.color || "#ff7c6b", 72, .28);
+      }
+    }
     if (attack.kind === "slash" || attack.kind === "spin") {
       const profile = { ...game.output.primary, arc: attack.kind === "spin" ? 360 : 112 };
       executeSlash(profile, attack.angle, attack.damageScale, true, { synthetic: true, x: attack.x, y: attack.y, direction: 0 });
@@ -1635,9 +1996,9 @@ function updateDelayedAttacks(dt) {
         (attack.cold ? Number(b.slowed) - Number(a.slowed) : 0) || distanceSquared(a, attack) - distanceSquared(b, attack)
       )[0];
       if (target) {
-        const spectral = hasSynergy("spectral_observer");
+        const spectral = hasSynergy("spectral_observer") || hasPlaystyle("hunter", 3);
         spawnRailShot(Math.atan2(target.y - attack.y, target.x - attack.x), { x: attack.x, y: attack.y, damage: spectral ? 24 : 16, drone: true, homing: true, charged: spectral, pierce: spectral ? 99 : 0, color: spectral ? "#a48cff" : "#71efad" });
-        noteAugment("s_drone");
+        if (hasTrait("s_drone")) noteAugment("s_drone");
         if (attack.cold) noteProtocol("cold_observer");
         if (spectral) noteProtocol("spectral_observer");
       }
@@ -1673,7 +2034,7 @@ function createAuditPlayer() {
     x: 300, y: 500, renderX: 300, renderY: 500, radius: 17, hp: 80, maxHp: 100, level: 1, speed: 225,
     aim: 0, facing: 0, weaponFacing: 0, aimHold: 0, bufferedAim: null,
     attackCooldown: 0, dashCooldown: 0, dashTime: 0, invulnerable: 0, combo: 0, slash: null,
-    nextSwingDirection: 1, swingCount: 0, attackBuffer: 0, shotCount: 0, dashBombCount: 0,
+    nextSwingDirection: 1, swingCount: 0, attackBuffer: 0, shotCount: 0, dashBombCount: 0, rangerVolley: 0,
     stillTime: 2, attackFlash: 0, riposteReady: false, riposteTargetId: null, lastMoveX: 1, lastMoveY: 0
   };
 }
@@ -1698,6 +2059,120 @@ function installAuditSequence(classId, reverse) {
   });
 }
 
+function installPlaystyleSequence(classId, styleId, linkCount) {
+  const style = PLAYSTYLES[classId].find((item) => item.id === styleId);
+  const definitions = style.protocols.slice(0, linkCount || 3)
+    .map((kind) => SYNERGY_DEFINITIONS[classId].find((item) => item.kind === kind));
+  const sequence = [definitions[0].types[0], ...definitions.map((item) => item.types[1])];
+  boardCols = INITIAL_COLS;
+  board.length = boardCols * ROWS;
+  board.fill(null);
+  sequence.forEach((type, index) => {
+    board[indexOf(index + 1, MAIN_ROW)] = { id: 9500 + index, type };
+  });
+}
+
+function runPlaystyleAudits() {
+  const savedBoard = board.slice();
+  const savedCols = boardCols;
+  const saved = {
+    selectedClass: game.selectedClass, output: game.output, player: game.player, enemies: game.enemies,
+    enemyBullets: game.enemyBullets, playerShots: game.playerShots, zones: game.zones,
+    delayedAttacks: game.delayedAttacks, orbitals: game.orbitals, particles: game.particles,
+    floaters: game.floaters, pulses: game.pulses, echoes: game.echoes, mouse: game.mouse,
+    mode: game.mode, dashRequested: game.dashRequested, attackRequested: game.attackRequested,
+    kills: game.kills, xp: game.xp, levelUpQueued: game.levelUpQueued, shake: game.shake,
+    hitConfirm: game.hitConfirm, missPulse: game.missPulse,
+    augmentEvents: game.augmentEvents, protocolEvents: game.protocolEvents
+  };
+  const reports = [];
+  try {
+    for (const [classId, styles] of Object.entries(PLAYSTYLES)) {
+      for (const style of styles) {
+        game.selectedClass = classId;
+        const tiers = [1, 2, 3].map((tier) => {
+          installPlaystyleSequence(classId, style.id, tier);
+          const output = evaluateClassFactory();
+          return output.build?.id === style.id && output.build?.tier === tier && output.build?.depth === tier + 1;
+        });
+        installPlaystyleSequence(classId, style.id, 3);
+        game.output = evaluateClassFactory();
+        game.player = createAuditPlayer();
+        game.enemies = [];
+        game.enemyBullets = [];
+        game.playerShots = [];
+        game.zones = [];
+        game.delayedAttacks = [];
+        game.orbitals = [];
+        game.particles = [];
+        game.floaters = [];
+        game.pulses = [];
+        game.echoes = [];
+        game.mouse = { x: 620, y: 500 };
+        game.mode = "playing";
+        game.dashRequested = false;
+        game.attackRequested = false;
+        let mechanic = false;
+        if (style.id === "pursuit") {
+          game.enemies = [createAuditEnemy(101, 560, 500, 200, 200)];
+          startSlash(0);
+          mechanic = game.player.x > 400;
+        }
+        if (style.id === "maelstrom") {
+          startSlash(0);
+          mechanic = game.player.slash?.arc === 265;
+        }
+        if (style.id === "counter") {
+          game.enemyBullets = [{ x: 300, y: 500, vx: 0, vy: 0, radius: 5, damage: 1, life: 2, dead: false }];
+          startSlash(0);
+          mechanic = game.enemyBullets[0].dead && game.playerShots.length === 3;
+        }
+        if (style.id === "deadeye") {
+          startSlash(0);
+          mechanic = game.playerShots[0]?.charged && game.playerShots[0]?.pierce === 99 && game.player.attackCooldown > game.output.primary.cooldown;
+        }
+        if (style.id === "hunter") {
+          game.enemies = [createAuditEnemy(111, 430, 470, 200, 200), createAuditEnemy(112, 470, 500, 200, 200), createAuditEnemy(113, 430, 530, 200, 200)];
+          startSlash(0);
+          mechanic = game.playerShots.length === 3 && game.playerShots.every((shot) => shot.homing);
+        }
+        if (style.id === "ranger") {
+          game.enemies = [createAuditEnemy(121, 350, 500, 200, 200)];
+          startSlash(0);
+          advanceAuditProjectiles(12, .01);
+          mechanic = game.zones.some((zone) => zone.kind === "slow");
+        }
+        if (style.id === "inferno") {
+          game.enemies = [createAuditEnemy(131, 410, 500, 200, 200)];
+          createPlayerExplosion(400, 500, 12, 90);
+          mechanic = game.zones.some((zone) => zone.kind === "fire" && zone.vortex && zone.wildfire && zone.life > 5);
+        }
+        if (style.id === "cascade") {
+          game.enemies = [createAuditEnemy(141, 410, 500, 200, 200)];
+          createPlayerExplosion(400, 500, 12, 90);
+          mechanic = game.playerShots.length >= 13 && game.delayedAttacks.some((attack) => attack.kind === "explosion");
+        }
+        if (style.id === "orbital") {
+          game.enemies = [createAuditEnemy(151, 510, 500, 200, 200)];
+          createPlayerExplosion(400, 500, 12, 90);
+          mechanic = game.orbitals.length === 3;
+        }
+        const classified = game.output.build?.id === style.id && game.output.build?.tier === 3;
+        const expectedRam = modulesOnBoard().reduce((total, module) => total + MODULE_RAM[module.type], 0) + game.output.protocolRoutes.length * PROTOCOL_RAM;
+        const ramAccounted = ramUsage(game.output) === expectedRam;
+        const tiered = tiers.every(Boolean);
+        reports.push({ classId, styleId: style.id, classified, tiered, mechanic, ramAccounted, pass: classified && tiered && mechanic && ramAccounted });
+      }
+    }
+  } finally {
+    boardCols = savedCols;
+    board.length = savedBoard.length;
+    savedBoard.forEach((module, index) => { board[index] = module; });
+    Object.assign(game, saved);
+  }
+  return reports;
+}
+
 function auditMeleeRuntime() {
   game.enemies = [createAuditEnemy(1, 410, 500, 260, 260), createAuditEnemy(2, 470, 520, 180, 180)];
   for (let index = 0; index < 3; index += 1) {
@@ -1708,9 +2183,7 @@ function auditMeleeRuntime() {
 
   const victim = createAuditEnemy(3, game.player.x + 52, game.player.y, 50, 200);
   game.enemies = [victim];
-  game.player.combo = 2;
-  game.player.attackCooldown = 0;
-  startSlash();
+  executeSlash({ ...game.output.primary, crit: 0 }, 0, 1, false, { direction: 1, finisher: true });
   updateDelayedAttacks(.2);
 
   const attacker = createAuditEnemy(4, game.player.x + 75, game.player.y, 200, 200);
@@ -1879,13 +2352,14 @@ function runAugmentAuditForClass(classId) {
 
 function runAllAugmentAudits() {
   const reports = ["melee", "sniper", "artillery"].map(runAugmentAuditForClass);
-  const pass = reports.every((report) => report.pass);
-  canvas.dataset.auditReport = JSON.stringify({ pass, reports });
+  const playstyles = runPlaystyleAudits();
+  const pass = reports.every((report) => report.pass) && playstyles.every((report) => report.pass);
+  canvas.dataset.auditReport = JSON.stringify({ pass, reports, playstyles });
   canvas.dataset.auditStatus = pass ? "pass" : "fail";
   const result = $("#test-audit-result");
-  result.textContent = pass ? "30/30 증강 · 30/30 프로토콜 PASS" : "FAIL · 콘솔 진단 확인";
+  result.textContent = pass ? "30 증강 · 30 프로토콜 · 9 빌드 · RAM PASS" : "FAIL · 콘솔 진단 확인";
   result.classList.toggle("failed", !pass);
-  return { pass, reports };
+  return { pass, reports, playstyles };
 }
 
 function updateEchoes(dt) {
@@ -2145,7 +2619,7 @@ function drawRobot() {
   ctx.restore();
   const attackReady = 1 - clamp(player.attackCooldown / game.output.primary.cooldown, 0, 1);
   const dashReady = 1 - clamp(player.dashCooldown / game.output.guard.dashCooldown, 0, 1);
-  const classColor = CLASS_PROFILES[game.selectedClass].color;
+  const classColor = game.output.build?.color || CLASS_PROFILES[game.selectedClass].color;
   ctx.save();
   ctx.shadowBlur = 0;
   ctx.lineWidth = 2;
@@ -2413,7 +2887,7 @@ function drawAimReticle() {
   const radius = game.hitConfirm > 0 ? 13 : 10 + game.missPulse * 18;
   ctx.save();
   ctx.translate(x, y);
-  ctx.strokeStyle = game.hitConfirm > 0 ? "#f6dc66" : ready >= .999 ? CLASS_PROFILES[game.selectedClass].color : "rgba(164,184,187,.72)";
+  ctx.strokeStyle = game.hitConfirm > 0 ? "#f6dc66" : ready >= .999 ? (game.output.build?.color || CLASS_PROFILES[game.selectedClass].color) : "rgba(164,184,187,.72)";
   ctx.lineWidth = game.hitConfirm > 0 ? 2.4 : 1.4;
   ctx.beginPath();
   ctx.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ready);
@@ -2475,12 +2949,27 @@ function updateHud() {
   $("#dash-status").textContent = dashRatio >= .999 ? "READY" : Math.max(0, game.player.dashCooldown).toFixed(1) + "s";
   $("#attack-ability").classList.toggle("ready", attackRatio >= .999);
   $("#dash-ability").classList.toggle("ready", dashRatio >= .999);
+  const build = game.output.build;
+  const buildSignature = $("#build-signature");
+  buildSignature.hidden = !build;
+  if (build) {
+    buildSignature.style.setProperty("--build-color", build.color);
+    $("#build-tier").textContent = "LINE REACTOR · TIER " + ["0", "I", "II", "III"][build.tier] + " · " + build.depth + " MODULE";
+    $("#build-name").textContent = build.name;
+    $("#build-effect").textContent = build.tiers[build.tier - 1];
+  }
+  $("#attack-name").textContent = build?.attackName || CLASS_PROFILES[game.selectedClass].attackName;
+  $("#game").style.setProperty("--active-build-color", build?.color || CLASS_PROFILES[game.selectedClass].color);
   $("#game").classList.toggle("low-health", healthRatio > 0 && healthRatio <= .3 && game.mode === "playing");
   canvas.dataset.combatClass = game.selectedClass;
   canvas.dataset.activeTraits = [...game.output.traits].join(",");
   canvas.dataset.synergies = [...game.output.synergyKinds].join(",");
   canvas.dataset.protocolLinks = String(game.output.protocolRoutes.length);
   canvas.dataset.sequenceDepth = String(game.output.sequenceDepth);
+  canvas.dataset.playstyle = build?.id || "base";
+  canvas.dataset.playstyleTier = String(build?.tier || 0);
+  canvas.dataset.ramUsage = String(ramUsage(game.output));
+  canvas.dataset.ramCapacity = String(ramCapacity());
   canvas.dataset.playerShots = String(game.playerShots.length);
   canvas.dataset.zones = String(game.zones.length);
   canvas.dataset.delayedAttacks = String(game.delayedAttacks.length);
@@ -2526,8 +3015,19 @@ $("#choice-cards").addEventListener("click", (event) => {
   if (card) previewAugmentChoice(card.dataset.choice);
 });
 $("#choice-confirm").addEventListener("click", confirmAugmentChoice);
+$("#pending-archive").addEventListener("click", archivePending);
+$("#reserve-parts").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-reserve-id]");
+  if (button) activateReserve(Number(button.dataset.reserveId));
+});
 
 $("#factory-board").addEventListener("click", (event) => {
+  const storeButton = event.target.closest("[data-store-index]");
+  if (storeButton) {
+    event.stopPropagation();
+    storeBoardModule(Number(storeButton.dataset.storeIndex));
+    return;
+  }
   const cell = event.target.closest("[data-cell-index]");
   if (!cell) return;
   const index = Number(cell.dataset.cellIndex);

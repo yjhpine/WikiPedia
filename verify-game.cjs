@@ -11,6 +11,8 @@ const protocols = [...source.matchAll(/\{ types: \["([msa]_[a-z]+)", "([msa]_[a-
   .map((match) => ({ from: match[1], to: match[2], kind: match[3] }));
 const augmentEvents = new Set([...source.matchAll(/noteAugment\("([msa]_[a-z]+)"\)/g)].map((match) => match[1]));
 const protocolEvents = new Set([...source.matchAll(/noteProtocol\("([a-z_]+)"\)/g)].map((match) => match[1]));
+const playstyleIds = [...source.matchAll(/id: "(pursuit|maelstrom|counter|deadeye|hunter|ranger|inferno|cascade|orbital)"/g)].map((match) => match[1]);
+const ramEntries = [...source.matchAll(/\b([msa]_[a-z]+): [234](?:,|\s*\n)/g)].map((match) => match[1]);
 const failures = [];
 
 function check(condition, message) {
@@ -19,7 +21,10 @@ function check(condition, message) {
 
 check(modules.length === 30, `증강 정의 ${modules.length}/30`);
 check(protocols.length === 30, `프로토콜 정의 ${protocols.length}/30`);
+check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new Set(playstyleIds).size}/9`);
+check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
+check(["build-signature", "pending-archive", "reserve-parts"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM UI 항목 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -60,7 +65,7 @@ const documentStub = {
 };
 try {
   const runtime = vm.createContext({
-    document: documentStub, window: { location: { search: "" }, addEventListener() {} },
+    document: documentStub, window: { location: { search: "?test=1" }, addEventListener() {} },
     innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1, URLSearchParams,
     performance: { now: () => 0 }, requestAnimationFrame() {}, setTimeout() { return 0; }, clearTimeout() {}, console
   });
@@ -117,6 +122,27 @@ try {
     return { factoryOpened, pendingPlaced, moduleMoved, committed };
   })()`, runtime, { timeout: 1000 });
   check(Object.values(placementAudit).every(Boolean), `증강 배치 흐름 검증 실패: ${JSON.stringify(placementAudit)}`);
+  const ramAudit = vm.runInContext(`(() => {
+    game.selectedClass = "melee";
+    startGame();
+    factory.pending = { id: factory.nextId++, type: "m_step" };
+    openFactory(false);
+    placePending(indexOf(1, MAIN_ROW));
+    factory.pending = { id: factory.nextId++, type: "m_mark" };
+    placePending(indexOf(2, MAIN_ROW));
+    const linkedAtCapacity = ramUsage(evaluateClassFactory()) === 6 && evaluateClassFactory().build?.id === "pursuit";
+    factory.pending = { id: factory.nextId++, type: "m_blood" };
+    placePending(indexOf(3, MAIN_ROW));
+    const overBudgetRejected = factory.pending?.type === "m_blood" && board[indexOf(3, MAIN_ROW)] === null;
+    archivePending();
+    const archivedForZeroRam = factory.reserve.some((module) => module.type === "m_blood") && ramUsage(evaluateClassFactory()) === 6;
+    const capacities = [2, 3, 4, 7].map((level) => { game.player.level = level; return ramCapacity(); });
+    const capacityProgression = JSON.stringify(capacities) === JSON.stringify([6, 8, 10, 16]);
+    return { linkedAtCapacity, overBudgetRejected, archivedForZeroRam, capacityProgression };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(ramAudit).every(Boolean), `RAM 제약 검증 실패: ${JSON.stringify(ramAudit)}`);
+  const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
+  check(fullAudit.pass && fullAudit.playstyles.length === 9 && fullAudit.playstyles.every((report) => report.pass), `전체 런타임 검증 실패: ${JSON.stringify(fullAudit)}`);
 } catch (error) {
   failures.push(`초기 화면 런타임 오류: ${error.message}`);
 }
@@ -142,5 +168,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · 30/30 directional protocols · minimal HUD · decoupled facing · interpolated rendering");
+  console.log("30/30 augments · 30/30 protocols · 9/9 playstyles · RAM budget/storage · combat rendering");
 }
