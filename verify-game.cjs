@@ -13,6 +13,7 @@ const augmentEvents = new Set([...source.matchAll(/noteAugment\("([msa]_[a-z]+)"
 const protocolEvents = new Set([...source.matchAll(/noteProtocol\("([a-z_]+)"\)/g)].map((match) => match[1]));
 const playstyleIds = [...source.matchAll(/id: "(pursuit|maelstrom|counter|deadeye|hunter|ranger|inferno|cascade|orbital)"/g)].map((match) => match[1]);
 const ramEntries = [...source.matchAll(/\b([msa]_[a-z]+): [234](?:,|\s*\n)/g)].map((match) => match[1]);
+const toolIds = ["router", "splitter", "amplifier", "repeater", "focuser", "inverter"];
 const failures = [];
 
 function check(condition, message) {
@@ -23,8 +24,11 @@ check(modules.length === 30, `증강 정의 ${modules.length}/30`);
 check(protocols.length === 30, `프로토콜 정의 ${protocols.length}/30`);
 check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new Set(playstyleIds).size}/9`);
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
+check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(["build-signature", "pending-archive", "reserve-parts"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM UI 항목 누락");
+check(html.includes("styles.css?v=prototype-09") && html.includes("game.js?v=prototype-09"), "UX 보완 캐시 버전 prototype-09 누락");
+check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("queueFactoryEcho") && source.includes("buildFactoryTuning"), "신호 그래프 전투 가공 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -38,6 +42,14 @@ check(source.includes("player.renderX +=") && source.includes("enemy.renderX =")
 check(source.includes("game.cursorX +=") && source.includes("const eased = 1 - (1 - progress) ** 3"), "조준점·효과 보간 누락");
 check(styles.includes("cubic-bezier(.16,1,.3,1)") && styles.includes("image-rendering: auto"), "UI·캔버스 부드러운 전환 설정 누락");
 check(!source.includes('.factory-header > div > span'), "삭제된 공장 헤더 요소 참조가 남아 있음");
+check(!/\.game\s*\{[^}]*min-width:\s*920px/.test(styles), "좁은 화면을 강제로 잘라내는 게임 최소 너비가 남아 있음");
+check(/\.overlay\s*\{[^}]*overflow:\s*auto/.test(styles), "긴 오버레이의 양방향 스크롤 보호 누락");
+check(/\.factory-layout\s*\{[^}]*overflow-x:\s*auto/.test(styles), "좁은 공장 3열의 가로 스크롤 보호 누락");
+check(styles.includes(".augment-card .placement-hint { position: static;") && styles.includes(".build-affinity { position: static;"), "증강 카드 설명·태그 고정 배치 겹침 위험");
+check(/\.part-rotate\s*\{[^}]*left:\s*2px/.test(styles) && /\.module-ram\s*\{[^}]*right:\s*-7px/.test(styles), "회전 버튼과 RAM 배지 분리 누락");
+check(/\.board-message\s*\{[^}]*position:\s*sticky[^}]*white-space:\s*normal/.test(styles), "긴 보드 메시지 줄바꿈·고정 보호 누락");
+check(/\.factory-action-bar\s*\{[^}]*position:\s*sticky/.test(styles) && html.includes('class="factory-action-bar"'), "공장 적용 버튼 고정 영역 누락");
+check([980, 760, 560].every((width) => styles.includes(`@media (max-width: ${width}px)`)), "핵심 반응형 UX 구간 누락");
 
 const htmlIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]));
 const makeElement = () => ({
@@ -108,7 +120,7 @@ try {
   const placementAudit = vm.runInContext(`(() => {
     game.selectedClass = "melee";
     startGame();
-    factory.pending = { id: factory.nextId++, type: "m_step" };
+    factory.pending = { id: factory.nextId++, kind: "module", type: "m_step" };
     openFactory(false);
     const first = indexOf(1, MAIN_ROW);
     const second = indexOf(2, MAIN_ROW);
@@ -116,33 +128,48 @@ try {
     placePending(first);
     const pendingPlaced = factory.pending === null && board[first]?.type === "m_step" && !document.querySelector("#factory-commit").disabled;
     moveBoardModule(first, second);
-    const moduleMoved = board[first] === null && board[second]?.type === "m_step";
+    const moduleMoved = board[first] === null && board[second]?.type === "m_step" && !evaluateClassFactory().traits.has("m_step");
+    selectToolBlueprint("amplifier");
+    placePending(first);
+    const poweredThroughTool = evaluateClassFactory().traits.has("m_step") && evaluateClassFactory().recipes.get(board[second].id)?.mode === "OVERDRIVE";
+    const third = indexOf(3, MAIN_ROW);
+    selectToolBlueprint("router");
+    placePending(third);
+    factory.selectedIndex = third;
+    rotateBoardTool(third);
+    const toolRotated = board[third]?.type === "router" && board[third].dir === 1;
     commitFactory();
     const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_step");
-    return { factoryOpened, pendingPlaced, moduleMoved, committed };
+    return { factoryOpened, pendingPlaced, moduleMoved, poweredThroughTool, toolRotated, committed };
   })()`, runtime, { timeout: 1000 });
   check(Object.values(placementAudit).every(Boolean), `증강 배치 흐름 검증 실패: ${JSON.stringify(placementAudit)}`);
   const ramAudit = vm.runInContext(`(() => {
     game.selectedClass = "melee";
     startGame();
-    factory.pending = { id: factory.nextId++, type: "m_step" };
+    game.player.level = 1;
+    factory.pending = { id: factory.nextId++, kind: "module", type: "m_step" };
     openFactory(false);
     placePending(indexOf(1, MAIN_ROW));
-    factory.pending = { id: factory.nextId++, type: "m_mark" };
+    factory.pending = { id: factory.nextId++, kind: "module", type: "m_mark" };
     placePending(indexOf(2, MAIN_ROW));
-    const linkedAtCapacity = ramUsage(evaluateClassFactory()) === 6 && evaluateClassFactory().build?.id === "pursuit";
-    factory.pending = { id: factory.nextId++, type: "m_blood" };
+    const linkedWithinBudget = ramUsage(evaluateClassFactory()) === 6 && evaluateClassFactory().build?.id === "pursuit";
+    factory.pending = { id: factory.nextId++, kind: "module", type: "m_blood" };
     placePending(indexOf(3, MAIN_ROW));
-    const overBudgetRejected = factory.pending?.type === "m_blood" && board[indexOf(3, MAIN_ROW)] === null;
+    const thirdCoreAccepted = board[indexOf(3, MAIN_ROW)]?.type === "m_blood" && ramUsage(evaluateClassFactory()) === 9;
+    factory.pending = { id: factory.nextId++, kind: "tool", type: "amplifier", dir: 0 };
+    placePending(indexOf(5, MAIN_ROW));
+    const overBudgetRejected = factory.pending?.type === "amplifier" && board[indexOf(5, MAIN_ROW)] === null;
     archivePending();
+    const toolCancelIsFree = factory.pending === null && !factory.reserve.some((part) => part.type === "amplifier");
+    storeBoardModule(indexOf(3, MAIN_ROW));
     const archivedForZeroRam = factory.reserve.some((module) => module.type === "m_blood") && ramUsage(evaluateClassFactory()) === 6;
-    const capacities = [2, 3, 4, 7].map((level) => { game.player.level = level; return ramCapacity(); });
-    const capacityProgression = JSON.stringify(capacities) === JSON.stringify([6, 8, 10, 16]);
-    return { linkedAtCapacity, overBudgetRejected, archivedForZeroRam, capacityProgression };
+    const capacities = [1, 2, 4, 8].map((level) => { game.player.level = level; return ramCapacity(); });
+    const capacityProgression = JSON.stringify(capacities) === JSON.stringify([10, 12, 16, 24]);
+    return { linkedWithinBudget, thirdCoreAccepted, overBudgetRejected, toolCancelIsFree, archivedForZeroRam, capacityProgression };
   })()`, runtime, { timeout: 1000 });
   check(Object.values(ramAudit).every(Boolean), `RAM 제약 검증 실패: ${JSON.stringify(ramAudit)}`);
   const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
-  check(fullAudit.pass && fullAudit.playstyles.length === 9 && fullAudit.playstyles.every((report) => report.pass), `전체 런타임 검증 실패: ${JSON.stringify(fullAudit)}`);
+  check(fullAudit.pass && fullAudit.playstyles.length === 9 && fullAudit.playstyles.every((report) => report.pass) && fullAudit.factoryTools.pass, `전체 런타임 검증 실패: ${JSON.stringify(fullAudit)}`);
 } catch (error) {
   failures.push(`초기 화면 런타임 오류: ${error.message}`);
 }
@@ -168,5 +195,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · 30/30 protocols · 9/9 playstyles · RAM budget/storage · combat rendering");
+  console.log("30/30 augments · 6/6 process tools · routed graph · 9/9 playstyles · responsive UX guards · combat rendering");
 }

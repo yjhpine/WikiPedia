@@ -174,6 +174,41 @@ const MODULE_RAM = {
 };
 const PROTOCOL_RAM = 1;
 
+const TOOLS = {
+  router: {
+    name: "회전 라우터", code: "↪", color: "#58d7d3", ram: 1, rotatable: true,
+    description: "들어온 신호를 화살표 방향으로 꺾습니다.", tradeoff: "복잡한 배선 · 출력 손실 없음"
+  },
+  splitter: {
+    name: "직각 분배기", code: "Y", color: "#d9ef59", ram: 2, rotatable: true,
+    description: "화살표 방향과 그 오른쪽 방향으로 신호를 복제합니다.", tradeoff: "두 갈래 활성 · 각 갈래 처리량 72%"
+  },
+  amplifier: {
+    name: "과급 증폭기", code: "+", color: "#ff714f", ram: 2,
+    description: "다음 핵심 증강의 출력 강도를 높입니다.", tradeoff: "피해·효과 +32% · 공격 주기 +12%"
+  },
+  repeater: {
+    name: "지연 리피터", code: "Ⅱ", color: "#a48cff", ram: 2,
+    description: "다음 핵심 증강의 공정을 지연 복제합니다.", tradeoff: "후속 공격 생성 · 공격 주기 +10%"
+  },
+  focuser: {
+    name: "집속 렌즈", code: "◇", color: "#f6dc66", ram: 1,
+    description: "다음 핵심 증강의 신호를 좁고 멀리 집속합니다.", tradeoff: "피해·사거리 증가 · 공격 폭 감소"
+  },
+  inverter: {
+    name: "극성 반전기", code: "±", color: "#71efad", ram: 1,
+    description: "다음 핵심 증강을 공격 대신 제어·방어 성향으로 반전합니다.", tradeoff: "피해 감소 · 범위·방어·상태 지속 증가"
+  }
+};
+
+const TOOL_TYPES = Object.keys(TOOLS);
+const DIRECTIONS = [
+  { dc: 1, dr: 0, glyph: "→", name: "오른쪽" },
+  { dc: 0, dr: 1, glyph: "↓", name: "아래" },
+  { dc: -1, dr: 0, glyph: "←", name: "왼쪽" },
+  { dc: 0, dr: -1, glyph: "↑", name: "위" }
+];
+
 const ROWS = 5;
 const INITIAL_COLS = 9;
 const EXTEND_BY = 4;
@@ -181,8 +216,8 @@ let boardCols = INITIAL_COLS;
 const MAIN_ROW = 2;
 const ECHO_ROW = 1;
 const GUARD_ROW = 3;
-const LANE_NAMES = ["1행", "2행", "3행", "4행", "5행"];
-const LANE_CODES = ["01", "02", "03", "04", "05"];
+const LANE_NAMES = ["상부 보조선", "상부 공정선", "중앙 버스", "하부 공정선", "하부 보조선"];
+const LANE_CODES = ["AUX", "AUX", "BUS IN", "AUX", "AUX"];
 const moduleTypes = Object.keys(MODULES);
 const board = Array(boardCols * ROWS).fill(null);
 const indexOf = (col, row) => col * ROWS + row;
@@ -199,23 +234,21 @@ const isPlaceable = (index) => {
 
 function ramCapacity() {
   const level = game.player?.level || 1;
-  return Math.min(16, 6 + Math.max(0, level - 2) * 2);
+  return Math.min(24, 8 + level * 2);
 }
 
 function ramUsage(output) {
-  const moduleCost = modulesOnBoard().reduce((total, module) => total + (MODULE_RAM[module.type] || 1), 0);
-  return moduleCost + (output || evaluateClassFactory()).protocolRoutes.length * PROTOCOL_RAM;
+  const partCost = partsOnBoard().reduce((total, part) => total + partRamCost(part), 0);
+  return partCost + (output || evaluateClassFactory()).protocolRoutes.length * PROTOCOL_RAM;
 }
 
 function pendingPlacementUsage(index, type, currentOutput) {
   if (!isPlaceable(index) || board[index]) return Infinity;
-  const position = positionOf(index);
-  let extraLinks = 0;
-  const left = position.col > 1 ? board[indexOf(position.col - 1, position.row)] : null;
-  const right = position.col < boardCols - 1 ? board[indexOf(position.col + 1, position.row)] : null;
-  if (left && findClassSynergy(left.type, type, game.selectedClass)) extraLinks += 1;
-  if (right && findClassSynergy(type, right.type, game.selectedClass)) extraLinks += 1;
-  return ramUsage(currentOutput) + (MODULE_RAM[type] || 1) + extraLinks * PROTOCOL_RAM;
+  const pending = typeof type === "string" ? { id: -1, kind: "module", type } : type;
+  board[index] = pending;
+  const projected = ramUsage(evaluateClassFactory());
+  board[index] = null;
+  return projected;
 }
 
 function showSystemToast(label, message, tone, duration) {
@@ -287,8 +320,28 @@ function ensureBoardSpace(usedCol) {
   return true;
 }
 
+function partKind(part) {
+  return part?.kind === "tool" || TOOLS[part?.type] ? "tool" : "module";
+}
+
+function partDefinition(part) {
+  return partKind(part) === "tool" ? TOOLS[part.type] : MODULES[part.type];
+}
+
+function partRamCost(part) {
+  return partKind(part) === "tool" ? (TOOLS[part.type]?.ram || 0) : (MODULE_RAM[part.type] || 1);
+}
+
+function partsOnBoard() {
+  return board.flatMap((part, index) => part ? [{ ...part, kind: partKind(part), index, ...positionOf(index) }] : []);
+}
+
 function modulesOnBoard() {
-  return board.flatMap((module, index) => module ? [{ ...module, index, ...positionOf(index) }] : []);
+  return partsOnBoard().filter((part) => part.kind === "module");
+}
+
+function toolsOnBoard() {
+  return partsOnBoard().filter((part) => part.kind === "tool");
 }
 
 function createAttackProfile(name, damage, range, arc) {
@@ -324,19 +377,32 @@ function findClassSynergy(typeA, typeB, classId) {
 }
 
 function evaluateLineReactors(protocolRoutes) {
-  const chains = [];
-  for (let row = 0; row < ROWS; row += 1) {
-    const routes = protocolRoutes.filter((route) => route.row === row).sort((a, b) => a.col - b.col);
-    let current = [];
-    for (const route of routes) {
-      if (current.length && route.col !== current[current.length - 1].col + 1) {
-        chains.push(current);
-        current = [];
-      }
-      current.push(route);
-    }
-    if (current.length) chains.push(current);
+  const adjacency = new Map();
+  const incomingIds = new Set(protocolRoutes.map((route) => route.toId));
+  for (const route of protocolRoutes) {
+    if (!adjacency.has(route.fromId)) adjacency.set(route.fromId, []);
+    adjacency.get(route.fromId).push(route);
   }
+  const starters = protocolRoutes.filter((route) => !incomingIds.has(route.fromId));
+  const chains = [];
+  const signatures = new Set();
+  function walk(route, chain, visited) {
+    const routeKey = route.fromId + ">" + route.toId;
+    if (visited.has(routeKey)) return;
+    const nextChain = [...chain, route];
+    const nextVisited = new Set(visited).add(routeKey);
+    const nextRoutes = (adjacency.get(route.toId) || []).filter((next) => !nextVisited.has(next.fromId + ">" + next.toId));
+    if (!nextRoutes.length) {
+      const signature = nextChain.map((item) => item.fromId + ">" + item.toId).join("|");
+      if (!signatures.has(signature)) {
+        signatures.add(signature);
+        chains.push(nextChain);
+      }
+      return;
+    }
+    nextRoutes.forEach((next) => walk(next, nextChain, nextVisited));
+  }
+  (starters.length ? starters : protocolRoutes).forEach((route) => walk(route, [], new Set()));
   const reactors = chains.map((routes) => {
     const styleScores = new Map();
     for (const route of routes) {
@@ -347,7 +413,7 @@ function evaluateLineReactors(protocolRoutes) {
     const style = [...styleScores.entries()].sort((a, b) => b[1] - a[1])[0];
     const resolvedStyle = Object.values(PLAYSTYLES).flat().find((item) => item.id === style?.[0]) || firstStyle;
     return {
-      row: routes[0].row, startCol: routes[0].col, endCol: routes[routes.length - 1].col + 1,
+      row: routes[0].fromRow, startCol: routes[0].fromCol, endCol: routes[routes.length - 1].toCol,
       links: routes.length, depth: routes.length + 1, tier: Math.min(3, routes.length),
       cohesion: style?.[1] || 0, routes, style: resolvedStyle,
       moduleIds: new Set(routes.flatMap((route) => [route.fromId, route.toId]))
@@ -357,55 +423,180 @@ function evaluateLineReactors(protocolRoutes) {
   return { reactors, dominant: reactors[0] || null };
 }
 
+function emptyProcessState() {
+  return { power: 0, echo: 0, focus: 0, inverted: false, heat: 0 };
+}
+
+function recipeMode(recipe) {
+  if (recipe.inverted) return "UTILITY";
+  if (recipe.echo) return "ECHO";
+  if (recipe.power) return "OVERDRIVE";
+  if (recipe.focus) return "PRECISION";
+  if (recipe.feeds > 1) return "MERGED";
+  return "RAW";
+}
+
+function buildFactoryTuning(recipes, activeTools) {
+  const list = [...recipes.values()];
+  const divisor = Math.max(1, list.length);
+  const throughput = list.length ? list.reduce((sum, recipe) => sum + recipe.throughput, 0) / divisor : 0;
+  const power = list.reduce((sum, recipe) => sum + recipe.power, 0) / divisor;
+  const echo = list.reduce((maximum, recipe) => Math.max(maximum, recipe.echo), 0);
+  const focus = list.reduce((sum, recipe) => sum + recipe.focus, 0) / divisor;
+  const utility = list.reduce((sum, recipe) => sum + Number(recipe.inverted), 0) / divisor;
+  const heat = list.reduce((sum, recipe) => sum + recipe.heat, 0) / divisor;
+  const splitters = activeTools.filter((tool) => tool.type === "splitter").length;
+  const damageMult = list.length ? clamp(throughput * (1 + power * .32 + focus * .18 - utility * .18), .45, 2.4) : 1;
+  const cooldownMult = 1 + heat * .12 + echo * .1;
+  const rangeMult = 1 + focus * .18;
+  const areaMult = clamp(1 - focus * .14 + utility * .22, .6, 1.75);
+  const controlMult = 1 + utility * .45;
+  const mode = utility >= .5 ? "CONTROL" : echo ? "ECHO" : power >= .35 ? "OVERDRIVE" : focus >= .35 ? "PRECISION" : splitters ? "PARALLEL" : "RAW";
+  return { throughput, power, echo, focus, utility, heat, splitters, damageMult, cooldownMult, rangeMult, areaMult, controlMult, mode };
+}
+
 function evaluateClassFactory() {
   const classId = game.selectedClass || "melee";
   const classProfile = CLASS_PROFILES[classId];
-  const modules = modulesOnBoard().filter((module) => MODULES[module.type]?.classId === classId);
-  const activeIds = new Set(modules.map((module) => module.id));
-  const activeTypes = new Set(modules.map((module) => module.type));
-  const statuses = new Map(modules.map((module) => [module.id, "active"]));
+  const placedModules = modulesOnBoard().filter((module) => MODULES[module.type]?.classId === classId);
+  const placedTools = toolsOnBoard();
+  const statuses = new Map(partsOnBoard().map((part) => [part.id, "inactive"]));
+  const activeIds = new Set();
+  const activeToolIds = new Set();
+  const activeTypes = new Set();
+  const recipes = new Map();
+  const flowDirections = new Map();
+  const protocolRoutes = [];
+  const protocolKeys = new Set();
+  const queue = [{
+    col: 1, row: MAIN_ROW, dir: 0, sourceRow: MAIN_ROW, lastModule: null,
+    mods: emptyProcessState(), throughput: 1, toolIds: [], path: []
+  }];
+  const visited = new Set();
+  let processed = 0;
+
+  while (queue.length && processed < 240) {
+    const signal = queue.shift();
+    if (signal.col <= 0 || signal.col >= boardCols || signal.row < 0 || signal.row >= ROWS || signal.throughput < .16) continue;
+    const index = indexOf(signal.col, signal.row);
+    const part = board[index];
+    if (!part) continue;
+    const key = [index, signal.dir, signal.sourceRow, signal.lastModule?.id || 0, signal.mods.power, signal.mods.echo,
+      signal.mods.focus, Number(signal.mods.inverted), signal.throughput.toFixed(2)].join(":");
+    if (visited.has(key)) continue;
+    visited.add(key);
+    processed += 1;
+    const kind = partKind(part);
+    if (!flowDirections.has(part.id)) flowDirections.set(part.id, new Set());
+    flowDirections.get(part.id).add(signal.dir);
+
+    if (kind === "module") {
+      if (MODULES[part.type]?.classId !== classId) continue;
+      activeIds.add(part.id);
+      activeTypes.add(part.type);
+      const previous = recipes.get(part.id) || {
+        id: part.id, type: part.type, feeds: 0, throughput: 0, power: 0, echo: 0, focus: 0,
+        inverted: false, heat: 0, toolIds: new Set()
+      };
+      previous.feeds += 1;
+      previous.throughput = Math.min(1.5, previous.throughput + signal.throughput);
+      previous.power = Math.max(previous.power, signal.mods.power);
+      previous.echo = Math.max(previous.echo, signal.mods.echo);
+      previous.focus = Math.max(previous.focus, signal.mods.focus);
+      previous.inverted ||= signal.mods.inverted;
+      previous.heat = Math.max(previous.heat, signal.mods.heat);
+      signal.toolIds.forEach((id) => previous.toolIds.add(id));
+      previous.mode = recipeMode(previous);
+      recipes.set(part.id, previous);
+      statuses.set(part.id, previous.mode.toLowerCase());
+
+      if (signal.lastModule) {
+        const synergy = findClassSynergy(signal.lastModule.type, part.type, classId);
+        const routeKey = signal.lastModule.id + ">" + part.id;
+        if (synergy && !protocolKeys.has(routeKey)) {
+          protocolKeys.add(routeKey);
+          protocolRoutes.push({
+            kind: synergy.kind, fromId: signal.lastModule.id, toId: part.id,
+            fromRow: signal.lastModule.row, fromCol: signal.lastModule.col, toRow: signal.row, toCol: signal.col,
+            row: signal.lastModule.row, col: signal.lastModule.col, path: [...signal.path, index], toolIds: [...signal.toolIds]
+          });
+        }
+      }
+      const direction = DIRECTIONS[signal.dir];
+      queue.push({
+        ...signal, col: signal.col + direction.dc, row: signal.row + direction.dr,
+        lastModule: { id: part.id, type: part.type, row: signal.row, col: signal.col },
+        mods: emptyProcessState(), toolIds: [], path: []
+      });
+      continue;
+    }
+
+    const tool = TOOLS[part.type];
+    if (!tool) continue;
+    activeToolIds.add(part.id);
+    statuses.set(part.id, "tool-active");
+    const nextSignal = {
+      ...signal, mods: { ...signal.mods }, toolIds: [...signal.toolIds, part.id], path: [...signal.path, index]
+    };
+    let outputDirections = [signal.dir];
+    if (part.type === "amplifier") {
+      nextSignal.mods.power += 1;
+      nextSignal.mods.heat += 1;
+    }
+    if (part.type === "repeater") {
+      nextSignal.mods.echo += 1;
+      nextSignal.mods.heat += .84;
+    }
+    if (part.type === "focuser") nextSignal.mods.focus += 1;
+    if (part.type === "inverter") nextSignal.mods.inverted = !nextSignal.mods.inverted;
+    if (part.type === "router") outputDirections = [part.dir ?? 0];
+    if (part.type === "splitter") {
+      const primaryDirection = part.dir ?? 0;
+      outputDirections = [primaryDirection, (primaryDirection + 1) % DIRECTIONS.length];
+      nextSignal.throughput *= .72;
+    }
+    for (const dir of outputDirections) {
+      const direction = DIRECTIONS[dir];
+      queue.push({ ...nextSignal, dir, col: signal.col + direction.dc, row: signal.row + direction.dr });
+    }
+  }
+
+  const activeTools = placedTools.filter((tool) => activeToolIds.has(tool.id));
+  const tuning = buildFactoryTuning(recipes, activeTools);
   const primary = createAttackProfile(classProfile.attackName, classProfile.damage, classProfile.range, classProfile.arc);
-  primary.cooldown = classProfile.cooldown;
+  primary.damage = Math.round(primary.damage * tuning.damageMult * 10) / 10;
+  primary.cooldown = classProfile.cooldown * tuning.cooldownMult;
+  primary.range *= tuning.rangeMult;
+  primary.arc *= tuning.areaMult;
+  primary.stun *= tuning.controlMult;
   primary.classId = classId;
   primary.modules = new Set(activeIds);
-  primary.blastRadius = classId === "artillery" ? 86 : 0;
+  primary.blastRadius = classId === "artillery" ? 86 * tuning.areaMult : 0;
   const echo = createAttackProfile("조합 프로토콜", Math.round(classProfile.damage * .55), classProfile.range, classProfile.arc);
   echo.cooldown = 0;
   echo.modules = new Set(activeIds);
   const guard = createGuardProfile();
-  guard.modules = new Set(modules.filter((module) => module.row === GUARD_ROW).map((module) => module.id));
+  guard.modules = new Set(placedModules.filter((module) => activeIds.has(module.id) && module.row === GUARD_ROW).map((module) => module.id));
+  guard.maxHpBonus += Math.round(tuning.utility * 24);
+  guard.armor += tuning.utility * .12;
+  guard.dashCooldown *= 1 - tuning.utility * .16;
   const synergies = [];
   const synergyKinds = new Set();
   const synergyModuleIds = new Set();
   const outgoingModuleIds = new Set();
-  const protocolRoutes = [];
-  for (const module of modules) {
-    if (module.col >= boardCols - 1) continue;
-    const near = board[indexOf(module.col + 1, module.row)];
-    if (!near || MODULES[near.type]?.classId !== classId) continue;
-    const synergy = findClassSynergy(module.type, near.type, classId);
+  for (const route of protocolRoutes) {
+    const synergy = (SYNERGY_DEFINITIONS[classId] || []).find((item) => item.kind === route.kind);
     if (!synergy) continue;
-    synergyModuleIds.add(module.id);
-    synergyModuleIds.add(near.id);
-    outgoingModuleIds.add(module.id);
-    protocolRoutes.push({ kind: synergy.kind, row: module.row, col: module.col, fromId: module.id, toId: near.id });
+    synergyModuleIds.add(route.fromId);
+    synergyModuleIds.add(route.toId);
+    outgoingModuleIds.add(route.fromId);
     if (!synergyKinds.has(synergy.kind)) {
       synergyKinds.add(synergy.kind);
       synergies.push({ kind: synergy.kind, name: synergy.name, description: synergy.description });
     }
   }
-  const routeKeys = new Set(protocolRoutes.map((route) => route.row + ":" + route.col));
-  let sequenceDepth = 0;
-  for (let row = 0; row < ROWS; row += 1) {
-    let links = 0;
-    for (let col = 1; col < boardCols - 1; col += 1) {
-      if (routeKeys.has(row + ":" + col)) {
-        links += 1;
-        sequenceDepth = Math.max(sequenceDepth, links + 1);
-      } else links = 0;
-    }
-  }
   const lineReactors = evaluateLineReactors(protocolRoutes);
+  const sequenceDepth = lineReactors.reactors.reduce((maximum, reactor) => Math.max(maximum, reactor.depth), 0);
   const build = lineReactors.dominant ? {
     id: lineReactors.dominant.style.id,
     name: lineReactors.dominant.style.name,
@@ -421,16 +612,26 @@ function evaluateClassFactory() {
   return {
     primary, echo, guard, classId, classProfile, traits: activeTypes, synergyKinds, synergyModuleIds, outgoingModuleIds,
     statuses, synergies, protocolRoutes, sequenceDepth, reactors: lineReactors.reactors, build,
-    activeCount: activeIds.size, inactiveCount: 0
+    recipes, tuning, flowDirections, activeToolIds, activeCount: activeIds.size,
+    inactiveCount: placedModules.length - activeIds.size, placedToolCount: placedTools.length, activeToolCount: activeTools.length
   };
 }
 
-function moduleToken(module, status, index) {
-  const def = MODULES[module.type];
-  const isNew = module.id === factory.lastPlacedId ? " is-new" : "";
-  return '<div class="module-token module-' + module.type + ' ' + status + isNew + '" draggable="true" data-module-id="' +
-    module.id + '" data-label="' + def.name + '" style="--module-color:' + def.color + '">' + def.code + '<span class="module-ram">' + MODULE_RAM[module.type] + 'R</span></div>' +
-    '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' 보관함으로 이동">보관</button>';
+function partToken(part, status, index, flowDirections) {
+  const kind = partKind(part);
+  const def = partDefinition(part);
+  const isNew = part.id === factory.lastPlacedId ? " is-new" : "";
+  const directions = [...(flowDirections || [])].map((dir) => DIRECTIONS[dir].glyph).join("");
+  const rotate = kind === "tool" && def.rotatable
+    ? '<button class="part-rotate" type="button" data-rotate-index="' + index + '" aria-label="' + def.name + ' 회전">' + DIRECTIONS[part.dir ?? 0].glyph + '</button>'
+    : "";
+  const actionLabel = kind === "tool" ? "해체" : "보관";
+  const tokenClass = kind === "tool" ? "tool-token" : "module-token module-" + part.type;
+  return '<div class="' + tokenClass + ' ' + status + isNew + '" draggable="true" data-part-id="' +
+    part.id + '" data-label="' + def.name + (kind === "tool" ? ' · ' + def.tradeoff : '') + '" style="--module-color:' + def.color + '">' +
+    def.code + '<span class="module-ram">' + partRamCost(part) + 'R</span>' +
+    (directions ? '<span class="flow-glyph">' + directions + '</span>' : '') + '</div>' + rotate +
+    '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' ' + actionLabel + '">' + actionLabel + '</button>';
 }
 
 function renderPendingPart() {
@@ -440,12 +641,25 @@ function renderPendingPart() {
     $("#pending-archive").hidden = true;
     return;
   }
-  const def = MODULES[factory.pending.type];
-  target.innerHTML = '<div class="pending-module module-' + factory.pending.type +
+  const def = partDefinition(factory.pending);
+  const isTool = partKind(factory.pending) === "tool";
+  target.innerHTML = '<div class="pending-module ' + (isTool ? "pending-tool" : "module-" + factory.pending.type) +
     '" draggable="true" data-pending-module="true" style="--module-color:' + def.color +
-    '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name + ' · ' + MODULE_RAM[factory.pending.type] + ' RAM' +
-    '</b><span>' + def.description + '</span><span>' + def.hint + '</span></div>';
+    '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
+    '</b><span>' + def.description + '</span><span>' + (isTool ? def.tradeoff : def.hint) + '</span></div>';
+  $("#pending-archive").textContent = isTool ? "도구 설계 취소" : "장착하지 않고 보관";
   $("#pending-archive").hidden = false;
+}
+
+function renderToolPalette() {
+  const target = $("#factory-tools");
+  target.innerHTML = TOOL_TYPES.map((type) => {
+    const tool = TOOLS[type];
+    const selected = factory.pending?.kind === "tool" && factory.pending.type === type;
+    return '<button type="button" data-tool-type="' + type + '" class="' + (selected ? "selected" : "") +
+      '" style="--tool-color:' + tool.color + '" aria-pressed="' + selected + '" title="' + tool.description + '"><b>' + tool.code + '</b><span>' + tool.name +
+      '</span><em>' + tool.ram + 'R</em><small>' + tool.tradeoff + '</small></button>';
+  }).join("");
 }
 
 function renderReserveParts() {
@@ -461,6 +675,9 @@ function renderReserveParts() {
 
 function outputChangeSummary(previous, next) {
   if (!previous) return "새 생산 라인이 적용되었습니다.";
+  if (previous.tuning?.mode !== next.tuning?.mode) {
+    return "공정 모드 " + next.tuning.mode + " · 피해 ×" + next.tuning.damageMult.toFixed(2) + " · 처리량 " + Math.round(next.tuning.throughput * 100) + "%";
+  }
   if (previous.build?.id !== next.build?.id || previous.build?.tier !== next.build?.tier) {
     if (!next.build) return "주력 리액터가 해제되어 기본 전투 규칙으로 복귀합니다.";
     return next.build.name + " TIER " + ["0", "I", "II", "III"][next.build.tier] + " · " + next.build.tiers[next.build.tier - 1];
@@ -485,11 +702,11 @@ function renderFactoryBoard() {
     const fixed = position.col === 0;
     const laneClass = position.row === MAIN_ROW ? "main-lane" :
       position.row === ECHO_ROW || position.row === GUARD_ROW ? "branch-lane" : "service-lane";
-    const powered = Boolean(board[index] && output.synergyModuleIds.has(board[index].id));
+    const powered = Boolean(board[index] && output.statuses.get(board[index].id) !== "inactive");
     const sequenceOut = Boolean(board[index] && output.outgoingModuleIds.has(board[index].id));
     const reactorCore = Boolean(board[index] && output.build?.moduleIds.has(board[index].id));
     const selected = factory.selectedIndex === index;
-    const projectedRam = factory.pending ? pendingPlacementUsage(index, factory.pending.type, output) : 0;
+    const projectedRam = factory.pending ? pendingPlacementUsage(index, factory.pending, output) : 0;
     const validTarget = Boolean(factory.pending) && !fixed && !board[index] && projectedRam <= ramCapacity();
     const invalidTarget = Boolean(factory.pending) && !fixed && (!validTarget || Boolean(board[index]));
     const fixedText = position.col === 0 ? LANE_CODES[position.row] : "";
@@ -500,36 +717,59 @@ function renderFactoryBoard() {
       (invalidTarget ? " invalid-target" : "") + '" data-cell-index="' + index + '" aria-label="' +
       LANE_NAMES[position.row] + ' ' + (position.col + 1) + '열">' +
       (fixedText ? '<span class="fixed-node">' + fixedText + '</span>' : "") +
-      (board[index] ? moduleToken(board[index], status, index) : "") + (sequenceOut ? '<span class="sequence-arrow">→</span>' : "") + '</div>';
+      (board[index] ? partToken(board[index], status, index, output.flowDirections.get(board[index].id)) : "") +
+      (sequenceOut ? '<span class="sequence-arrow">◆</span>' : "") + '</div>';
   }).join("");
   renderPendingPart();
   renderReserveParts();
+  renderToolPalette();
   const mechanicNames = [...output.traits].map((type) => MODULES[type].name);
   const build = output.build;
   const usedRam = ramUsage(output);
   const capacity = ramCapacity();
   const freeRam = capacity - usedRam;
+  const moduleCost = modulesOnBoard().reduce((sum, module) => sum + partRamCost(module), 0);
+  const toolCost = toolsOnBoard().reduce((sum, tool) => sum + partRamCost(tool), 0);
+  const tuning = output.tuning;
+  const tuningSummary = '<article class="lane-summary tuning-summary" style="--lane-color:#58d7d3"><header><b>' + tuning.mode + ' 공정</b><span>' +
+    Math.round(tuning.throughput * 100) + '% FLOW</span></header><p>피해 ×' + tuning.damageMult.toFixed(2) + ' · 주기 ×' + tuning.cooldownMult.toFixed(2) +
+    ' · 거리 ×' + tuning.rangeMult.toFixed(2) + ' · 범위 ×' + tuning.areaMult.toFixed(2) + (tuning.echo ? ' · 지연 복제 ' + tuning.echo + '회' : '') + '</p></article>';
   const buildSummary = build
     ? '<article class="lane-summary build-summary" style="--lane-color:' + build.color + '"><header><b>' + build.name + '</b><span>TIER ' + ["0", "I", "II", "III"][build.tier] + ' · ' + build.depth + ' MODULE</span></header><p>' + build.identity + '</p><strong>' + build.tiers[build.tier - 1] + '</strong></article>'
-    : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>정의된 순서의 모듈 2개를 같은 행에 붙이면 기본 공격 규칙이 바뀝니다.</p></article>';
+    : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>신호 경로에서 정의된 순서의 핵심 증강 2개를 통과시키면 기본 공격 규칙이 바뀝니다.</p></article>';
   $("#factory-summary").innerHTML =
-    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + (usedRam / capacity * 100) + '%"></i></div><p>모듈 비용 ' + (usedRam - output.protocolRoutes.length * PROTOCOL_RAM) + ' · 활성 링크 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
+    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
+    tuningSummary +
     buildSummary +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' +
       (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
     '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' +
-      (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '같은 행에서 지정 부품을 좌→우로 연결하세요.') + '</p></article>';
+      (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '신호가 지정 증강을 순서대로 통과하도록 배선하세요.') + '</p></article>';
+  const recipeItems = [...output.recipes.values()];
+  $("#factory-recipe-list").innerHTML = recipeItems.length
+    ? recipeItems.map((recipe) => {
+      const def = MODULES[recipe.type];
+      const tags = [recipe.mode, Math.round(recipe.throughput * 100) + "%"];
+      if (recipe.power) tags.push("AMP×" + recipe.power);
+      if (recipe.echo) tags.push("ECHO×" + recipe.echo);
+      if (recipe.focus) tags.push("FOCUS×" + recipe.focus);
+      return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>';
+    }).join("")
+    : '<span class="no-synergy">BUS IN에 핵심 증강을 연결하세요.</span>';
   $("#factory-synergy-list").innerHTML = output.synergies.length
     ? output.synergies.map((item) => '<div class="synergy-chip"><b>→ ' + item.name + '</b>' + item.description + '</div>').join("")
-    : '<span class="no-synergy">좌→우 순서 프로토콜 없음</span>';
+    : '<span class="no-synergy">활성 신호 경로의 순서 프로토콜 없음</span>';
   const commit = $("#factory-commit");
   commit.disabled = Boolean(factory.pending);
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "라인 적용 · 전투 복귀";
-  $("#factory-warning").textContent = factory.pending ? "장착하거나 보관해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 모든 배치가 정상 가동됩니다.";
-  $("#board-message").textContent = factory.pending ? MODULES[factory.pending.type].name + "(" + MODULE_RAM[factory.pending.type] + " RAM) 배치 · 남은 RAM " + freeRam + ". 어두운 셀은 링크 비용까지 포함해 초과합니다." :
-    factory.selectedIndex !== null ? "이동할 셀을 선택하세요. 같은 셀을 다시 누르면 선택이 해제됩니다." :
-      factory.placementNotice || (build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " 가동 · 가장 긴 연속 라인이 전투 방식을 결정합니다." : "정의된 순서의 모듈을 같은 행에 붙여 주력 플레이스타일을 가동하세요.");
-  $("#board-message").className = "board-message " + (factory.pending ? "warning" : "ok");
+  $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." :
+    "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
+  const pendingDef = factory.pending ? partDefinition(factory.pending) : null;
+  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) 배치 · 남은 RAM " + freeRam + ". 밝은 셀만 예산 안에서 설치할 수 있습니다." :
+    factory.selectedIndex !== null ? "이동할 셀을 선택하세요. 회전 도구는 R 또는 화살표 버튼으로 방향을 바꿉니다." :
+      factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · 중앙 BUS IN까지 빈칸 없이 연결해야 효과가 적용됩니다." :
+        build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "중앙 BUS IN에서 시작해 도구와 핵심 증강을 끊기지 않게 연결하세요.");
+  $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount ? "warning" : "ok");
 }
 
 function placePending(index) {
@@ -540,19 +780,19 @@ function placePending(index) {
     $("#board-message").className = "board-message warning";
     return;
   }
-  const projectedRam = pendingPlacementUsage(index, factory.pending.type, evaluateClassFactory());
+  const projectedRam = pendingPlacementUsage(index, factory.pending, evaluateClassFactory());
   if (projectedRam > ramCapacity()) {
     $("#board-message").textContent = "RAM 부족 · 이 위치는 링크 비용을 포함해 " + projectedRam + "/" + ramCapacity() + " RAM입니다. 기존 모듈을 보관하거나 다른 셀을 선택하세요.";
     $("#board-message").className = "board-message warning";
     return;
   }
   const placed = factory.pending;
-  const def = MODULES[placed.type];
+  const def = partDefinition(placed);
   board[index] = placed;
   factory.pending = null;
   factory.selectedIndex = null;
   factory.lastPlacedId = placed.id;
-  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 배치 완료. 오른쪽에서 활성 결과를 확인하세요.";
+  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 설치 완료. 신호와 공정 결과를 확인하세요.";
   ensureBoardSpace(position.col);
   renderFactoryBoard();
 }
@@ -575,7 +815,7 @@ function moveBoardModule(from, to) {
   }
   factory.selectedIndex = null;
   factory.lastPlacedId = moving ? moving.id : null;
-  factory.placementNotice = moving ? MODULES[moving.type].name + " · " + LANE_NAMES[positionOf(to).row] + "로 이동했습니다." : null;
+  factory.placementNotice = moving ? partDefinition(moving).name + " · " + LANE_NAMES[positionOf(to).row] + "로 이동했습니다." : null;
   ensureBoardSpace(positionOf(to).col);
   renderFactoryBoard();
 }
@@ -584,19 +824,55 @@ function storeBoardModule(index) {
   if (!isPlaceable(index) || !board[index]) return;
   const stored = board[index];
   board[index] = null;
-  factory.reserve.push(stored);
+  const isTool = partKind(stored) === "tool";
+  if (!isTool) factory.reserve.push({ ...stored, kind: "module" });
   factory.selectedIndex = null;
   factory.lastPlacedId = null;
-  factory.placementNotice = MODULES[stored.type].name + "을 보관했습니다. RAM이 반환되었습니다.";
+  factory.placementNotice = partDefinition(stored).name + (isTool ? "를 해체했습니다." : "을 보관했습니다.") + " RAM이 반환되었습니다.";
   renderFactoryBoard();
 }
 
 function archivePending() {
   if (!factory.pending) return;
   const stored = factory.pending;
-  factory.reserve.push(stored);
+  const isTool = partKind(stored) === "tool";
+  if (!isTool) factory.reserve.push({ ...stored, kind: "module" });
   factory.pending = null;
-  factory.placementNotice = MODULES[stored.type].name + "을 장착하지 않고 보관했습니다.";
+  factory.placementNotice = partDefinition(stored).name + (isTool ? " 설계를 취소했습니다." : "을 장착하지 않고 보관했습니다.");
+  renderFactoryBoard();
+}
+
+function selectToolBlueprint(type) {
+  if (game.mode !== "factory" || !TOOLS[type]) return;
+  if (factory.pending && partKind(factory.pending) === "module") {
+    factory.placementNotice = "먼저 신규 핵심 증강을 배치하거나 보관하세요.";
+    renderFactoryBoard();
+    return;
+  }
+  if (factory.pending?.kind === "tool" && factory.pending.type === type) {
+    factory.pending = null;
+    factory.placementNotice = TOOLS[type].name + " 설계를 취소했습니다.";
+  } else {
+    factory.pending = { id: factory.nextId++, kind: "tool", type, dir: 0 };
+    factory.selectedIndex = null;
+    factory.placementNotice = TOOLS[type].name + " 배치 위치를 선택하세요.";
+  }
+  renderFactoryBoard();
+}
+
+function rotateBoardTool(index) {
+  if (!isPlaceable(index)) return;
+  const part = board[index];
+  if (!part || partKind(part) !== "tool" || !TOOLS[part.type]?.rotatable) return;
+  const previousDirection = part.dir ?? 0;
+  part.dir = (previousDirection + 1) % DIRECTIONS.length;
+  if (ramUsage(evaluateClassFactory()) > ramCapacity()) {
+    part.dir = previousDirection;
+    factory.placementNotice = "회전으로 활성 프로토콜이 늘어 RAM을 초과합니다.";
+  } else {
+    factory.lastPlacedId = part.id;
+    factory.placementNotice = TOOLS[part.type].name + " · " + DIRECTIONS[part.dir].name + " 출력으로 회전했습니다.";
+  }
   renderFactoryBoard();
 }
 
@@ -608,7 +884,7 @@ function activateReserve(moduleId) {
   }
   const index = factory.reserve.findIndex((module) => module.id === moduleId);
   if (index < 0) return;
-  factory.pending = factory.reserve.splice(index, 1)[0];
+  factory.pending = { ...factory.reserve.splice(index, 1)[0], kind: "module" };
   factory.selectedIndex = null;
   factory.placementNotice = null;
   renderFactoryBoard();
@@ -717,7 +993,7 @@ function previewAugmentChoice(type) {
 function confirmAugmentChoice() {
   const type = factory.choiceSelection;
   if (game.mode !== "choice" || !MODULES[type]) return;
-  factory.pending = { id: factory.nextId++, type };
+  factory.pending = { id: factory.nextId++, kind: "module", type };
   factory.choiceSelection = null;
   $("#choice-overlay").hidden = true;
   openFactory(false);
@@ -1014,6 +1290,33 @@ function hasTrait(type) {
   return Boolean(game.output?.traits?.has(type));
 }
 
+function augmentRecipesForType(type) {
+  return [...(game.output?.recipes?.values() || [])].filter((recipe) => recipe.type === type);
+}
+
+function augmentStrength(type) {
+  const recipes = augmentRecipesForType(type);
+  if (!recipes.length) return 1;
+  return Math.max(...recipes.map((recipe) => recipe.throughput * (1 + recipe.power * .32 + recipe.focus * .18 - Number(recipe.inverted) * .18)));
+}
+
+function augmentUtility(type) {
+  return augmentRecipesForType(type).some((recipe) => recipe.inverted);
+}
+
+function queueFactoryEcho(angle) {
+  const echoLevel = Math.min(2, game.output?.tuning?.echo || 0);
+  if (!echoLevel) return;
+  for (let index = 0; index < echoLevel; index += 1) {
+    game.delayedAttacks.push({
+      delay: .16 + index * .13, kind: "factory-echo", classId: game.selectedClass, angle,
+      x: game.player.x, y: game.player.y, targetX: game.mouse.x, targetY: game.mouse.y,
+      damageScale: .42 + echoLevel * .08
+    });
+  }
+  canvas.dataset.lastSpecial = "factory-echo";
+}
+
 function hasSynergy(kind) {
   return Boolean(game.output?.synergyKinds?.has(kind));
 }
@@ -1079,7 +1382,7 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
     if (distance > profile.range + enemy.radius) continue;
     if (Math.abs(angleDelta(Math.atan2(dy, dx), angle)) > profile.arc * Math.PI / 360) continue;
     if (game.selectedClass === "melee" && (hasTrait("m_hook") || hasPlaystyle("maelstrom"))) {
-      const pull = hasPlaystyle("maelstrom") ? .32 + playstyleTier("maelstrom") * .06 : .24;
+      const pull = hasPlaystyle("maelstrom") ? .32 + playstyleTier("maelstrom") * .06 : .24 * augmentStrength("m_hook");
       enemy.x += (originX - enemy.x) * pull;
       enemy.y += (originY - enemy.y) * pull;
       if (hasTrait("m_hook")) noteAugment("m_hook");
@@ -1088,13 +1391,13 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
     let consumedMark = false;
     if (game.selectedClass === "melee" && hasTrait("m_mark") && !context.synthetic) {
       if (enemy.duelMark && enemy.markDirection !== context.direction) {
-        strikeScale *= 1.7;
+        strikeScale *= 1 + .7 * augmentStrength("m_mark");
         enemy.duelMark = 0;
         consumedMark = true;
         noteAugment("m_mark");
         addFloater(enemy.x, enemy.y - enemy.radius - 12, "CROSS CUT", "#58d7d3");
       } else {
-        enemy.duelMark = 4;
+        enemy.duelMark = augmentUtility("m_mark") ? 7 : 4;
         enemy.markDirection = context.direction;
         noteAugment("m_mark");
       }
@@ -1178,8 +1481,8 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
 function spawnRailShot(angle, options) {
   const settings = options || {};
   const speed = settings.speed || 920;
-  const pierce = settings.pierce ?? (hasTrait("s_pierce") ? 2 : 0);
-  const ricochet = settings.ricochet ?? (hasTrait("s_ricochet") ? 1 : 0);
+  const pierce = settings.pierce ?? (hasTrait("s_pierce") ? Math.max(1, Math.round(2 * augmentStrength("s_pierce"))) : 0);
+  const ricochet = settings.ricochet ?? (hasTrait("s_ricochet") ? Math.max(1, Math.round(augmentStrength("s_ricochet"))) : 0);
   const homing = settings.homing ?? hasTrait("s_homing");
   game.playerShots.push({
     kind: settings.kind || "rail", x: settings.x ?? game.player.x, y: settings.y ?? game.player.y,
@@ -1303,11 +1606,13 @@ function startSlash(attackAngle) {
   if (game.selectedClass === "sniper") {
     canvas.dataset.swingDirection = "rail-shot";
     fireSniperAttack(player.aim);
+    queueFactoryEcho(player.aim);
     return true;
   }
   if (game.selectedClass === "artillery") {
     canvas.dataset.swingDirection = "grenade-launch";
     fireArtilleryAttack(player.aim);
+    queueFactoryEcho(player.aim);
     return true;
   }
   const maelstromTier = playstyleTier("maelstrom");
@@ -1368,6 +1673,7 @@ function startSlash(attackAngle) {
   player.riposteReady = false;
   player.riposteTargetId = null;
   executeSlash(meleeProfile, player.aim, (finisher ? 1.28 : 1) * riposteScale, false, { direction, finisher });
+  queueFactoryEcho(player.aim);
   if (riposteActive && counterTier >= 3) {
     for (const offset of [-.22, 0, .22]) {
       spawnRailShot(player.aim + offset, { damage: 16, homing: true, pierce: 1, ricochet: 0, color: game.output.build.color });
@@ -1714,10 +2020,11 @@ function createPlayerExplosion(x, y, damage, radius, options) {
     if (settings.orbital && hasSynergy("gravity_satellite")) noteProtocol("gravity_satellite");
   }
   if (augmented && primaryExplosion && (hasTrait("a_fire") || infernoTier)) {
+    const fireStrength = hasTrait("a_fire") ? augmentStrength("a_fire") : 1;
     game.zones.push({
       kind: "fire", x, y,
-      radius: radius * (infernoTier >= 3 ? 1.05 : infernoTier ? .88 : .72),
-      life: infernoTier >= 3 ? 5.4 : infernoTier ? 4.1 : 3.2,
+      radius: radius * (infernoTier >= 3 ? 1.05 : infernoTier ? .88 : .72) * (augmentUtility("a_fire") ? 1.28 : 1),
+      life: (infernoTier >= 3 ? 5.4 : infernoTier ? 4.1 : 3.2) * fireStrength,
       tick: 0, color: infernoTier ? game.output.build.color : "#ff714f",
       vortex: Boolean(infernoTier) || hasSynergy("inferno_vortex"),
       wildfire: infernoTier >= 2 || hasSynergy("wildfire_chain")
@@ -1872,7 +2179,8 @@ function updatePlayerShots(dt) {
         createPlayerExplosion(enemy.x, enemy.y, 10 + playstyleTier("deadeye") * 3, 48 + playstyleTier("deadeye") * 8, { source: "deadeye", noAugments: true, color: game.output.build.color });
       }
       if (game.selectedClass === "sniper" && (hasTrait("s_freeze") || hasPlaystyle("ranger"))) {
-        game.zones.push({ kind: "slow", x: enemy.x, y: enemy.y, radius: 70, life: 2.8, tick: 0, color: "#57d8ee" });
+        const freezeStrength = hasTrait("s_freeze") ? augmentStrength("s_freeze") : 1;
+        game.zones.push({ kind: "slow", x: enemy.x, y: enemy.y, radius: 70 * (augmentUtility("s_freeze") ? 1.35 : 1), life: 2.8 * freezeStrength, tick: 0, color: "#57d8ee" });
         if (hasTrait("s_freeze")) noteAugment("s_freeze");
       }
       if (shot.charged && hasSynergy("dead_center")) {
@@ -1963,6 +2271,23 @@ function updateDelayedAttacks(dt) {
     if (attack.delay > 0 || attack.fired) continue;
     attack.fired = true;
     if (attack.kind === "explosion") createPlayerExplosion(attack.x, attack.y, attack.damage, attack.radius, attack.options);
+    if (attack.kind === "factory-echo") {
+      if (attack.classId === "melee") {
+        const profile = { ...game.output.primary, arc: game.output.primary.arc * .9 };
+        executeSlash(profile, attack.angle, attack.damageScale, true, { synthetic: true, x: attack.x, y: attack.y, direction: 0 });
+      }
+      if (attack.classId === "sniper") {
+        spawnRailShot(attack.angle, { x: attack.x, y: attack.y, damage: game.output.primary.damage * attack.damageScale, pierce: 0, ricochet: 0, color: "#a48cff" });
+      }
+      if (attack.classId === "artillery") {
+        launchGrenade(attack.angle, {
+          x: attack.x, y: attack.y, targetX: attack.targetX, targetY: attack.targetY,
+          damage: game.output.primary.damage * attack.damageScale, blastRadius: game.output.primary.blastRadius * .82,
+          color: "#a48cff"
+        });
+      }
+      addFloater(attack.x, attack.y - 34, "PROCESS ECHO", "#a48cff");
+    }
     if (attack.kind === "guard") {
       const cleared = clearEnemyBulletsNear(attack.x, attack.y, attack.radius || 140);
       if (cleared) addFloater(attack.x, attack.y - 28, "ECHO GUARD ×" + cleared, game.output.build?.color || "#71efad");
@@ -2070,6 +2395,93 @@ function installPlaystyleSequence(classId, styleId, linkCount) {
   sequence.forEach((type, index) => {
     board[indexOf(index + 1, MAIN_ROW)] = { id: 9500 + index, type };
   });
+}
+
+function runFactoryToolAudits() {
+  const savedBoard = board.slice();
+  const savedCols = boardCols;
+  const saved = {
+    selectedClass: game.selectedClass, output: game.output, player: game.player, enemies: game.enemies,
+    enemyBullets: game.enemyBullets, playerShots: game.playerShots, zones: game.zones,
+    delayedAttacks: game.delayedAttacks, orbitals: game.orbitals, particles: game.particles,
+    floaters: game.floaters, pulses: game.pulses, echoes: game.echoes, mouse: game.mouse,
+    mode: game.mode, attackRequested: game.attackRequested, dashRequested: game.dashRequested
+  };
+  let report;
+  try {
+    game.selectedClass = "melee";
+    boardCols = INITIAL_COLS;
+    board.length = boardCols * ROWS;
+    board.fill(null);
+    const variantOutput = (toolType) => {
+      board.fill(null);
+      if (toolType) {
+        board[indexOf(1, MAIN_ROW)] = { id: 9701, kind: "tool", type: toolType, dir: 0 };
+        board[indexOf(2, MAIN_ROW)] = { id: 9702, kind: "module", type: "m_mark" };
+      } else {
+        board[indexOf(1, MAIN_ROW)] = { id: 9702, kind: "module", type: "m_mark" };
+      }
+      return evaluateClassFactory();
+    };
+    const rawVariant = variantOutput(null);
+    const ampVariant = variantOutput("amplifier");
+    const echoVariant = variantOutput("repeater");
+    const focusVariant = variantOutput("focuser");
+    const utilityVariant = variantOutput("inverter");
+    const sameCoreVariants =
+      rawVariant.recipes.get(9702)?.mode === "RAW" &&
+      ampVariant.recipes.get(9702)?.mode === "OVERDRIVE" && ampVariant.primary.damage > rawVariant.primary.damage &&
+      echoVariant.recipes.get(9702)?.mode === "ECHO" && echoVariant.tuning.echo === 1 &&
+      focusVariant.recipes.get(9702)?.mode === "PRECISION" && focusVariant.primary.range > rawVariant.primary.range && focusVariant.primary.arc < rawVariant.primary.arc &&
+      utilityVariant.recipes.get(9702)?.mode === "UTILITY" && utilityVariant.guard.armor > rawVariant.guard.armor && utilityVariant.primary.damage < rawVariant.primary.damage;
+    board.fill(null);
+    board[indexOf(1, MAIN_ROW)] = { id: 9801, kind: "tool", type: "splitter", dir: 0 };
+    board[indexOf(2, MAIN_ROW)] = { id: 9802, kind: "tool", type: "amplifier" };
+    board[indexOf(3, MAIN_ROW)] = { id: 9803, kind: "module", type: "m_step" };
+    board[indexOf(4, MAIN_ROW)] = { id: 9804, kind: "tool", type: "router", dir: 1 };
+    board[indexOf(4, MAIN_ROW + 1)] = { id: 9805, kind: "module", type: "m_mark" };
+    board[indexOf(1, MAIN_ROW + 1)] = { id: 9806, kind: "tool", type: "repeater" };
+    board[indexOf(1, MAIN_ROW + 2)] = { id: 9807, kind: "module", type: "m_blood" };
+    const output = evaluateClassFactory();
+    const stepRecipe = output.recipes.get(9803);
+    const bloodRecipe = output.recipes.get(9807);
+    const branched = output.activeCount === 3 && output.activeToolCount === 4 && output.tuning.splitters === 1;
+    const toolProcessed = stepRecipe?.mode === "OVERDRIVE" && bloodRecipe?.mode === "ECHO";
+    const throughputPaid = Math.abs(stepRecipe?.throughput - .72) < .001 && Math.abs(bloodRecipe?.throughput - .72) < .001;
+    const routedProtocol = output.synergyKinds.has("first_mark") && output.build?.id === "pursuit";
+    const unpoweredIndex = indexOf(6, 0);
+    board[unpoweredIndex] = { id: 9808, kind: "module", type: "m_guard" };
+    const unpoweredRejected = !evaluateClassFactory().traits.has("m_guard");
+    board[unpoweredIndex] = null;
+    game.output = output;
+    game.player = createAuditPlayer();
+    game.enemies = [];
+    game.enemyBullets = [];
+    game.playerShots = [];
+    game.zones = [];
+    game.delayedAttacks = [];
+    game.orbitals = [];
+    game.particles = [];
+    game.floaters = [];
+    game.pulses = [];
+    game.echoes = [];
+    game.mouse = { x: 620, y: 500 };
+    game.mode = "playing";
+    startSlash(0);
+    const echoCombat = game.delayedAttacks.some((attack) => attack.kind === "factory-echo");
+    report = {
+      sameCoreVariants, branched, toolProcessed, throughputPaid, routedProtocol, unpoweredRejected, echoCombat,
+      damageChanged: Math.abs(output.primary.damage - CLASS_PROFILES.melee.damage) > .1,
+      pass: false
+    };
+    report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
+  } finally {
+    boardCols = savedCols;
+    board.length = savedBoard.length;
+    savedBoard.forEach((part, index) => { board[index] = part; });
+    Object.assign(game, saved);
+  }
+  return report;
 }
 
 function runPlaystyleAudits() {
@@ -2353,13 +2765,14 @@ function runAugmentAuditForClass(classId) {
 function runAllAugmentAudits() {
   const reports = ["melee", "sniper", "artillery"].map(runAugmentAuditForClass);
   const playstyles = runPlaystyleAudits();
-  const pass = reports.every((report) => report.pass) && playstyles.every((report) => report.pass);
-  canvas.dataset.auditReport = JSON.stringify({ pass, reports, playstyles });
+  const factoryTools = runFactoryToolAudits();
+  const pass = reports.every((report) => report.pass) && playstyles.every((report) => report.pass) && factoryTools.pass;
+  canvas.dataset.auditReport = JSON.stringify({ pass, reports, playstyles, factoryTools });
   canvas.dataset.auditStatus = pass ? "pass" : "fail";
   const result = $("#test-audit-result");
-  result.textContent = pass ? "30 증강 · 30 프로토콜 · 9 빌드 · RAM PASS" : "FAIL · 콘솔 진단 확인";
+  result.textContent = pass ? "30 증강 · 6 도구 · 신호 그래프 · 9 빌드 PASS" : "FAIL · 콘솔 진단 확인";
   result.classList.toggle("failed", !pass);
-  return { pass, reports, playstyles };
+  return { pass, reports, playstyles, factoryTools };
 }
 
 function updateEchoes(dt) {
@@ -2950,13 +3363,16 @@ function updateHud() {
   $("#attack-ability").classList.toggle("ready", attackRatio >= .999);
   $("#dash-ability").classList.toggle("ready", dashRatio >= .999);
   const build = game.output.build;
+  const tuning = game.output.tuning;
   const buildSignature = $("#build-signature");
-  buildSignature.hidden = !build;
-  if (build) {
-    buildSignature.style.setProperty("--build-color", build.color);
-    $("#build-tier").textContent = "LINE REACTOR · TIER " + ["0", "I", "II", "III"][build.tier] + " · " + build.depth + " MODULE";
-    $("#build-name").textContent = build.name;
-    $("#build-effect").textContent = build.tiers[build.tier - 1];
+  buildSignature.hidden = !build && !game.output.activeCount;
+  if (build || game.output.activeCount) {
+    buildSignature.style.setProperty("--build-color", build?.color || CLASS_PROFILES[game.selectedClass].color);
+    $("#build-tier").textContent = tuning.mode + " FACTORY" + (build ? " · TIER " + ["0", "I", "II", "III"][build.tier] : "") + " · " + Math.round(tuning.throughput * 100) + "% FLOW";
+    $("#build-name").textContent = build?.name || "가공 증강 " + game.output.activeCount + "기";
+    const buildEffectText = build?.tiers[build.tier - 1] || ("피해 ×" + tuning.damageMult.toFixed(2) + " · 주기 ×" + tuning.cooldownMult.toFixed(2) + (tuning.echo ? " · 지연 복제" : ""));
+    $("#build-effect").textContent = buildEffectText;
+    $("#build-effect").title = buildEffectText;
   }
   $("#attack-name").textContent = build?.attackName || CLASS_PROFILES[game.selectedClass].attackName;
   $("#game").style.setProperty("--active-build-color", build?.color || CLASS_PROFILES[game.selectedClass].color);
@@ -2968,6 +3384,11 @@ function updateHud() {
   canvas.dataset.sequenceDepth = String(game.output.sequenceDepth);
   canvas.dataset.playstyle = build?.id || "base";
   canvas.dataset.playstyleTier = String(build?.tier || 0);
+  canvas.dataset.factoryMode = tuning.mode;
+  canvas.dataset.factoryThroughput = tuning.throughput.toFixed(2);
+  canvas.dataset.factoryDamage = tuning.damageMult.toFixed(2);
+  canvas.dataset.factoryEcho = String(tuning.echo);
+  canvas.dataset.activeTools = String(game.output.activeToolCount);
   canvas.dataset.ramUsage = String(ramUsage(game.output));
   canvas.dataset.ramCapacity = String(ramCapacity());
   canvas.dataset.playerShots = String(game.playerShots.length);
@@ -3016,12 +3437,22 @@ $("#choice-cards").addEventListener("click", (event) => {
 });
 $("#choice-confirm").addEventListener("click", confirmAugmentChoice);
 $("#pending-archive").addEventListener("click", archivePending);
+$("#factory-tools").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-tool-type]");
+  if (button) selectToolBlueprint(button.dataset.toolType);
+});
 $("#reserve-parts").addEventListener("click", (event) => {
   const button = event.target.closest("[data-reserve-id]");
   if (button) activateReserve(Number(button.dataset.reserveId));
 });
 
 $("#factory-board").addEventListener("click", (event) => {
+  const rotateButton = event.target.closest("[data-rotate-index]");
+  if (rotateButton) {
+    event.stopPropagation();
+    rotateBoardTool(Number(rotateButton.dataset.rotateIndex));
+    return;
+  }
   const storeButton = event.target.closest("[data-store-index]");
   if (storeButton) {
     event.stopPropagation();
@@ -3041,12 +3472,22 @@ $("#factory-board").addEventListener("click", (event) => {
 });
 
 $("#factory-board").addEventListener("dragstart", (event) => {
-  const token = event.target.closest("[data-module-id]");
+  const token = event.target.closest("[data-part-id]");
   if (!token) return;
-  const moduleId = Number(token.dataset.moduleId);
-  const index = board.findIndex((module) => module && module.id === moduleId);
+  const partId = Number(token.dataset.partId);
+  const index = board.findIndex((part) => part && part.id === partId);
   factory.dragged = index >= 0 ? { kind: "board", index } : null;
   event.dataTransfer.effectAllowed = "move";
+});
+
+$("#factory-board").addEventListener("contextmenu", (event) => {
+  const cell = event.target.closest("[data-cell-index]");
+  if (!cell) return;
+  const index = Number(cell.dataset.cellIndex);
+  const part = board[index];
+  if (!part || partKind(part) !== "tool" || !TOOLS[part.type]?.rotatable) return;
+  event.preventDefault();
+  rotateBoardTool(index);
 });
 
 $("#pending-part").addEventListener("dragstart", (event) => {
@@ -3099,6 +3540,10 @@ window.addEventListener("keydown", (event) => {
   }
   if (game.mode === "gameover" && (event.code === "KeyR" || event.code === "Enter")) {
     startGame();
+    return;
+  }
+  if (event.code === "KeyR" && game.mode === "factory" && factory.selectedIndex !== null) {
+    rotateBoardTool(factory.selectedIndex);
     return;
   }
   game.keys.add(event.code);
@@ -3165,7 +3610,7 @@ if (TEST_MODE) {
   $("#test-module-buttons").addEventListener("click", (event) => {
     const button = event.target.closest("[data-test-module]");
     if (!button || game.mode !== "playing") return;
-    factory.pending = { id: factory.nextId++, type: button.dataset.testModule };
+    factory.pending = { id: factory.nextId++, kind: "module", type: button.dataset.testModule };
     openFactory(false);
   });
 }
