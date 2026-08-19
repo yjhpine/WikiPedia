@@ -26,8 +26,9 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-09") && html.includes("game.js?v=prototype-09"), "UX 보완 캐시 버전 prototype-09 누락");
+check(html.includes("styles.css?v=prototype-10") && html.includes("game.js?v=prototype-10"), "비율 스케일링 캐시 버전 prototype-10 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
+check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
 check(source.includes("runFactoryToolAudits") && source.includes("queueFactoryEcho") && source.includes("buildFactoryTuning"), "신호 그래프 전투 가공 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
@@ -50,6 +51,9 @@ check(/\.part-rotate\s*\{[^}]*left:\s*2px/.test(styles) && /\.module-ram\s*\{[^}
 check(/\.board-message\s*\{[^}]*position:\s*sticky[^}]*white-space:\s*normal/.test(styles), "긴 보드 메시지 줄바꿈·고정 보호 누락");
 check(/\.factory-action-bar\s*\{[^}]*position:\s*sticky/.test(styles) && html.includes('class="factory-action-bar"'), "공장 적용 버튼 고정 영역 누락");
 check([980, 760, 560].every((width) => styles.includes(`@media (max-width: ${width}px)`)), "핵심 반응형 UX 구간 누락");
+check(/\.ui-stage\s*\{[^}]*transform:\s*scale\(var\(--ui-scale\)\)[^}]*transform-origin:\s*0 0/.test(styles), "전체 UI 균일 스케일 스테이지 누락");
+check(["--ui-width", "--ui-height", "--ui-vw", "--ui-vh"].every((token) => styles.includes(token)), "가상 UI viewport 변수 누락");
+check(source.includes("UI_LAYOUT_PROFILES") && source.includes("UI_REFERENCE_ANCHORS") && source.includes("interfaceReference") && source.includes("interfaceMetrics") && source.includes("resizeInterface"), "화면 비율별 UI 스케일 계산 누락");
 
 const htmlIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]));
 const makeElement = () => ({
@@ -69,6 +73,7 @@ const canvasContext = new Proxy({}, {
 });
 elements.get("game-canvas").getContext = () => canvasContext;
 const documentStub = {
+  documentElement: { clientWidth: 1280, clientHeight: 720, style: { setProperty() {} }, dataset: {} },
   querySelector(selector) {
     if (selector.startsWith("#")) return elements.get(selector.slice(1)) || null;
     return makeElement();
@@ -82,6 +87,25 @@ try {
     performance: { now: () => 0 }, requestAnimationFrame() {}, setTimeout() { return 0; }, clearTimeout() {}, console
   });
   vm.runInContext(source, runtime, { filename: "game.js", timeout: 1500 });
+  const interfaceAudit = vm.runInContext(`(() => {
+    const wide = interfaceMetrics(1920, 1080);
+    const portrait = interfaceMetrics(390, 844);
+    const compact = interfaceMetrics(1024, 1024);
+    const short = interfaceMetrics(844, 390);
+    const portraitEdgeLeft = interfaceMetrics(819, 1000);
+    const portraitEdgeRight = interfaceMetrics(821, 1000);
+    const wideEdgeLeft = interfaceMetrics(1449, 1000);
+    const wideEdgeRight = interfaceMetrics(1451, 1000);
+    return {
+      wideFits: wide.layout === "wide" && Math.abs(wide.scale - 1.2) < .001 && Math.abs(wide.width - 1600) < .01,
+      portraitFits: portrait.layout === "portrait" && Math.abs(portrait.scale - .75) < .001 && Math.abs(portrait.width - 520) < .01,
+      compactFits: compact.layout === "compact" && compact.scale > .93 && compact.scale < .932,
+      minimumGuard: short.layout === "wide" && Math.abs(short.scale - UI_SCALE_MIN) < .001,
+      profileEdgesAreSmooth: Math.abs(portraitEdgeLeft.scale - portraitEdgeRight.scale) < .01 && Math.abs(wideEdgeLeft.scale - wideEdgeRight.scale) < .01,
+      stageUpdated: document.querySelector("#ui-stage").dataset.layout === "wide" && document.querySelector("#ui-stage").dataset.scale === "0.800"
+    };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(interfaceAudit).every(Boolean), `UI 비율 스케일 런타임 검증 실패: ${JSON.stringify(interfaceAudit)}`);
   const facingAudit = vm.runInContext(`(() => {
     selectClass("sniper");
     startGame();
@@ -195,5 +219,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · 6/6 process tools · routed graph · 9/9 playstyles · responsive UX guards · combat rendering");
+  console.log("30/30 augments · 6/6 process tools · routed graph · 9/9 playstyles · aspect-fit UI scaling · combat rendering");
 }

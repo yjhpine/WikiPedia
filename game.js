@@ -1,7 +1,22 @@
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#game-canvas");
 const ctx = canvas.getContext("2d");
+const uiStage = $("#ui-stage");
 const TEST_MODE = new URLSearchParams(window.location.search).has("test");
+
+const UI_LAYOUT_PROFILES = [
+  { id: "portrait", maxAspect: .82, width: 520, height: 920 },
+  { id: "compact", maxAspect: 1.45, width: 1100, height: 900 },
+  { id: "wide", maxAspect: Infinity, width: 1600, height: 900 }
+];
+const UI_REFERENCE_ANCHORS = [
+  { aspect: .72, width: 520, height: 920 },
+  { aspect: 1, width: 1100, height: 900 },
+  { aspect: 1.25, width: 1100, height: 900 },
+  { aspect: 1.6, width: 1600, height: 900 }
+];
+const UI_SCALE_MIN = .56;
+const UI_SCALE_MAX = 1.6;
 
 const CLASS_PROFILES = {
   melee: {
@@ -999,7 +1014,51 @@ function confirmAugmentChoice() {
   openFactory(false);
 }
 
+function interfaceReference(aspect) {
+  const first = UI_REFERENCE_ANCHORS[0];
+  const last = UI_REFERENCE_ANCHORS.at(-1);
+  if (aspect <= first.aspect) return first;
+  if (aspect >= last.aspect) return last;
+  const upperIndex = UI_REFERENCE_ANCHORS.findIndex((entry) => aspect <= entry.aspect);
+  const lower = UI_REFERENCE_ANCHORS[upperIndex - 1];
+  const upper = UI_REFERENCE_ANCHORS[upperIndex];
+  const progress = (aspect - lower.aspect) / (upper.aspect - lower.aspect);
+  return {
+    width: lower.width + (upper.width - lower.width) * progress,
+    height: lower.height + (upper.height - lower.height) * progress
+  };
+}
+
+function interfaceMetrics(viewportWidth, viewportHeight) {
+  const aspect = viewportWidth / Math.max(1, viewportHeight);
+  const profile = UI_LAYOUT_PROFILES.find((entry) => aspect <= entry.maxAspect) || UI_LAYOUT_PROFILES.at(-1);
+  const reference = interfaceReference(aspect);
+  const fittedScale = Math.min(viewportWidth / reference.width, viewportHeight / reference.height);
+  const scale = clamp(fittedScale, UI_SCALE_MIN, UI_SCALE_MAX);
+  return {
+    layout: profile.id,
+    scale,
+    width: viewportWidth / scale,
+    height: viewportHeight / scale
+  };
+}
+
+function resizeInterface() {
+  const viewportWidth = Math.max(1, document.documentElement.clientWidth || innerWidth);
+  const viewportHeight = Math.max(1, document.documentElement.clientHeight || innerHeight);
+  const metrics = interfaceMetrics(viewportWidth, viewportHeight);
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty("--ui-scale", metrics.scale.toFixed(4));
+  rootStyle.setProperty("--ui-width", metrics.width.toFixed(3) + "px");
+  rootStyle.setProperty("--ui-height", metrics.height.toFixed(3) + "px");
+  rootStyle.setProperty("--ui-vw", (metrics.width / 100).toFixed(4) + "px");
+  rootStyle.setProperty("--ui-vh", (metrics.height / 100).toFixed(4) + "px");
+  uiStage.dataset.layout = metrics.layout;
+  uiStage.dataset.scale = metrics.scale.toFixed(3);
+}
+
 function resizeCanvas() {
+  resizeInterface();
   const dpr = Math.min(2, devicePixelRatio || 1);
   const rect = canvas.getBoundingClientRect();
   canvas.width = Math.round(rect.width * dpr);
