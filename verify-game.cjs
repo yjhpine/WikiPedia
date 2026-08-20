@@ -26,7 +26,7 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-10") && html.includes("game.js?v=prototype-10"), "비율 스케일링 캐시 버전 prototype-10 누락");
+check(html.includes("styles.css?v=prototype-11") && html.includes("game.js?v=prototype-11"), "마우스 입력 복구 캐시 버전 prototype-11 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
 check(source.includes("runFactoryToolAudits") && source.includes("queueFactoryEcho") && source.includes("buildFactoryTuning"), "신호 그래프 전투 가공 진단 누락");
@@ -52,6 +52,8 @@ check(/\.board-message\s*\{[^}]*position:\s*sticky[^}]*white-space:\s*normal/.te
 check(/\.factory-action-bar\s*\{[^}]*position:\s*sticky/.test(styles) && html.includes('class="factory-action-bar"'), "공장 적용 버튼 고정 영역 누락");
 check([980, 760, 560].every((width) => styles.includes(`@media (max-width: ${width}px)`)), "핵심 반응형 UX 구간 누락");
 check(/\.ui-stage\s*\{[^}]*transform:\s*scale\(var\(--ui-scale\)\)[^}]*transform-origin:\s*0 0/.test(styles), "전체 UI 균일 스케일 스테이지 누락");
+check(/\.ui-stage\s*\{[^}]*pointer-events:\s*none/.test(styles), "UI 스테이지가 전투 캔버스 마우스 입력을 차단함");
+check(/\.overlay\s*\{[^}]*pointer-events:\s*auto/.test(styles) && /\.factory-toggle\s*\{[^}]*pointer-events:\s*auto/.test(styles) && /\.test-panel\s*\{[^}]*pointer-events:\s*auto/.test(styles), "상호작용 UI 포인터 복구 규칙 누락");
 check(["--ui-width", "--ui-height", "--ui-vw", "--ui-vh"].every((token) => styles.includes(token)), "가상 UI viewport 변수 누락");
 check(source.includes("UI_LAYOUT_PROFILES") && source.includes("UI_REFERENCE_ANCHORS") && source.includes("interfaceReference") && source.includes("interfaceMetrics") && source.includes("resizeInterface"), "화면 비율별 UI 스케일 계산 누락");
 

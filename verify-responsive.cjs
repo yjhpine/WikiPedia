@@ -82,6 +82,23 @@ function rectFits(rect, width, height, tolerance = 1.5) {
   return rect.left >= -tolerance && rect.top >= -tolerance && rect.right <= width + tolerance && rect.bottom <= height + tolerance;
 }
 
+async function clickPoint(session, x, y) {
+  await session.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+  await session.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1 });
+  await session.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1 });
+}
+
+async function clickElement(session, selector) {
+  const point = await evaluate(session, `(() => {
+    const element = document.querySelector(${JSON.stringify(selector)});
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  })()`);
+  assert(point, `클릭 대상 누락: ${selector}`);
+  await clickPoint(session, point.x, point.y);
+}
+
 async function auditViewport(session, viewport) {
   await session.send("Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
@@ -127,12 +144,20 @@ async function auditViewport(session, viewport) {
   assert(start.overlayOverflowX <= 1, `${viewport.name}: 시작 오버레이 가로 오버플로 ${start.overlayOverflowX}px`);
   assert(start.documentOverflowX <= 1, `${viewport.name}: 문서 가로 오버플로 ${start.documentOverflowX}px`);
 
-  await evaluate(session, `(() => {
-    document.querySelector('[data-class="melee"]').click();
-    document.querySelector('#start-button').click();
-    return true;
-  })()`);
+  await clickElement(session, '[data-class="melee"]');
+  await sleep(50);
+  await clickElement(session, "#start-button");
   await sleep(80);
+  const canvasPoint = { x: Math.round(viewport.width * .72), y: Math.round(viewport.height * .48) };
+  const pointerTarget = await evaluate(session, `(() => {
+    const target = document.elementFromPoint(${canvasPoint.x}, ${canvasPoint.y});
+    return { tag: target?.tagName || null, id: target?.id || null, className: target?.className || null };
+  })()`);
+  await clickPoint(session, canvasPoint.x, canvasPoint.y);
+  const swingAfterClick = await waitUntil(async () => {
+    const count = await evaluate(session, "Number(document.querySelector('#game-canvas').dataset.swingCount || 0)");
+    return count >= 1 ? count : null;
+  }, 2000);
   const combat = await evaluate(session, `(() => {
     const rect = (selector) => {
       const value = document.querySelector(selector).getBoundingClientRect();
@@ -145,11 +170,13 @@ async function auditViewport(session, viewport) {
       factoryToggle: rect('#factory-toggle')
     };
   })()`);
+  assert(pointerTarget.id === "game-canvas", `${viewport.name}: 전투 클릭이 ${pointerTarget.id || pointerTarget.className || pointerTarget.tag}에 차단됨`);
+  assert(swingAfterClick >= 1, `${viewport.name}: 실제 마우스 클릭 공격 미발동`);
   for (const [name, rect] of Object.entries(combat)) {
     assert(rectFits(rect, viewport.width, viewport.height), `${viewport.name}: ${name} HUD 잘림 ${JSON.stringify(rect)}`);
   }
 
-  await evaluate(session, "document.querySelector('#factory-toggle').click(); true");
+  await clickElement(session, "#factory-toggle");
   await sleep(360);
   const factory = await evaluate(session, `(() => {
     const overlay = document.querySelector('#factory-overlay');
