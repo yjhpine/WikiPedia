@@ -18,12 +18,13 @@ const UI_REFERENCE_ANCHORS = [
 const UI_SCALE_MIN = .56;
 const UI_SCALE_MAX = 1.6;
 const COMBAT_TEMPO = Object.freeze({ unitMove: 1.42, attackRate: 1.52, projectile: 1.62 });
+const MELEE_WEAPON_SCALE = 2;
 
 const CLASS_PROFILES = {
   melee: {
     name: "근접 클래스", title: "절단 집행자", code: "BLADE", color: "#58d7d3", icon: "刃",
-    attackName: "교대 횡베기", damage: 18, range: 104, arc: 118, cooldown: .5,
-    description: "좌우 횡베기를 교대로 잇고, 표식·반격·돌진으로 적진 안에서 싸웁니다.",
+    attackName: "교대 횡베기", damage: 18, range: 104 * MELEE_WEAPON_SCALE, arc: 118, cooldown: .5,
+    description: "2배 길이의 칼날로 넓어진 사거리에서 좌우 횡베기를 교대로 잇고, 표식·반격·돌진으로 적진 안에서 싸웁니다.",
     identity: "근접 압박 · 방향 콤보 · 반격", signature: "m_mark"
   },
   sniper: {
@@ -3785,7 +3786,8 @@ function drawRobot() {
   const swingEnd = -swingStart;
   const idleAngle = player.nextSwingDirection > 0 ? -1.18 : 1.18;
   const swordAngle = slash ? swingStart + (swingEnd - swingStart) * eased : idleAngle;
-  const bladeLength = slash ? clamp(slash.range * .78, 68, 104) : 68;
+  const bladeLength = slash ? clamp(slash.range * .39, 68, 104) : 68;
+  const renderedBladeLength = bladeLength * MELEE_WEAPON_SCALE;
   const bladeColor = slash && slash.echo ? "#b6a8ff" : "#eafffd";
 
   if (slash) {
@@ -3797,7 +3799,7 @@ function drawRobot() {
     ctx.lineWidth = 13 - progress * 5;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.arc(0, 0, bladeLength * .82, trailStart, swordAngle, slash.direction < 0);
+    ctx.arc(0, 0, renderedBladeLength * .82, trailStart, swordAngle, slash.direction < 0);
     ctx.stroke();
     ctx.restore();
   }
@@ -3805,6 +3807,7 @@ function drawRobot() {
   ctx.save();
   ctx.translate(10, 0);
   ctx.rotate(swordAngle);
+  ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE);
   ctx.shadowBlur = slash ? 24 : 10;
   ctx.shadowColor = slash && slash.echo ? "#8b7fff" : "#58d7d3";
   ctx.fillStyle = "#718084";

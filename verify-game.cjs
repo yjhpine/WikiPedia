@@ -26,10 +26,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-17") && html.includes("game.js?v=prototype-17") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-17 누락");
+check(html.includes("styles.css?v=prototype-18") && html.includes("game.js?v=prototype-18") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-18 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "도구 진행·드래그·물리 단자·전투 템포·치명타 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "도구 진행·드래그·물리 단자·전투 템포·치명타·근접 무기 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -143,6 +143,15 @@ try {
     return Number.isFinite(game.player.facing) && Number.isFinite(game.player.weaponFacing);
   })`, runtime, { timeout: 1000 });
   check(classRenderAudit, "세 클래스 보간 렌더링 스모크 테스트 실패");
+  const meleeWeaponAudit = vm.runInContext(`(() => {
+    game.mode = "start";
+    selectClass("melee");
+    startGame();
+    const range = game.output.primary.range;
+    startSlash(0);
+    return { doubledRange: range === 104 * MELEE_WEAPON_SCALE, slashUsesRange: game.player.slash?.range === range };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(meleeWeaponAudit).every(Boolean), `근접 무기 2배 스케일 런타임 검증 실패: ${JSON.stringify(meleeWeaponAudit)}`);
   const tempoAudit = vm.runInContext(`(() => {
     game.mode = "start";
     selectClass("sniper");
