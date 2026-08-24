@@ -338,3 +338,175 @@ kbd { font-family: var(--mono); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Schematic circuit-board reskin */
+.board-panel {
+  position: relative;
+  border: 1px solid #263d42;
+  padding: 16px;
+  background:
+    linear-gradient(135deg, rgba(88,215,211,.06), transparent 32%),
+    repeating-linear-gradient(0deg, rgba(116,157,163,.055) 0 1px, transparent 1px 20px),
+    #091113;
+  box-shadow: inset 0 0 0 1px rgba(201,240,90,.035), 0 22px 55px #0008;
+}
+.board-column-labels {
+  position: relative;
+  min-width: 0;
+  grid-template-columns: var(--cell) minmax(420px, 1fr);
+  margin-bottom: 11px;
+  color: #6e979a;
+  letter-spacing: .18em;
+  text-align: left;
+}
+.board-column-labels span:first-child { padding-left: 8px; color: #c9f05a; }
+.board-column-labels span:last-child { color: #79aeb2; text-align: center; }
+.factory-board {
+  gap: 8px;
+  border: 1px solid #476167;
+  padding: 18px;
+  background-color: #071012;
+  background-image:
+    linear-gradient(rgba(88,215,211,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(88,215,211,.055) 1px, transparent 1px),
+    radial-gradient(circle at 1px 1px, rgba(201,240,90,.18) 1px, transparent 1.4px),
+    linear-gradient(135deg, rgba(88,215,211,.045), transparent 45%);
+  background-size: 16px 16px, 16px 16px, 8px 8px, 100% 100%;
+  box-shadow: inset 0 0 0 1px #0c2226, inset 0 0 42px #020607, 0 22px 55px #0008;
+}
+.factory-cell,
+.factory-cell.main-lane,
+.factory-cell.branch-lane,
+.factory-cell.service-lane {
+  overflow: visible;
+  border: 1px dashed rgba(104,147,152,.38);
+  background: rgba(5,17,19,.42);
+  box-shadow: inset 0 0 0 1px rgba(88,215,211,.035);
+}
+.factory-cell::before,
+.factory-cell.main-lane::before,
+.factory-cell.branch-lane::before,
+.factory-cell.service-lane::before,
+.factory-cell.powered::before,
+.factory-cell.reactor-core::before {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border: 1px solid #39575d;
+  border-radius: 0;
+  background: #0b1c1f;
+  box-shadow: 0 0 8px rgba(88,215,211,.22);
+  content: "";
+  opacity: .8;
+  transform: translate(-50%, -50%);
+  animation: none;
+}
+.factory-cell.main-lane { border-color: rgba(88,215,211,.58); background: rgba(8,34,37,.36); }
+.factory-cell.branch-lane { border-color: rgba(154,190,113,.34); }
+.factory-cell.service-lane { border-color: rgba(94,126,132,.22); }
+.factory-cell.drop-target,
+.factory-cell:hover:not(.fixed) { border-color: #c9f05a; background: rgba(58,92,54,.17); transform: none; }
+.factory-cell.valid-target { border-color: #c9f05a; background: rgba(201,240,90,.08); }
+.factory-cell.valid-target::after { border-radius: 0; }
+.factory-cell.powered { border-color: color-mix(in srgb, var(--module-color, #c9f05a) 65%, #58d7d3); background: color-mix(in srgb, var(--module-color, #c9f05a) 7%, #08171a); box-shadow: inset 0 0 18px color-mix(in srgb, var(--module-color, #c9f05a) 13%, transparent); }
+.factory-cell.powered::before { border-color: var(--module-color, #c9f05a); background: var(--module-color, #c9f05a); box-shadow: 0 0 11px var(--module-color, #c9f05a); opacity: 1; }
+.factory-cell.reactor-core { border-style: solid; background: color-mix(in srgb, var(--reactor-color, #c9f05a) 11%, #071214); box-shadow: inset 0 0 22px color-mix(in srgb, var(--reactor-color, #c9f05a) 17%, transparent); }
+.factory-cell.fixed { border-color: #294a50; background: rgba(6,27,30,.68); box-shadow: inset -2px 0 #2d6869; }
+.factory-cell.fixed::before { display: block; left: calc(100% - 2px); width: 3px; height: calc(100% + 16px); border: 0; background: #397a7b; box-shadow: 0 0 12px #397a7b; }
+.factory-cell.fixed.main-lane { border-color: #c9f05a; background: linear-gradient(90deg, rgba(201,240,90,.2), rgba(7,31,30,.75)); box-shadow: inset -2px 0 #c9f05a, inset 0 0 24px rgba(201,240,90,.12); }
+.fixed-node { display: grid; gap: 3px; place-items: center; color: #c9f05a; font: 700 9px var(--mono); letter-spacing: .14em; text-shadow: 0 0 10px rgba(201,240,90,.55); }
+.fixed-node b { font: 900 11px var(--mono); }
+.fixed-node small { color: #85ab90; font: 700 6px var(--mono); letter-spacing: .22em; }
+.factory-cell.output { border-color: #294a50; background: rgba(6,27,30,.68); }
+.module-token,
+.tool-token {
+  display: block;
+  border: 1px solid var(--module-color);
+  border-radius: 1px;
+  color: #e8f7f5;
+  background:
+    linear-gradient(135deg, transparent 8px, color-mix(in srgb, var(--module-color) 16%, #0b1c1f) 8px),
+    linear-gradient(180deg, rgba(255,255,255,.06), transparent 35%),
+    #0a1619;
+  box-shadow: inset 0 0 0 1px rgba(5,11,12,.85), inset 0 0 22px color-mix(in srgb, var(--module-color) 11%, transparent), 0 0 0 2px #061012, 0 8px 18px #0009;
+}
+.tool-token {
+  border-style: double;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 8px, color-mix(in srgb, var(--module-color) 12%, transparent) 8px 9px),
+    linear-gradient(135deg, transparent 8px, color-mix(in srgb, var(--module-color) 13%, #0b1c1f) 8px),
+    #091518;
+}
+.module-token .part-type,
+.tool-token .part-type {
+  position: absolute;
+  top: 7px;
+  left: 9px;
+  color: color-mix(in srgb, var(--module-color) 72%, #dffaf8);
+  font: 700 6px var(--mono);
+  letter-spacing: .15em;
+}
+.module-token .part-code,
+.tool-token .part-code {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: #e8f7f5;
+  transform: translate(-50%, -58%);
+  font: 900 clamp(16px, calc(var(--ui-vw) * 1.65), 25px) var(--mono);
+  letter-spacing: -.06em;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--module-color) 48%, transparent);
+}
+.module-token .part-name,
+.tool-token .part-name {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  left: 8px;
+  overflow: hidden;
+  color: #93afb2;
+  font: 700 7px var(--mono);
+  letter-spacing: .04em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.module-token.size-1 .part-type,
+.module-token.size-1 .part-name,
+.tool-token.size-1 .part-type,
+.tool-token.size-1 .part-name { display: none; }
+.module-token.size-1 .part-code,
+.tool-token.size-1 .part-code { transform: translate(-50%, -50%); }
+.module-token .rarity-badge,
+.tool-token .rarity-badge { border-radius: 0; border-color: var(--rarity-color, var(--module-color)); background: #061113eF; }
+.module-token .module-ram,
+.tool-token .module-ram { right: -6px; bottom: -6px; border-color: var(--module-color); border-radius: 1px; color: #e5f7f3; background: #071315; box-shadow: 0 0 8px color-mix(in srgb, var(--module-color) 40%, transparent); }
+.module-token::after,
+.tool-token::after { right: 5px; bottom: 5px; width: 5px; border: 0; border-radius: 0; background: var(--status-color, #4d6266); box-shadow: 0 0 8px var(--status-color, #4d6266); }
+.module-token.inactive,
+.tool-token.inactive { filter: saturate(.45) brightness(.78); }
+.module-token:hover,
+.tool-token:hover { transform: translateY(-2px); border-color: #e8f7f5; box-shadow: inset 0 0 0 1px #071012, inset 0 0 22px color-mix(in srgb, var(--module-color) 18%, transparent), 0 0 0 2px #061012, 0 10px 22px #0009; }
+.circuit-port {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #061012;
+  border-radius: 1px;
+  box-shadow: 0 0 0 1px #84a8aa, 0 0 10px currentColor;
+}
+.circuit-port.input { color: #58d7d3; background: #0d5556; }
+.circuit-port.output { color: #ffbd57; background: #7b4f14; }
+.circuit-port:hover,
+.circuit-port.selected { outline: 1px solid #f2faf7; outline-offset: 3px; }
+.factory-cell.fixed .bus-port.output { right: -6px; }
+.circuit-wires { z-index: 8; }
+.circuit-wire { stroke-width: 2; stroke-linecap: square; stroke-linejoin: miter; }
+.circuit-wire.active { stroke: #58d7d3; filter: drop-shadow(0 0 3px #58d7d3); stroke-dasharray: 9 5; animation: schematic-flow .72s linear infinite; }
+.circuit-wire.inactive { stroke: #805154; stroke-dasharray: 3 5; opacity: .86; }
+.circuit-wire.selected { stroke: #f6dc66; stroke-width: 3; }
+.wire-hit { stroke-width: 16; }
+@keyframes schematic-flow { to { stroke-dashoffset: -14; } }

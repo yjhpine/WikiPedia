@@ -205,12 +205,10 @@ async function auditViewport(session, viewport) {
     assert(owner, "wide: 배치된 증강 단자 누락");
     await clickElement(session, '[data-port-owner="bus-source"][data-port-kind="output"]');
     await clickElement(session, '[data-port-owner="' + owner + '"][data-port-kind="input"]');
-    await clickElement(session, '[data-port-owner="' + owner + '"][data-port-kind="output"]');
-    await clickElement(session, '[data-port-owner="bus-sink"][data-port-kind="input"]');
     await sleep(120);
-    const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, message: document.querySelector('#board-message')?.textContent || null })");
-    const connected = circuitState.wires === 2 && circuitState.token?.includes("raw");
-    assert(connected, "wide: 입력·출력 단자 연결 후 증강이 가동되지 않음 " + JSON.stringify(circuitState));
+    const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, sinkPresent: Boolean(document.querySelector('[data-port-owner=\"bus-sink\"]')), message: document.querySelector('#board-message')?.textContent || null })");
+    const connected = circuitState.wires === 1 && circuitState.token?.includes("raw") && !circuitState.sinkPresent;
+    assert(connected, "wide: BUS IN 연결만으로 증강 라인이 가동되지 않음 " + JSON.stringify(circuitState));
     await clickElement(session, "#factory-commit");
     await sleep(80);
     const applied = await evaluate(session, "({ factoryOpen: !document.querySelector('#factory-overlay').hidden, traits: document.querySelector('#game-canvas').dataset.activeTraits || '', pending: Boolean(document.querySelector('#pending-part .pending-module')) })");

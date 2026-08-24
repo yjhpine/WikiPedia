@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-12" />
+    <link rel="stylesheet" href="styles.css?v=prototype-13" />
   </head>
   <body>
     <main class="game" id="game">
@@ -115,17 +115,17 @@
               </section>
               <div class="factory-help">
                 <b>배치 규칙</b>
-                <p>적이 드랍한 공정 도구를 회수해 사용하고, 모든 부품의 입·출력 단자를 직접 연결해야 가동됩니다.</p>
+                <p>적이 드랍한 공정 도구를 회수해 사용하고, BUS IN에서 닿는 증강 라인 전체가 가동됩니다.</p>
                 <ul>
                   <li>일반은 1×1, 희귀는 2×2, 전설은 4×4 공간을 차지합니다.</li>
-                  <li>출력 단자 → 대상 입력 단자 순서로 클릭해 BUS IN부터 BUS OUT까지 배선하세요.</li>
+                  <li>출력 단자 → 대상 입력 단자 순서로 클릭해 BUS IN에서 원하는 증강 라인으로 신호를 분기하세요.</li>
                   <li>공장은 전투 중에도 TAB으로 열 수 있으며, 선을 클릭해 해제·재배치할 수 있습니다.</li>
                 </ul>
               </div>
             </aside>
 
             <section class="board-panel" aria-label="가로로 무한 확장되는 5행 증강 배치 보드">
-              <div class="board-column-labels"><span>INPUT</span><span>BUS → 가공 도구 → 핵심 증강</span></div>
+              <div class="board-column-labels"><span>SOURCE</span><span>SCHEMATIC · CONNECTED LINES APPLY</span></div>
               <div class="factory-board" id="factory-board"></div>
               <p class="board-message" id="board-message" aria-live="polite">신규 부품을 빈 셀에 배치하세요.</p>
             </section>
@@ -180,6 +180,6 @@
       </div>
     </main>
 
-    <script type="module" src="game.js?v=prototype-12"></script>
+    <script type="module" src="game.js?v=prototype-13"></script>
   </body>
 </html>

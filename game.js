@@ -245,9 +245,7 @@ const MODULE_RARITIES = Object.fromEntries(moduleTypes.map((type, index) => {
   return [type, slot < 4 ? "common" : slot < 8 ? "rare" : "legendary"];
 }));
 const BUS_SOURCE_ID = "bus-source";
-const BUS_SINK_ID = "bus-sink";
 const BUS_SOURCE_LABEL = "BUS IN";
-const BUS_SINK_LABEL = "BUS OUT";
 const board = Array(boardCols * ROWS).fill(null);
 const indexOf = (col, row) => col * ROWS + row;
 const positionOf = (index) => ({ col: Math.floor(index / ROWS), row: index % ROWS });
@@ -354,7 +352,7 @@ function clearWiresFor(partId) {
 }
 
 function circuitId(id) {
-  if (id === BUS_SOURCE_ID || id === BUS_SINK_ID) return id;
+  if (id === BUS_SOURCE_ID) return id;
   const numeric = Number(id);
   return Number.isFinite(numeric) && String(numeric) === String(id) ? numeric : id;
 }
@@ -363,9 +361,10 @@ function connectPorts(fromId, toId) {
   fromId = circuitId(fromId);
   toId = circuitId(toId);
   if (fromId === toId || !fromId || !toId) return false;
-  const fromValid = fromId === BUS_SOURCE_ID || partsOnBoard().some((part) => part.id === fromId);
-  const toValid = toId === BUS_SINK_ID || partsOnBoard().some((part) => part.id === toId);
-  if (!fromValid || !toValid || toId === BUS_SOURCE_ID || fromId === BUS_SINK_ID) return false;
+  const parts = partsOnBoard();
+  const fromValid = fromId === BUS_SOURCE_ID || parts.some((part) => part.id === fromId);
+  const toValid = parts.some((part) => part.id === toId);
+  if (!fromValid || !toValid || toId === BUS_SOURCE_ID) return false;
   factory.wires = factory.wires.filter((wire) => wire.toId !== toId && wireKey(wire.fromId, wire.toId) !== wireKey(fromId, toId));
   factory.wires.push({ id: factory.nextWireId++, fromId, toId });
   return true;
@@ -611,8 +610,7 @@ function operationalCircuit(parts) {
   const partIds = new Set(parts.map((part) => part.id));
   const validWires = factory.wires.filter((wire) =>
     (wire.fromId === BUS_SOURCE_ID || partIds.has(wire.fromId)) &&
-    (wire.toId === BUS_SINK_ID || partIds.has(wire.toId)) &&
-    wire.fromId !== wire.toId
+    partIds.has(wire.toId) && wire.fromId !== wire.toId
   );
   const outgoing = new Map();
   const incoming = new Map();
@@ -633,19 +631,8 @@ function operationalCircuit(parts) {
       }
     }
   }
-  const toSink = new Set([BUS_SINK_ID]);
-  const backwardQueue = [BUS_SINK_ID];
-  while (backwardQueue.length) {
-    const id = backwardQueue.shift();
-    for (const wire of incoming.get(id) || []) {
-      if (!toSink.has(wire.fromId)) {
-        toSink.add(wire.fromId);
-        backwardQueue.push(wire.fromId);
-      }
-    }
-  }
-  const operationalIds = new Set(parts.filter((part) => fromSource.has(part.id) && toSink.has(part.id)).map((part) => part.id));
-  return { validWires, outgoing, incoming, fromSource, toSink, operationalIds };
+  const operationalIds = new Set(parts.filter((part) => fromSource.has(part.id)).map((part) => part.id));
+  return { validWires, outgoing, incoming, fromSource, operationalIds };
 }
 
 function evaluateClassFactory() {
@@ -715,7 +702,7 @@ function evaluateClassFactory() {
       }
       const next = { lastModule: part, mods: emptyProcessState(), toolIds: [], path: [] };
       for (const wire of circuit.outgoing.get(part.id) || []) {
-        if (wire.toId !== BUS_SINK_ID && circuit.operationalIds.has(wire.toId)) queue.push({ ...next, wire, throughput: signal.throughput });
+        if (circuit.operationalIds.has(wire.toId)) queue.push({ ...next, wire, throughput: signal.throughput });
       }
       continue;
     }
@@ -729,10 +716,9 @@ function evaluateClassFactory() {
     if (part.type === "repeater") { nextMods.echo += 1; nextMods.heat += .84; }
     if (part.type === "focuser") nextMods.focus += 1;
     if (part.type === "inverter") nextMods.inverted = !nextMods.inverted;
-    const nextWires = (circuit.outgoing.get(part.id) || []).filter((wire) => wire.toId === BUS_SINK_ID || circuit.operationalIds.has(wire.toId));
+    const nextWires = (circuit.outgoing.get(part.id) || []).filter((wire) => circuit.operationalIds.has(wire.toId));
     const throughput = part.type === "splitter" && nextWires.length > 1 ? signal.throughput * .72 : signal.throughput;
     for (const wire of nextWires) {
-      if (wire.toId === BUS_SINK_ID) continue;
       queue.push({ wire, lastModule: signal.lastModule, mods: { ...nextMods }, throughput, toolIds: [...signal.toolIds, part.id], path: [...signal.path, part.id] });
     }
   }
@@ -817,9 +803,9 @@ function partToken(part, status, index) {
   const actionLabel = kind === "tool" ? "회수" : "보관";
   const tokenClass = kind === "tool" ? "tool-token" : "module-token module-" + part.type;
   const sizeLabel = footprint.width + "×" + footprint.height;
-  return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' ' + status + isNew + '" draggable="true" data-part-id="' +
+  return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' size-' + footprint.width + ' ' + status + isNew + '" draggable="true" data-part-id="' +
     part.id + '" data-label="' + def.name + (rarity ? " · " + rarity.label + " " + sizeLabel : " · 공정 도구") + '" style="--module-color:' + def.color + ';--footprint-w:' + footprint.width + ';--footprint-h:' + footprint.height + ';--footprint-width:' + footprintCssSize(footprint.width) + ';--footprint-height:' + footprintCssSize(footprint.height) + '">' +
-    '<span class="part-code">' + def.code + '</span>' +
+    '<span class="part-type">' + (kind === "tool" ? "PROCESS TOOL" : "AUGMENT NODE") + '</span><span class="part-code">' + def.code + '</span><span class="part-name">' + def.name + '</span>' +
     (rarity ? '<span class="rarity-badge" style="--rarity-color:' + rarity.color + '">' + rarity.label + ' ' + sizeLabel + '</span>' : '<span class="rarity-badge tool-badge">DROP</span>') +
     '<span class="module-ram">' + partRamCost(part) + 'R</span>' + portButton(part, "input") + portButton(part, "output") +
     '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' ' + actionLabel + '">' + actionLabel + '</button></div>';
@@ -901,10 +887,10 @@ function renderCircuitWires(output) {
     const from = portCenter(wire.fromId, "output");
     const to = portCenter(wire.toId, "input");
     if (!from || !to) return "";
-    const bend = Math.max(22, Math.abs(to.x - from.x) * .42);
-    const active = (wire.fromId === BUS_SOURCE_ID || output.operationalIds.has(wire.fromId)) && (wire.toId === BUS_SINK_ID || output.operationalIds.has(wire.toId));
+    const midpoint = from.x + (to.x - from.x) * .5;
+    const active = (wire.fromId === BUS_SOURCE_ID || output.operationalIds.has(wire.fromId)) && output.operationalIds.has(wire.toId);
     const selected = factory.wireStart?.id === wire.fromId;
-    const pathData = "M " + from.x.toFixed(1) + " " + from.y.toFixed(1) + " C " + (from.x + bend).toFixed(1) + " " + from.y.toFixed(1) + ", " + (to.x - bend).toFixed(1) + " " + to.y.toFixed(1) + ", " + to.x.toFixed(1) + " " + to.y.toFixed(1);
+    const pathData = "M " + from.x.toFixed(1) + " " + from.y.toFixed(1) + " H " + midpoint.toFixed(1) + " V " + to.y.toFixed(1) + " H " + to.x.toFixed(1);
     return '<path class="circuit-wire ' + (active ? "active" : "inactive") + (selected ? " selected" : "") + '" d="' + pathData + '"></path><path class="wire-hit" data-wire-id="' + wire.id + '" d="' + pathData + '"></path>';
   }).join("");
   if (paths) boardElement.insertAdjacentHTML("beforeend", '<svg class="circuit-wires" viewBox="0 0 ' + boardRect.width + ' ' + boardRect.height + '" aria-label="증강 회로 연결">' + paths + '</svg>');
@@ -933,8 +919,7 @@ function renderFactoryBoard() {
     const validTarget = Boolean(factory.pending) && !fixed && canPlacePart(index, factory.pending) && projectedRam <= ramCapacity();
     const invalidTarget = Boolean(factory.pending) && !fixed && !validTarget;
     let fixedText = "";
-    if (position.col === 0 && position.row === MAIN_ROW) fixedText = '<span class="fixed-node">' + BUS_SOURCE_LABEL + '</span><button type="button" class="circuit-port output bus-port" data-port-owner="' + BUS_SOURCE_ID + '" data-port-kind="output" aria-label="BUS 입력 출력 단자"></button>';
-    if (position.col === 0 && position.row === 0) fixedText = '<span class="fixed-node">' + BUS_SINK_LABEL + '</span><button type="button" class="circuit-port input bus-port" data-port-owner="' + BUS_SINK_ID + '" data-port-kind="input" aria-label="BUS 출력 입력 단자"></button>';
+    if (position.col === 0 && position.row === MAIN_ROW) fixedText = '<span class="fixed-node"><b>' + BUS_SOURCE_LABEL + '</b><small>SIGNAL</small></span><button type="button" class="circuit-port output bus-port" data-port-owner="' + BUS_SOURCE_ID + '" data-port-kind="output" aria-label="BUS 신호 출력 단자"></button>';
     const status = part ? output.statuses.get(part.id) : "";
     return '<div class="factory-cell ' + laneClass + (part ? " occupied" : "") + (powered ? " powered" : "") + (sequenceOut ? " sequence-out" : "") +
       (reactorCore ? " reactor-core" : "") + (fixed ? " fixed" : "") + (selected ? " selected" : "") + (validTarget ? " valid-target" : "") +
@@ -956,27 +941,27 @@ function renderFactoryBoard() {
   const tuningSummary = '<article class="lane-summary tuning-summary" style="--lane-color:#58d7d3"><header><b>' + tuning.mode + ' 공정</b><span>' + Math.round(tuning.throughput * 100) + '% FLOW</span></header><p>피해 ×' + tuning.damageMult.toFixed(2) + ' · 주기 ×' + tuning.cooldownMult.toFixed(2) + ' · 거리 ×' + tuning.rangeMult.toFixed(2) + ' · 범위 ×' + tuning.areaMult.toFixed(2) + (tuning.echo ? ' · 지연 복제 ' + tuning.echo + '회' : '') + '</p></article>';
   const buildSummary = build
     ? '<article class="lane-summary build-summary" style="--lane-color:' + build.color + '"><header><b>' + build.name + '</b><span>TIER ' + ["0", "I", "II", "III"][build.tier] + ' · ' + build.depth + ' MODULE</span></header><p>' + build.identity + '</p><strong>' + build.tiers[build.tier - 1] + '</strong></article>'
-    : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>BUS IN에서 시작해 각 증강의 입력과 출력을 모두 연결하면 전용 행동이 가동됩니다.</p></article>';
+    : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>BUS IN에서 도달한 증강 라인 전체가 즉시 적용됩니다. 도구를 사이에 두면 성능과 반동이 달라집니다.</p></article>';
   $("#factory-summary").innerHTML =
     '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
-    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' WIRE</span></header><p>녹색 선만 BUS IN에서 BUS OUT까지 왕복하는 유효 경로입니다. 선을 클릭하면 연결을 제거합니다.</p></article>' +
+    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' WIRE</span></header><p>BUS IN에서 도달 가능한 연결 라인 전체가 가동됩니다. 종단 버스는 없으며, 선을 클릭하면 연결을 제거합니다.</p></article>' +
     tuningSummary + buildSummary +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' + (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
     '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' + (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '입력·출력이 모두 이어진 핵심 증강의 순서가 프로토콜을 만듭니다.') + '</p></article>';
   const recipeItems = [...output.recipes.values()];
   $("#factory-recipe-list").innerHTML = recipeItems.length
     ? recipeItems.map((recipe) => { const def = MODULES[recipe.type]; const tags = [recipe.mode, Math.round(recipe.throughput * 100) + "%"]; if (recipe.power) tags.push("AMP×" + recipe.power); if (recipe.echo) tags.push("ECHO×" + recipe.echo); if (recipe.focus) tags.push("FOCUS×" + recipe.focus); return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>'; }).join("")
-    : '<span class="no-synergy">BUS IN → 입력 단자 → 출력 단자 → BUS OUT으로 배선하세요.</span>';
+    : '<span class="no-synergy">BUS IN 출력에서 원하는 증강의 입력 단자로 신호를 보내세요. 연결된 라인은 즉시 적용됩니다.</span>';
   $("#factory-synergy-list").innerHTML = output.synergies.length ? output.synergies.map((item) => '<div class="synergy-chip"><b>→ ' + item.name + '</b>' + item.description + '</div>').join("") : '<span class="no-synergy">유효 회로의 순서 프로토콜 없음</span>';
   const commit = $("#factory-commit");
   commit.disabled = Boolean(factory.pending);
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "회로 적용 · 전투 복귀";
   $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
   const pendingDef = factory.pending ? partDefinition(factory.pending) : null;
-  $("#board-message").textContent = factory.wireStart ? "선택한 " + (factory.wireStart.id === BUS_SOURCE_ID ? BUS_SOURCE_LABEL : partDefinition(partsOnBoard().find((part) => String(part.id) === String(factory.wireStart.id))).name) + " 출력 단자입니다. 다음 부품의 입력 단자 또는 BUS OUT을 클릭하세요." :
+  $("#board-message").textContent = factory.wireStart ? "선택한 " + (factory.wireStart.id === BUS_SOURCE_ID ? BUS_SOURCE_LABEL : partDefinition(partsOnBoard().find((part) => String(part.id) === String(factory.wireStart.id))).name) + " 출력 단자입니다. 다음 부품의 입력 단자를 클릭하면 해당 라인이 적용됩니다." :
     factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) 배치 · " + partFootprint(factory.pending).width + "×" + partFootprint(factory.pending).height + " 공간과 남은 RAM " + freeRam + "을 확인하세요." :
       factory.selectedIndex !== null ? "이동할 시작 셀을 선택하세요. 연결선은 유지되며, 단자는 각 부품에 고정됩니다." :
-        factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · 각 부품의 입력과 출력을 BUS IN부터 BUS OUT까지 연결해야 효과가 적용됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "출력 단자를 클릭한 다음 대상의 입력 단자를 클릭해 회로를 배선하세요.");
+        factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · BUS IN에서 해당 증강의 입력 단자까지 연결하면 효과가 적용됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "출력 단자를 클릭한 다음 대상의 입력 단자를 클릭해 회로를 배선하세요.");
   $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount || factory.wireStart ? "warning" : "ok");
 }
 function placePending(index) {
@@ -2709,7 +2694,6 @@ function wireInstalledParts(parts) {
     connectPorts(previous, part.id);
     previous = part.id;
   }
-  if (parts.length) connectPorts(previous, BUS_SINK_ID);
 }
 
 function installAuditSequence(classId, reverse) {
@@ -2756,7 +2740,7 @@ function runFactoryToolAudits() {
     board.fill(null);
     factory.wires = [];
     factory.nextWireId = 1;
-    const install = (parts, sink = true) => {
+    const install = (parts) => {
       board.fill(null);
       factory.wires = [];
       const installed = parts.map((part, index) => {
@@ -2766,15 +2750,29 @@ function runFactoryToolAudits() {
       });
       let previous = BUS_SOURCE_ID;
       installed.forEach((part) => { connectPorts(previous, part.id); previous = part.id; });
-      if (sink && installed.length) connectPorts(previous, BUS_SINK_ID);
       return { installed, output: evaluateClassFactory() };
     };
     const core = { id: 9702, kind: "module", type: "m_mark", index: indexOf(1, 0) };
-    const inputOnly = install([core], false).output;
-    const fullCircuit = install([core]).output;
+    board.fill(null);
+    factory.wires = [];
+    const isolated = ensurePartPorts({ ...core });
+    board[isolated.index] = isolated;
+    const disconnectedInactive = !evaluateClassFactory().traits.has("m_mark");
+    const sourceCircuit = install([core]).output;
     const ampCircuit = install([{ id: 9701, kind: "tool", type: "amplifier", index: indexOf(1, 0) }, { id: 9702, kind: "module", type: "m_mark", index: indexOf(2, 0) }]).output;
-    const inactiveUntilOutputConnected = !inputOnly.traits.has("m_mark") && fullCircuit.traits.has("m_mark");
-    const toolProcessed = ampCircuit.recipes.get(9702)?.mode === "OVERDRIVE" && ampCircuit.primary.damage > fullCircuit.primary.damage;
+    const terminalFreeActive = sourceCircuit.traits.has("m_mark") && sourceCircuit.connectedCount === 1;
+    const toolProcessed = ampCircuit.recipes.get(9702)?.mode === "OVERDRIVE" && ampCircuit.primary.damage > sourceCircuit.primary.damage;
+    const branchA = { id: 9703, kind: "module", type: "m_guard", index: indexOf(1, 0) };
+    const branchB = { id: 9704, kind: "module", type: "m_spin", index: indexOf(3, 0) };
+    board.fill(null);
+    factory.wires = [];
+    const splitA = ensurePartPorts({ ...branchA });
+    const splitB = ensurePartPorts({ ...branchB });
+    board[splitA.index] = splitA;
+    board[splitB.index] = splitB;
+    connectPorts(BUS_SOURCE_ID, splitA.id);
+    connectPorts(BUS_SOURCE_ID, splitB.id);
+    const branchLinesApply = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().traits.has("m_spin") && evaluateClassFactory().connectedCount === 2;
     factory.toolInventory = Object.fromEntries(TOOL_TYPES.map((type) => [type, 0]));
     game.mode = "factory";
     factory.pending = null;
@@ -2813,7 +2811,7 @@ function runFactoryToolAudits() {
     const disconnected = !evaluateClassFactory().traits.has("m_mark");
     const restored = connectPorts(BUS_SOURCE_ID, rewired.installed[0].id) && evaluateClassFactory().traits.has("m_mark");
     const rewireable = removed && disconnected && restored;
-    report = { inactiveUntilOutputConnected, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, randomStablePorts, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
+    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, randomStablePorts, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
     report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
   } finally {
     boardCols = savedCols;
@@ -3811,7 +3809,7 @@ $("#factory-board").addEventListener("click", (event) => {
       factory.placementNotice = factory.wireStart ? "출력 단자를 선택했습니다. 대상 입력 단자를 클릭하세요." : "단자 선택을 취소했습니다.";
     } else if (factory.wireStart) {
       const connected = connectPorts(factory.wireStart.id, owner);
-      factory.placementNotice = connected ? "입력과 출력을 연결했습니다. BUS OUT까지 이어지면 증강이 가동됩니다." : "이 단자는 연결할 수 없습니다.";
+      factory.placementNotice = connected ? "입력 신호를 연결했습니다. BUS IN에서 도달한 라인 전체가 즉시 가동됩니다." : "이 단자는 연결할 수 없습니다.";
       factory.wireStart = null;
     } else {
       factory.placementNotice = "먼저 BUS IN 또는 부품의 출력 단자를 클릭하세요.";
