@@ -202,8 +202,8 @@ async function auditViewport(session, viewport) {
     await clickElement(session, '#factory-board [data-cell-index="7"]');
     await sleep(120);
     await sleep(120);
-    const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, rails: document.querySelectorAll('[data-port-owner=\"bus-source\"][data-port-row]').length, rightJacks: document.querySelectorAll('.module-token [data-port-edge=\"right\"]').length, leftJacks: document.querySelectorAll('.module-token [data-port-edge=\"left\"]').length, hasPickup: Boolean(document.querySelector('.module-token [data-store-index]')), message: document.querySelector('#board-message')?.textContent || null })");
-    const connected = circuitState.wires === 1 && circuitState.token?.includes("raw") && circuitState.rails === 5 && circuitState.rightJacks >= 1 && circuitState.leftJacks >= 1 && circuitState.hasPickup;
+    const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, rails: document.querySelectorAll('[data-port-owner=\"bus-source\"][data-port-row]').length, jacks: document.querySelectorAll('.module-token [data-port-kind=\"jack\"]').length, leftJacks: document.querySelectorAll('.module-token [data-port-edge=\"left\"]').length, hasPickup: Boolean(document.querySelector('.module-token [data-store-index]')), message: document.querySelector('#board-message')?.textContent || null })");
+    const connected = circuitState.wires === 1 && circuitState.token?.includes("raw") && circuitState.rails === 5 && circuitState.jacks >= 2 && circuitState.leftJacks >= 1 && circuitState.hasPickup;
     assert(connected, "wide: 인접 레고 결합 또는 PICK 버튼이 동작하지 않음 " + JSON.stringify(circuitState));
     await clickElement(session, '.module-token .part-code');
     await sleep(70);

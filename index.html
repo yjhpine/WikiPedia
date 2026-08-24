@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-14" />
+    <link rel="stylesheet" href="styles.css?v=prototype-15" />
   </head>
   <body>
     <main class="game" id="game">
@@ -115,17 +115,17 @@
               </section>
               <div class="factory-help">
                 <b>배치 규칙</b>
-                <p>블록의 상·우·하 잭이 가까이 맞닿을 때만 자동 결합되고, BUS 레일에서 닿는 증강 라인 전체가 가동됩니다.</p>
+                <p>도구는 상·우·하 잭을 모두 쓰고, 증강은 좌측 BUS 입력과 무작위 전방 잭 1~2개(총 2~3곳)로 자동 결합됩니다.</p>
                 <ul>
                   <li>일반은 1×1, 희귀는 2×2, 전설은 4×4 공간을 차지합니다.</li>
-                  <li>출력은 상·우·하 방향으로만 나가며, 블록을 바로 맞닿게 놓으면 레고처럼 자동 결합됩니다.</li>
+                  <li>도구는 상·우·하 세 방향 모두 출력하고, 증강은 매번 다른 2곳 이상 잭 조합으로 배치 퍼즐을 만듭니다.</li>
                   <li>블록을 클릭하면 바로 들어 올려 다른 셀에 놓을 수 있고, PICK으로 STORAGE에 회수해 나중에 재배치할 수도 있습니다.</li>
                 </ul>
               </div>
             </aside>
 
             <section class="board-panel" aria-label="가로로 무한 확장되는 5행 증강 배치 보드">
-              <div class="board-column-labels"><span>SOURCE RAIL</span><span>LEGO CIRCUIT · UP / RIGHT / DOWN LINKS</span><button id="board-expand" type="button">+ EXTEND 8</button></div>
+              <div class="board-column-labels"><span>SOURCE RAIL</span><span>TOOL U/R/D · AUGMENT RANDOM 2+</span><button id="board-expand" type="button">+ EXTEND 8</button></div>
               <div class="factory-board" id="factory-board"></div>
               <p class="board-message" id="board-message" aria-live="polite">신규 부품을 빈 셀에 배치하세요.</p>
             </section>
@@ -180,6 +180,6 @@
       </div>
     </main>
 
-    <script type="module" src="game.js?v=prototype-14"></script>
+    <script type="module" src="game.js?v=prototype-15"></script>
   </body>
 </html>

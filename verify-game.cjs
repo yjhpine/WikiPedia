@@ -26,10 +26,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-14") && html.includes("game.js?v=prototype-14"), "레고 회로 화면 캐시 버전 prototype-14 누락");
+check(html.includes("styles.css?v=prototype-15") && html.includes("game.js?v=prototype-15"), "랜덤 증강 단자 화면 캐시 버전 prototype-15 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch"), "물리 레고 단자 회로 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO"), "랜덤 물리 단자·전투 템포 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -143,6 +143,34 @@ try {
     return Number.isFinite(game.player.facing) && Number.isFinite(game.player.weaponFacing);
   })`, runtime, { timeout: 1000 });
   check(classRenderAudit, "세 클래스 보간 렌더링 스모크 테스트 실패");
+  const tempoAudit = vm.runInContext(`(() => {
+    game.mode = "start";
+    selectClass("sniper");
+    startGame();
+    game.enemies = [];
+    game.playerShots = [];
+    const close = (actual, expected) => Math.abs(actual - expected) < .001;
+    const playerMove = close(game.player.speed, 225 * COMBAT_TEMPO.unitMove);
+    const attackRate = close(game.output.primary.cooldown, CLASS_PROFILES.sniper.cooldown / COMBAT_TEMPO.attackRate);
+    spawnRailShot(0, { speed: 100 });
+    launchGrenade(0, { speed: 100 });
+    const railSpeed = Math.hypot(game.playerShots[0].vx, game.playerShots[0].vy);
+    const grenadeSpeed = Math.hypot(game.playerShots[1].vx, game.playerShots[1].vy);
+    spawnEnemy("turret", game.player.x + 320, game.player.y);
+    const turret = game.enemies[0];
+    const enemyMove = close(turret.speed, (45 + game.room * 1.4) * COMBAT_TEMPO.unitMove);
+    fireEnemyBullet(turret, 100, 1);
+    const enemyProjectileSpeed = Math.hypot(game.enemyBullets[0].vx, game.enemyBullets[0].vy);
+    turret.shootCooldown = 0;
+    updateEnemies(.001);
+    const enemyAttackRate = close(turret.shootWindup, .38 / COMBAT_TEMPO.attackRate);
+    return {
+      playerMove, attackRate,
+      playerProjectile: close(railSpeed, 100 * COMBAT_TEMPO.projectile) && close(grenadeSpeed, 100 * COMBAT_TEMPO.projectile),
+      enemyMove, enemyProjectile: close(enemyProjectileSpeed, 100 * COMBAT_TEMPO.projectile), enemyAttackRate
+    };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(tempoAudit).every(Boolean), `전투 템포 런타임 검증 실패: ${JSON.stringify(tempoAudit)}`);
   const circuitAudit = vm.runInContext(`(() => {
     game.selectedClass = "melee";
     startGame();
@@ -163,12 +191,14 @@ try {
     const redeployedActive = evaluateClassFactory().traits.has("m_guard") && factory.wires.length === 1;
     const branch = createPart("module", "m_spin");
     board[indexOf(1, 3)] = branch;
-    const neighbor = createPart("module", "m_mark");
-    board[indexOf(3, 0)] = neighbor;
+    const toolLink = createPart("tool", "router");
+    const neighbor = createPart("tool", "amplifier");
+    board[indexOf(4, 1)] = toolLink;
+    board[indexOf(5, 1)] = neighbor;
     rebuildPhysicalWires();
-    const neighborWire = factory.wires.find((wire) => wire.fromId === moduleId && wire.toId === neighbor.id);
+    const neighborWire = factory.wires.find((wire) => wire.fromId === toolLink.id && wire.toId === neighbor.id);
     const branchLinesApply = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().traits.has("m_spin") && factory.wires.filter((wire) => wire.fromId === BUS_SOURCE_ID).length === 2;
-    const proximityOnly = Boolean(neighborWire) && neighborWire.fromEdge === "right" && neighborWire.toEdge === "left" && !findPhysicalPortMatch(neighbor.id, moduleId) && !connectPorts(moduleId, branch.id);
+    const proximityOnly = Boolean(neighborWire) && neighborWire.fromEdge === "right" && neighborWire.toEdge === "left" && !findPhysicalPortMatch(neighbor.id, toolLink.id) && !connectPorts(toolLink.id, branch.id);
     const colsBeforeExtend = boardCols;
     extendBoard();
     const boardExtends = boardCols === colsBeforeExtend + EXTEND_BY && board.length === boardCols * ROWS;
@@ -184,12 +214,17 @@ try {
     const toolRecovered = factory.toolInventory.amplifier === 1;
     const raritySizes = ["common", "rare", "legendary"].every((rarity) => moduleTypes.some((type) => MODULE_RARITIES[type] === rarity)) &&
       JSON.stringify([RARITIES.common.width, RARITIES.rare.width, RARITIES.legendary.width]) === JSON.stringify([1, 2, 4]);
-    const threeWayPorts = (() => { const part = createPart("module", "m_mark"); return part.ports.layout === "lego-three-way" && ["top", "right", "bottom"].every((edge) => portOffsets(part, edge).length) && portOffsets(part, "left").length; })();
+    const portLayouts = (() => {
+      const tool = createPart("tool", "router");
+      const augment = createPart("module", "m_mark");
+      return tool.ports.layout === "lego-tool-three-way" && PORT_EDGES.every((edge) => portOffsets(tool, edge).length) &&
+        augment.ports.layout === "lego-augment-random" && augment.ports.edges.length >= 2 && augment.ports.edges.includes("left");
+    })();
     commitFactory();
     const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_guard");
     const capacities = [1, 2, 4, 8].map((level) => { game.player.level = level; return ramCapacity(); });
     const capacityProgression = JSON.stringify(capacities) === JSON.stringify([10, 12, 16, 24]);
-    return { factoryOpened, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, branchLinesApply, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, raritySizes, threeWayPorts, committed, capacityProgression };
+    return { factoryOpened, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, branchLinesApply, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, raritySizes, portLayouts, committed, capacityProgression };
   })()`, runtime, { timeout: 1500 });
   check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);
   const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
@@ -219,5 +254,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · 6/6 monster-drop tools · 3-way LEGO circuit · PICK/redeploy · 9/9 playstyles · aspect-fit UI scaling · combat rendering");
+  console.log("30/30 augments · 6/6 monster-drop tools · tool 3-way / random 2+ augment jacks · PICK/redeploy · 9/9 playstyles · fast combat rendering");
 }

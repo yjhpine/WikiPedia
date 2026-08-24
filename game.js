@@ -17,6 +17,7 @@ const UI_REFERENCE_ANCHORS = [
 ];
 const UI_SCALE_MIN = .56;
 const UI_SCALE_MAX = 1.6;
+const COMBAT_TEMPO = Object.freeze({ unitMove: 1.28, attackRate: 1.32, projectile: 1.36 });
 
 const CLASS_PROFILES = {
   melee: {
@@ -308,16 +309,56 @@ function canPlacePart(index, part, ignorePartId) {
 }
 
 const OUTPUT_EDGES = ["top", "right", "bottom"];
+const PORT_EDGES = ["top", "right", "bottom", "left"];
 const OPPOSITE_EDGE = { top: "bottom", right: "left", bottom: "top", left: "right" };
 const EDGE_DELTA = { top: { dc: 0, dr: -1 }, right: { dc: 1, dr: 0 }, bottom: { dc: 0, dr: 1 }, left: { dc: -1, dr: 0 } };
 
+function portSeed(part) {
+  const value = String(part?.id ?? 0) + ":" + String(part?.type ?? "");
+  let seed = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    seed ^= value.charCodeAt(index);
+    seed = Math.imul(seed, 16777619);
+  }
+  return seed >>> 0;
+}
+
+function randomAugmentEdges(part) {
+  const shuffled = [...OUTPUT_EDGES];
+  let seed = portSeed(part);
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const swapIndex = seed % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  const outputCount = 1 + (seed % 2);
+  const selected = new Set(shuffled.slice(0, outputCount));
+  return PORT_EDGES.filter((edge) => edge === "left" || selected.has(edge));
+}
+
+function hasUsableAugmentPorts(part) {
+  const edges = part?.ports?.edges;
+  return Array.isArray(edges) && edges.length >= 2 && edges.length <= 3 && edges.includes("left") &&
+    edges.some((edge) => OUTPUT_EDGES.includes(edge)) && edges.every((edge) => PORT_EDGES.includes(edge));
+}
+
 function ensurePartPorts(part) {
   if (!part) return part;
-  part.ports = { layout: "lego-three-way" };
+  if (partKind(part) === "tool") {
+    part.ports = { layout: "lego-tool-three-way", edges: [...PORT_EDGES] };
+    return part;
+  }
+  if (!hasUsableAugmentPorts(part)) {
+    part.ports = { layout: "lego-augment-random", edges: randomAugmentEdges(part) };
+  } else {
+    part.ports = { layout: "lego-augment-random", edges: PORT_EDGES.filter((edge) => part.ports.edges.includes(edge)) };
+  }
   return part;
 }
 
 function portOffsets(part, edge) {
+  ensurePartPorts(part);
+  if (!part.ports.edges.includes(edge)) return [];
   const footprint = partFootprint(part);
   const span = edge === "top" || edge === "bottom" ? footprint.width : footprint.height;
   return Array.from({ length: span }, (_, offset) => offset);
@@ -783,7 +824,7 @@ function evaluateClassFactory() {
   const tuning = buildFactoryTuning(recipes, activeTools);
   const primary = createAttackProfile(classProfile.attackName, classProfile.damage, classProfile.range, classProfile.arc);
   primary.damage = Math.round(primary.damage * tuning.damageMult * 10) / 10;
-  primary.cooldown = classProfile.cooldown * tuning.cooldownMult;
+  primary.cooldown = classProfile.cooldown * tuning.cooldownMult / COMBAT_TEMPO.attackRate;
   primary.range *= tuning.rangeMult;
   primary.arc *= tuning.areaMult;
   primary.stun *= tuning.controlMult;
@@ -843,11 +884,13 @@ function footprintCssSize(cells) {
 
 function portPads(part) {
   const footprint = partFootprint(part);
-  const edges = ["top", "right", "bottom", "left"];
+  const kind = partKind(part);
+  const edges = PORT_EDGES.filter((edge) => portOffsets(part, edge).length);
   return edges.flatMap((edge) => portOffsets(part, edge).map((offset) => {
     const direction = edge === "left" ? "input" : "output";
-    const label = edge === "left" ? "입력 전용" : edge + " 방향 출력/입력";
-    return '<span class="circuit-port jack ' + direction + ' edge-' + edge + '" data-port-owner="' + part.id + '" data-port-kind="jack" data-port-edge="' + edge + '" data-port-offset="' + offset + '" style="' + portStyle(edge, offset, footprint) + '" aria-label="' + partDefinition(part).name + ' ' + label + ' 패드"></span>';
+    const label = edge === "left" ? "BUS 입력" : edge + " 방향 출력";
+    const jackKind = kind === "tool" ? "tool-jack" : "augment-jack";
+    return '<span class="circuit-port jack ' + jackKind + ' ' + direction + ' edge-' + edge + '" data-port-owner="' + part.id + '" data-port-kind="jack" data-port-edge="' + edge + '" data-port-offset="' + offset + '" style="' + portStyle(edge, offset, footprint) + '" aria-label="' + partDefinition(part).name + ' ' + label + ' 패드"></span>';
   })).join("");
 }
 
@@ -1371,7 +1414,7 @@ function resetGame() {
   game.protocolEvents = {};
   game.player = {
     x: game.width * .5, y: game.height - 145, radius: 17,
-    hp: 100, maxHp: 100, level: 1, speed: 225,
+    hp: 100, maxHp: 100, level: 1, speed: 225 * COMBAT_TEMPO.unitMove,
     aim: -Math.PI / 2, facing: -Math.PI / 2, weaponFacing: -Math.PI / 2,
     renderX: game.width * .5, renderY: game.height - 145, aimHold: 0, bufferedAim: null,
     attackCooldown: 0, dashCooldown: 0, dashTime: 0,
@@ -1472,9 +1515,9 @@ function spawnEnemy(type, x, y) {
     id: game.nextEnemyId++, type,
     x: spawnX, y: spawnY, renderX: spawnX, renderY: spawnY,
     radius: data.radius, hp: data.hp * scale, maxHp: data.hp * scale,
-    speed: data.speed + game.room * 1.4, damage: data.damage, xp: data.xp,
-    color: data.color, attackCooldown: .5 + Math.random() * .5,
-    shootCooldown: 1 + Math.random(), chargeCooldown: 1.8,
+    speed: (data.speed + game.room * 1.4) * COMBAT_TEMPO.unitMove, damage: data.damage, xp: data.xp,
+    color: data.color, attackCooldown: (.5 + Math.random() * .5) / COMBAT_TEMPO.attackRate,
+    shootCooldown: (1 + Math.random()) / COMBAT_TEMPO.attackRate, chargeCooldown: 1.8 / COMBAT_TEMPO.attackRate,
     shootWindup: 0, chargeWindup: 0, chargeTime: 0, chargeAngle: 0,
     burnTime: 0, burnDps: 0, bleedTime: 0, bleedDps: 0,
     stun: 0, flash: 0, dead: false
@@ -1864,7 +1907,7 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
 
 function spawnRailShot(angle, options) {
   const settings = options || {};
-  const speed = settings.speed || 920;
+  const speed = (settings.speed || 920) * COMBAT_TEMPO.projectile;
   const pierce = settings.pierce ?? (hasTrait("s_pierce") ? Math.max(1, Math.round(2 * augmentStrength("s_pierce"))) : 0);
   const ricochet = settings.ricochet ?? (hasTrait("s_ricochet") ? Math.max(1, Math.round(augmentStrength("s_ricochet"))) : 0);
   const homing = settings.homing ?? hasTrait("s_homing");
@@ -1945,7 +1988,7 @@ function launchGrenade(angle, options) {
   const targetDistance = Math.min(game.output.primary.range, Math.hypot(game.mouse.x - player.x, game.mouse.y - player.y));
   const targetX = settings.targetX ?? player.x + Math.cos(angle) * targetDistance;
   const targetY = settings.targetY ?? player.y + Math.sin(angle) * targetDistance;
-  const speed = settings.speed || 440;
+  const speed = (settings.speed || 440) * COMBAT_TEMPO.projectile;
   game.playerShots.push({
     kind: "grenade", x: settings.x ?? player.x, y: settings.y ?? player.y,
     vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, angle,
@@ -2205,7 +2248,7 @@ function updatePlayer(dt) {
   } else {
     for (const enemy of game.enemies) enemy.dashHit = false;
   }
-  const speed = dashing ? 610 : player.speed;
+  const speed = dashing ? 610 * COMBAT_TEMPO.unitMove : player.speed;
   player.x = clamp(player.x + moveX * speed * dt, bounds.left + player.radius, bounds.right - player.radius);
   player.y = clamp(player.y + moveY * speed * dt, bounds.top + player.radius, bounds.bottom - player.radius);
   if (player.aimHold <= 0) player.weaponFacing = smoothAngle(player.weaponFacing, player.facing, smoothFactor(10, dt));
@@ -2238,7 +2281,7 @@ function fireEnemyBullet(enemy, speed, count) {
     const offset = (index - (amount - 1) / 2) * .16;
     const angle = base + offset;
     game.enemyBullets.push({
-      x: enemy.x, y: enemy.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      x: enemy.x, y: enemy.y, vx: Math.cos(angle) * speed * COMBAT_TEMPO.projectile, vy: Math.sin(angle) * speed * COMBAT_TEMPO.projectile,
       radius: enemy.type === "guardian" ? 7 : 5, damage: enemy.damage, life: 3.2, dead: false
     });
   }
@@ -2283,8 +2326,8 @@ function updateEnemies(dt) {
         move = 0;
         if (enemy.shootWindup <= 0) fireEnemyBullet(enemy, 280 + game.room * 3, 1);
       } else if (enemy.shootCooldown <= 0) {
-        enemy.shootWindup = .38;
-        enemy.shootCooldown = Math.max(.75, 1.55 - game.room * .025);
+        enemy.shootWindup = .38 / COMBAT_TEMPO.attackRate;
+        enemy.shootCooldown = Math.max(.75, 1.55 - game.room * .025) / COMBAT_TEMPO.attackRate;
       }
     }
     if (enemy.type === "guardian") {
@@ -2292,21 +2335,21 @@ function updateEnemies(dt) {
         enemy.shootWindup -= dt;
         if (enemy.shootWindup <= 0) fireEnemyBullet(enemy, 245, 3);
       } else if (enemy.shootCooldown <= 0) {
-        enemy.shootWindup = .42;
-        enemy.shootCooldown = 1.25;
+        enemy.shootWindup = .42 / COMBAT_TEMPO.attackRate;
+        enemy.shootCooldown = 1.25 / COMBAT_TEMPO.attackRate;
       }
     }
     let charging = false;
     if (enemy.chargeWindup > 0) {
       enemy.chargeWindup -= dt;
       move = 0;
-      if (enemy.chargeWindup <= 0) enemy.chargeTime = enemy.type === "guardian" ? .3 : .24;
+      if (enemy.chargeWindup <= 0) enemy.chargeTime = (enemy.type === "guardian" ? .3 : .24) / COMBAT_TEMPO.attackRate;
     } else if (enemy.chargeTime > 0) {
       enemy.chargeTime -= dt;
       charging = true;
     } else if ((enemy.type === "brute" || enemy.type === "guardian") && enemy.chargeCooldown <= 0 && distance > 90) {
-      enemy.chargeWindup = enemy.type === "guardian" ? .5 : .42;
-      enemy.chargeCooldown = enemy.type === "guardian" ? 1.5 : 2.2;
+      enemy.chargeWindup = (enemy.type === "guardian" ? .5 : .42) / COMBAT_TEMPO.attackRate;
+      enemy.chargeCooldown = (enemy.type === "guardian" ? 1.5 : 2.2) / COMBAT_TEMPO.attackRate;
       enemy.chargeAngle = angle;
       move = 0;
     }
@@ -2316,7 +2359,7 @@ function updateEnemies(dt) {
     enemy.y = clamp(enemy.y + Math.sin(movementAngle) * velocity * dt, bounds.top + enemy.radius, bounds.bottom - enemy.radius);
     if (distance < player.radius + enemy.radius + 3 && enemy.attackCooldown <= 0) {
       damagePlayer(enemy.damage, enemy.x, enemy.y);
-      enemy.attackCooldown = enemy.type === "guardian" ? .8 : 1.05;
+      enemy.attackCooldown = (enemy.type === "guardian" ? .8 : 1.05) / COMBAT_TEMPO.attackRate;
       if (game.output.guard.thorns > 0) {
         enemy.hp -= game.output.guard.thorns;
         if (enemy.hp <= 0) killEnemy(enemy);
@@ -2762,13 +2805,19 @@ function wireInstalledParts(parts) {
   board.fill(null);
   let column = 1;
   for (const part of parts) {
-    const installed = ensurePartPorts(part);
+    const installed = configureAuditPorts(part);
     const footprint = partFootprint(installed);
     while (column + footprint.width > boardCols) extendBoard();
     board[indexOf(column, 0)] = installed;
     column += footprint.width;
   }
   rebuildPhysicalWires();
+}
+
+function configureAuditPorts(part) {
+  const prepared = { ...part };
+  if (partKind(prepared) === "module") prepared.ports = { layout: "lego-augment-random", edges: ["left", "right"] };
+  return ensurePartPorts(prepared);
 }
 
 function installAuditSequence(classId, reverse) {
@@ -2820,7 +2869,7 @@ function runFactoryToolAudits() {
       factory.wires = [];
       let column = 1;
       const installed = parts.map((part) => {
-        const next = ensurePartPorts({ ...part, index: undefined });
+        const next = configureAuditPorts({ ...part, index: undefined });
         const footprint = partFootprint(next);
         while (column + footprint.width > boardCols) extendBoard();
         board[indexOf(column, 0)] = next;
@@ -2868,11 +2917,15 @@ function runFactoryToolAudits() {
       const rarity = RARITIES[MODULE_RARITIES[type]];
       return Boolean(rarity) && footprint.width === rarity.width && footprint.height === rarity.height && [1, 2, 4].includes(footprint.width);
     });
-    const firstPortPart = createPart("module", "m_mark");
-    const threeWayJackLayout = moduleTypes.every((type) => {
+    const toolThreeWayJackLayout = TOOL_TYPES.every((type) => {
+      const part = createPart("tool", type);
+      return part.ports.layout === "lego-tool-three-way" && PORT_EDGES.every((edge) => portOffsets(part, edge).length === 1);
+    });
+    const randomAugmentJackLayout = moduleTypes.every((type) => {
       const part = createPart("module", type);
-      return part.ports.layout === "lego-three-way" && ["top", "right", "bottom", "left"].every((edge) => portOffsets(part, edge).length === (edge === "top" || edge === "bottom" ? partFootprint(part).width : partFootprint(part).height));
-    }) && ensurePartPorts(firstPortPart).ports.layout === "lego-three-way";
+      const edges = part.ports.edges;
+      return part.ports.layout === "lego-augment-random" && edges.length >= 2 && edges.length <= 3 && edges.includes("left") && edges.some((edge) => OUTPUT_EDGES.includes(edge));
+    }) && new Set([20001, 20002, 20003, 20004, 20005, 20006].map((id) => ensurePartPorts({ id, kind: "module", type: "m_mark" }).ports.edges.join(","))).size > 1;
     board.fill(null);
     const legendary = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "legendary"));
     const rare = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "rare"));
@@ -2885,7 +2938,7 @@ function runFactoryToolAudits() {
     rebuildPhysicalWires();
     const restored = evaluateClassFactory().traits.has("m_mark") && factory.wires.length === 1;
     const rewireable = removed && disconnected && restored;
-    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, threeWayJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
+    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, toolThreeWayJackLayout, randomAugmentJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
     report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
   } finally {
     boardCols = savedCols;
