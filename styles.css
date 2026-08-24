@@ -510,3 +510,49 @@ kbd { font-family: var(--mono); }
 .circuit-wire.selected { stroke: #f6dc66; stroke-width: 3; }
 .wire-hit { stroke-width: 16; }
 @keyframes schematic-flow { to { stroke-dashoffset: -14; } }
+
+
+/* Lego proximity circuit controls */
+.board-panel { align-items: flex-start; justify-content: flex-start; padding-right: 28px; overscroll-behavior: contain; }
+.board-column-labels { grid-template-columns: minmax(88px, var(--cell)) minmax(420px, 1fr) auto; align-items: center; column-gap: 10px; min-width: max-content; }
+.board-column-labels span:last-child { text-align: left; }
+#board-expand { border: 1px solid #4f8583; padding: 5px 8px; color: #bdf7f1; background: #0a1b1d; font: 800 8px var(--mono); letter-spacing: .08em; cursor: pointer; }
+#board-expand:hover { border-color: var(--lime); color: var(--lime); box-shadow: 0 0 12px rgba(201,240,90,.22); }
+.factory-board { --board-gap: 4px; gap: var(--board-gap); min-width: max-content; }
+.factory-cell.occupied { cursor: default; }
+.module-token, .tool-token { cursor: default; }
+.module-token .module-store, .tool-token .module-store {
+  z-index: 40;
+  top: 4px;
+  right: 4px;
+  border: 1px solid var(--module-color);
+  padding: 2px 3px;
+  color: #dffbf8;
+  background: #061113e8;
+  font: 800 6px var(--mono);
+  letter-spacing: .04em;
+  opacity: 1;
+}
+.module-token.size-1 .module-store, .tool-token.size-1 .module-store { padding: 1px 2px; font-size: 5px; }
+.module-token .module-store:hover, .tool-token .module-store:hover { color: #101707; background: var(--module-color); }
+.circuit-port { pointer-events: none; }
+.circuit-port.jack, .circuit-port.bus-port {
+  z-index: 34;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #061012;
+  border-radius: 1px;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px #8aa5a6, 0 0 8px rgba(88,215,211,.48);
+}
+.circuit-port.jack.output { background: linear-gradient(135deg, #f6dc66 0 44%, #58d7d3 45% 100%); }
+.circuit-port.jack.input { background: #0b6262; box-shadow: 0 0 0 1px #8aa5a6, 0 0 9px rgba(88,215,211,.75); }
+.circuit-port.jack.edge-top, .circuit-port.jack.edge-bottom { box-shadow: 0 0 0 1px #8aa5a6, 0 0 9px rgba(246,220,102,.42); }
+.circuit-port.bus-port { background: #c9f05a; box-shadow: 0 0 0 1px #eaffbd, 0 0 11px rgba(201,240,90,.78); }
+.factory-cell.fixed .bus-port.output { right: -5px; }
+.factory-cell.fixed::before { z-index: 1; }
+.circuit-wires { z-index: 22; pointer-events: none; }
+.circuit-wire { stroke-width: 3; stroke-linecap: square; }
+.circuit-wire.active { stroke: #c9f05a; filter: drop-shadow(0 0 3px #c9f05a); stroke-dasharray: 3 3; animation: lego-link-flow .45s linear infinite; }
+.module-token:hover::before, .tool-token:hover::before { content: attr(data-label) " · PICK으로 회수"; }
+@keyframes lego-link-flow { to { stroke-dashoffset: -6; } }

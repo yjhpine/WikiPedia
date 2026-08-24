@@ -231,8 +231,8 @@ const DIRECTIONS = [
 ];
 
 const ROWS = 5;
-const INITIAL_COLS = 9;
-const EXTEND_BY = 4;
+const INITIAL_COLS = 11;
+const EXTEND_BY = 8;
 let boardCols = INITIAL_COLS;
 const MAIN_ROW = 2;
 const ECHO_ROW = 1;
@@ -307,43 +307,39 @@ function canPlacePart(index, part, ignorePartId) {
   });
 }
 
-function stableHash(value) {
-  let hash = 2166136261;
-  for (const char of String(value)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-  return hash >>> 0;
-}
-
-function randomPort(part, kind, salt) {
-  const { width, height } = partFootprint(part);
-  const seed = salt === undefined ? Math.floor(Math.random() * 0x7fffffff) : stableHash(String(part.id) + ":" + part.type + ":" + kind + ":" + salt);
-  const edge = ["top", "right", "bottom", "left"][seed % 4];
-  const span = edge === "top" || edge === "bottom" ? width : height;
-  return { edge, offset: Math.floor(seed / 7) % span };
-}
+const OUTPUT_EDGES = ["top", "right", "bottom"];
+const OPPOSITE_EDGE = { top: "bottom", right: "left", bottom: "top", left: "right" };
+const EDGE_DELTA = { top: { dc: 0, dr: -1 }, right: { dc: 1, dr: 0 }, bottom: { dc: 0, dr: 1 }, left: { dc: -1, dr: 0 } };
 
 function ensurePartPorts(part) {
   if (!part) return part;
-  if (!part.ports) part.ports = {};
-  if (!part.ports.input) part.ports.input = randomPort(part, "input", "fallback-in");
-  if (!part.ports.output) part.ports.output = randomPort(part, "output", "fallback-out");
-  if (part.ports.input.edge === part.ports.output.edge && part.ports.input.offset === part.ports.output.offset) {
-    const { width, height } = partFootprint(part);
-    const opposite = { top: "bottom", right: "left", bottom: "top", left: "right" };
-    part.ports.output = { edge: opposite[part.ports.output.edge], offset: part.ports.output.edge === "top" || part.ports.output.edge === "bottom" ? Math.min(part.ports.output.offset, width - 1) : Math.min(part.ports.output.offset, height - 1) };
-  }
+  part.ports = { layout: "lego-three-way" };
   return part;
+}
+
+function portOffsets(part, edge) {
+  const footprint = partFootprint(part);
+  const span = edge === "top" || edge === "bottom" ? footprint.width : footprint.height;
+  return Array.from({ length: span }, (_, offset) => offset);
+}
+
+function portGridPoint(part, edge, offset) {
+  const position = { col: part.col, row: part.row };
+  const footprint = partFootprint(part);
+  if (edge === "top") return { col: position.col + offset, row: position.row };
+  if (edge === "right") return { col: position.col + footprint.width - 1, row: position.row + offset };
+  if (edge === "bottom") return { col: position.col + offset, row: position.row + footprint.height - 1 };
+  return { col: position.col, row: position.row + offset };
 }
 
 function createPart(kind, type) {
   const part = { id: factory.nextId++, kind, type };
   if (kind === "tool") part.dir = 0;
-  part.ports = { input: randomPort(part, "input"), output: randomPort(part, "output") };
-  ensurePartPorts(part);
-  return part;
+  return ensurePartPorts(part);
 }
 
-function wireKey(fromId, toId) {
-  return String(fromId) + ">" + String(toId);
+function wireKey(fromId, toId, fromEdge, fromOffset, toEdge, toOffset) {
+  return [fromId, toId, fromEdge, fromOffset, toEdge, toOffset].join(">");
 }
 
 function clearWiresFor(partId) {
@@ -357,17 +353,69 @@ function circuitId(id) {
   return Number.isFinite(numeric) && String(numeric) === String(id) ? numeric : id;
 }
 
-function connectPorts(fromId, toId) {
+function findPhysicalPortMatch(fromId, toId, preferred = {}) {
   fromId = circuitId(fromId);
   toId = circuitId(toId);
-  if (fromId === toId || !fromId || !toId) return false;
   const parts = partsOnBoard();
-  const fromValid = fromId === BUS_SOURCE_ID || parts.some((part) => part.id === fromId);
-  const toValid = parts.some((part) => part.id === toId);
-  if (!fromValid || !toValid || toId === BUS_SOURCE_ID) return false;
-  factory.wires = factory.wires.filter((wire) => wire.toId !== toId && wireKey(wire.fromId, wire.toId) !== wireKey(fromId, toId));
-  factory.wires.push({ id: factory.nextWireId++, fromId, toId });
+  const fromPart = parts.find((part) => part.id === fromId);
+  const toPart = parts.find((part) => part.id === toId);
+  if (!toPart || fromId === toId) return null;
+  if (fromId === BUS_SOURCE_ID) {
+    const toEdge = preferred.toEdge || "left";
+    if ((preferred.fromEdge && preferred.fromEdge !== "right") || toEdge !== "left") return null;
+    for (const toOffset of portOffsets(toPart, "left")) {
+      const toPoint = portGridPoint(toPart, "left", toOffset);
+      const fromRow = preferred.fromRow ?? toPoint.row;
+      if (toPoint.col === 1 && toPoint.row === fromRow) {
+        return { fromId, toId, fromEdge: "right", fromOffset: 0, fromRow, toEdge, toOffset };
+      }
+    }
+    return null;
+  }
+  if (!fromPart) return null;
+  const edgeChoices = preferred.fromEdge ? [preferred.fromEdge] : OUTPUT_EDGES;
+  for (const fromEdge of edgeChoices) {
+    if (!OUTPUT_EDGES.includes(fromEdge)) continue;
+    const toEdge = OPPOSITE_EDGE[fromEdge];
+    if (preferred.toEdge && preferred.toEdge !== toEdge) continue;
+    const delta = EDGE_DELTA[fromEdge];
+    const fromOffsets = preferred.fromOffset === undefined ? portOffsets(fromPart, fromEdge) : [Number(preferred.fromOffset)];
+    const toOffsets = preferred.toOffset === undefined ? portOffsets(toPart, toEdge) : [Number(preferred.toOffset)];
+    for (const fromOffset of fromOffsets) {
+      if (!portOffsets(fromPart, fromEdge).includes(fromOffset)) continue;
+      const fromPoint = portGridPoint(fromPart, fromEdge, fromOffset);
+      for (const toOffset of toOffsets) {
+        if (!portOffsets(toPart, toEdge).includes(toOffset)) continue;
+        const toPoint = portGridPoint(toPart, toEdge, toOffset);
+        if (toPoint.col === fromPoint.col + delta.dc && toPoint.row === fromPoint.row + delta.dr) {
+          return { fromId, toId, fromEdge, fromOffset, toEdge, toOffset };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function connectPorts(fromId, toId, preferred) {
+  fromId = circuitId(fromId);
+  toId = circuitId(toId);
+  if (!fromId || !toId || fromId === toId || toId === BUS_SOURCE_ID) return false;
+  const match = findPhysicalPortMatch(fromId, toId, preferred);
+  if (!match) return false;
+  factory.wires = factory.wires.filter((wire) => wire.toId !== toId && wireKey(wire.fromId, wire.toId, wire.fromEdge, wire.fromOffset, wire.toEdge, wire.toOffset) !== wireKey(match.fromId, match.toId, match.fromEdge, match.fromOffset, match.toEdge, match.toOffset));
+  factory.wires.push({ id: factory.nextWireId++, ...match });
   return true;
+}
+
+function rebuildPhysicalWires() {
+  const parts = partsOnBoard().sort((a, b) => a.col - b.col || a.row - b.row || a.id - b.id);
+  factory.wires = [];
+  for (const target of parts) connectPorts(BUS_SOURCE_ID, target.id);
+  for (const from of parts) {
+    for (const target of parts) {
+      if (from.id !== target.id) connectPorts(from.id, target.id);
+    }
+  }
 }
 
 function disconnectWire(wireId) {
@@ -386,12 +434,15 @@ function ramUsage(output) {
   return partCost + (output || evaluateClassFactory()).protocolRoutes.length * PROTOCOL_RAM;
 }
 
-function pendingPlacementUsage(index, type, currentOutput) {
+function pendingPlacementUsage(index, type) {
   const pending = typeof type === "string" ? { id: -1, kind: "module", type } : type;
   if (!canPlacePart(index, pending)) return Infinity;
+  const savedWires = factory.wires.slice();
   board[index] = pending;
+  rebuildPhysicalWires();
   const projected = ramUsage(evaluateClassFactory());
   board[index] = null;
+  factory.wires = savedWires;
   return projected;
 }
 
@@ -458,12 +509,17 @@ const game = {
 };
 let toastTimer = 0;
 
-function ensureBoardSpace(usedCol) {
-  if (usedCol < boardCols - 2) return false;
+function extendBoard() {
   const previousLength = board.length;
   boardCols += EXTEND_BY;
   board.length = boardCols * ROWS;
   board.fill(null, previousLength);
+  return boardCols;
+}
+
+function ensureBoardSpace(usedCol) {
+  if (usedCol < boardCols - 3) return false;
+  extendBoard();
   return true;
 }
 
@@ -773,25 +829,26 @@ function evaluateClassFactory() {
     wires: circuit.validWires, operationalIds: circuit.operationalIds, connectedCount: circuit.operationalIds.size
   };
 }
-function portStyle(port, footprint) {
-  const horizontal = port.edge === "top" || port.edge === "bottom";
-  const offset = (port.offset + .5) / (horizontal ? footprint.width : footprint.height) * 100;
-  const left = port.edge === "left" ? 0 : port.edge === "right" ? 100 : offset;
-  const top = port.edge === "top" ? 0 : port.edge === "bottom" ? 100 : offset;
+function portStyle(edge, offset, footprint) {
+  const horizontal = edge === "top" || edge === "bottom";
+  const percentage = (offset + .5) / (horizontal ? footprint.width : footprint.height) * 100;
+  const left = edge === "left" ? 0 : edge === "right" ? 100 : percentage;
+  const top = edge === "top" ? 0 : edge === "bottom" ? 100 : percentage;
   return "--port-left:" + left.toFixed(2) + "%;--port-top:" + top.toFixed(2) + "%";
 }
 
 function footprintCssSize(cells) {
-  return "calc(" + Array.from({ length: cells }, () => "var(--cell)").join(" + ") + " + " + Math.max(0, cells - 1) * 6 + "px - 8px)";
+  return "calc(var(--cell) * " + cells + " + var(--board-gap, 4px) * " + Math.max(0, cells - 1) + " - 8px)";
 }
 
-function portButton(part, kind) {
+function portPads(part) {
   const footprint = partFootprint(part);
-  const port = ensurePartPorts(part).ports[kind];
-  const label = kind === "input" ? "입력" : "출력";
-  const selected = factory.wireStart?.id === part.id && factory.wireStart?.kind === kind;
-  return '<button type="button" class="circuit-port ' + kind + (selected ? " selected" : "") + '" data-port-owner="' + part.id +
-    '" data-port-kind="' + kind + '" style="' + portStyle(port, footprint) + '" aria-label="' + partDefinition(part).name + ' ' + label + ' 단자"></button>';
+  const edges = ["top", "right", "bottom", "left"];
+  return edges.flatMap((edge) => portOffsets(part, edge).map((offset) => {
+    const direction = edge === "left" ? "input" : "output";
+    const label = edge === "left" ? "입력 전용" : edge + " 방향 출력/입력";
+    return '<span class="circuit-port jack ' + direction + ' edge-' + edge + '" data-port-owner="' + part.id + '" data-port-kind="jack" data-port-edge="' + edge + '" data-port-offset="' + offset + '" style="' + portStyle(edge, offset, footprint) + '" aria-label="' + partDefinition(part).name + ' ' + label + ' 패드"></span>';
+  })).join("");
 }
 
 function partToken(part, status, index) {
@@ -800,15 +857,15 @@ function partToken(part, status, index) {
   const footprint = partFootprint(part);
   const rarity = footprint.rarity;
   const isNew = part.id === factory.lastPlacedId ? " is-new" : "";
-  const actionLabel = kind === "tool" ? "회수" : "보관";
+  const actionLabel = kind === "tool" ? "도구 인벤토리 회수" : "보관함으로 회수";
   const tokenClass = kind === "tool" ? "tool-token" : "module-token module-" + part.type;
   const sizeLabel = footprint.width + "×" + footprint.height;
   return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' size-' + footprint.width + ' ' + status + isNew + '" draggable="true" data-part-id="' +
     part.id + '" data-label="' + def.name + (rarity ? " · " + rarity.label + " " + sizeLabel : " · 공정 도구") + '" style="--module-color:' + def.color + ';--footprint-w:' + footprint.width + ';--footprint-h:' + footprint.height + ';--footprint-width:' + footprintCssSize(footprint.width) + ';--footprint-height:' + footprintCssSize(footprint.height) + '">' +
     '<span class="part-type">' + (kind === "tool" ? "PROCESS TOOL" : "AUGMENT NODE") + '</span><span class="part-code">' + def.code + '</span><span class="part-name">' + def.name + '</span>' +
     (rarity ? '<span class="rarity-badge" style="--rarity-color:' + rarity.color + '">' + rarity.label + ' ' + sizeLabel + '</span>' : '<span class="rarity-badge tool-badge">DROP</span>') +
-    '<span class="module-ram">' + partRamCost(part) + 'R</span>' + portButton(part, "input") + portButton(part, "output") +
-    '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' ' + actionLabel + '">' + actionLabel + '</button></div>';
+    '<span class="module-ram">' + partRamCost(part) + 'R</span>' + portPads(part) +
+    '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' ' + actionLabel + '" title="' + actionLabel + '">PICK</button></div>';
 }
 
 function renderPendingPart() {
@@ -824,7 +881,7 @@ function renderPendingPart() {
   const rarity = footprint.rarity;
   target.innerHTML = '<div class="pending-module ' + (isTool ? "pending-tool" : "module-" + factory.pending.type) +
     '" draggable="true" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
-    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 랜덤 입·출력 단자' : '드랍 공정 도구 · 랜덤 입·출력 단자') + '</span><span>' + def.description + '</span></div>';
+    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 상·우·하 방향 레고 잭' : '드랍 공정 도구 · 상·우·하 방향 레고 잭') + '</span><span>' + def.description + '</span></div>';
   $("#pending-archive").textContent = isTool ? "드랍 도구 선택 취소" : "장착하지 않고 보관";
   $("#pending-archive").hidden = false;
 }
@@ -846,7 +903,7 @@ function renderToolPalette() {
 
 function renderReserveParts() {
   const target = $("#reserve-parts");
-  $(".reserve-shelf > header span").textContent = factory.reserve.length + " PART · 0 RAM";
+  $(".reserve-shelf > header span").textContent = factory.reserve.length + " PART · REDEPLOY";
   target.innerHTML = factory.reserve.length
     ? factory.reserve.map((module) => {
       const def = MODULES[module.type];
@@ -877,21 +934,22 @@ function renderCircuitWires(output) {
   if (!boardElement?.getBoundingClientRect || !boardElement.querySelector) return;
   const boardRect = boardElement.getBoundingClientRect();
   if (!boardRect.width || !boardRect.height) return;
-  const portCenter = (owner, kind) => {
-    const port = boardElement.querySelector('[data-port-owner="' + owner + '"][data-port-kind="' + kind + '"]');
+  const portCenter = (owner, edge, offset, row) => {
+    const sourceRow = row === undefined ? "" : '[data-port-row="' + row + '"]';
+    const port = boardElement.querySelector('[data-port-owner="' + owner + '"][data-port-edge="' + edge + '"][data-port-offset="' + offset + '"]' + sourceRow);
     if (!port?.getBoundingClientRect) return null;
     const rect = port.getBoundingClientRect();
     return { x: rect.left - boardRect.left + rect.width * .5, y: rect.top - boardRect.top + rect.height * .5 };
   };
   const paths = output.wires.map((wire) => {
-    const from = portCenter(wire.fromId, "output");
-    const to = portCenter(wire.toId, "input");
+    const from = portCenter(wire.fromId, wire.fromEdge, wire.fromOffset, wire.fromRow);
+    const to = portCenter(wire.toId, wire.toEdge, wire.toOffset);
     if (!from || !to) return "";
     const midpoint = from.x + (to.x - from.x) * .5;
     const active = (wire.fromId === BUS_SOURCE_ID || output.operationalIds.has(wire.fromId)) && output.operationalIds.has(wire.toId);
     const selected = factory.wireStart?.id === wire.fromId;
     const pathData = "M " + from.x.toFixed(1) + " " + from.y.toFixed(1) + " H " + midpoint.toFixed(1) + " V " + to.y.toFixed(1) + " H " + to.x.toFixed(1);
-    return '<path class="circuit-wire ' + (active ? "active" : "inactive") + (selected ? " selected" : "") + '" d="' + pathData + '"></path><path class="wire-hit" data-wire-id="' + wire.id + '" d="' + pathData + '"></path>';
+    return '<path class="circuit-wire ' + (active ? "active" : "inactive") + (selected ? " selected" : "") + '" d="' + pathData + '"></path>';
   }).join("");
   if (paths) boardElement.insertAdjacentHTML("beforeend", '<svg class="circuit-wires" viewBox="0 0 ' + boardRect.width + ' ' + boardRect.height + '" aria-label="증강 회로 연결">' + paths + '</svg>');
 }
@@ -919,7 +977,10 @@ function renderFactoryBoard() {
     const validTarget = Boolean(factory.pending) && !fixed && canPlacePart(index, factory.pending) && projectedRam <= ramCapacity();
     const invalidTarget = Boolean(factory.pending) && !fixed && !validTarget;
     let fixedText = "";
-    if (position.col === 0 && position.row === MAIN_ROW) fixedText = '<span class="fixed-node"><b>' + BUS_SOURCE_LABEL + '</b><small>SIGNAL</small></span><button type="button" class="circuit-port output bus-port" data-port-owner="' + BUS_SOURCE_ID + '" data-port-kind="output" aria-label="BUS 신호 출력 단자"></button>';
+    if (position.col === 0) {
+      fixedText = (position.row === MAIN_ROW ? '<span class="fixed-node"><b>' + BUS_SOURCE_LABEL + '</b><small>LEGO RAIL</small></span>' : '') +
+        '<span class="circuit-port output bus-port" data-port-owner="' + BUS_SOURCE_ID + '" data-port-kind="source" data-port-edge="right" data-port-offset="0" data-port-row="' + position.row + '" style="' + portStyle("right", 0, { width: 1, height: 1 }) + '" aria-label="BUS 신호 레일 ' + LANE_NAMES[position.row] + '"></span>';
+    }
     const status = part ? output.statuses.get(part.id) : "";
     return '<div class="factory-cell ' + laneClass + (part ? " occupied" : "") + (powered ? " powered" : "") + (sequenceOut ? " sequence-out" : "") +
       (reactorCore ? " reactor-core" : "") + (fixed ? " fixed" : "") + (selected ? " selected" : "") + (validTarget ? " valid-target" : "") +
@@ -944,82 +1005,91 @@ function renderFactoryBoard() {
     : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>BUS IN에서 도달한 증강 라인 전체가 즉시 적용됩니다. 도구를 사이에 두면 성능과 반동이 달라집니다.</p></article>';
   $("#factory-summary").innerHTML =
     '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
-    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' WIRE</span></header><p>BUS IN에서 도달 가능한 연결 라인 전체가 가동됩니다. 종단 버스는 없으며, 선을 클릭하면 연결을 제거합니다.</p></article>' +
+    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>LEGO 회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' LINK</span></header><p>블록의 상·우·하 잭이 바로 맞닿을 때만 자동 결합됩니다. BUS 레일은 왼쪽 입력 잭과만 맞물립니다.</p></article>' +
     tuningSummary + buildSummary +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' + (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
     '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' + (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '입력·출력이 모두 이어진 핵심 증강의 순서가 프로토콜을 만듭니다.') + '</p></article>';
   const recipeItems = [...output.recipes.values()];
   $("#factory-recipe-list").innerHTML = recipeItems.length
     ? recipeItems.map((recipe) => { const def = MODULES[recipe.type]; const tags = [recipe.mode, Math.round(recipe.throughput * 100) + "%"]; if (recipe.power) tags.push("AMP×" + recipe.power); if (recipe.echo) tags.push("ECHO×" + recipe.echo); if (recipe.focus) tags.push("FOCUS×" + recipe.focus); return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>'; }).join("")
-    : '<span class="no-synergy">BUS IN 출력에서 원하는 증강의 입력 단자로 신호를 보내세요. 연결된 라인은 즉시 적용됩니다.</span>';
+    : '<span class="no-synergy">BUS 레일 바로 오른쪽에 블록을 놓고, 다른 블록은 상·우·하로 맞닿게 배치하세요. 결합은 자동입니다.</span>';
   $("#factory-synergy-list").innerHTML = output.synergies.length ? output.synergies.map((item) => '<div class="synergy-chip"><b>→ ' + item.name + '</b>' + item.description + '</div>').join("") : '<span class="no-synergy">유효 회로의 순서 프로토콜 없음</span>';
   const commit = $("#factory-commit");
   commit.disabled = Boolean(factory.pending);
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "회로 적용 · 전투 복귀";
   $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
   const pendingDef = factory.pending ? partDefinition(factory.pending) : null;
-  $("#board-message").textContent = factory.wireStart ? "선택한 " + (factory.wireStart.id === BUS_SOURCE_ID ? BUS_SOURCE_LABEL : partDefinition(partsOnBoard().find((part) => String(part.id) === String(factory.wireStart.id))).name) + " 출력 단자입니다. 다음 부품의 입력 단자를 클릭하면 해당 라인이 적용됩니다." :
-    factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) 배치 · " + partFootprint(factory.pending).width + "×" + partFootprint(factory.pending).height + " 공간과 남은 RAM " + freeRam + "을 확인하세요." :
-      factory.selectedIndex !== null ? "이동할 시작 셀을 선택하세요. 연결선은 유지되며, 단자는 각 부품에 고정됩니다." :
-        factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · BUS IN에서 해당 증강의 입력 단자까지 연결하면 효과가 적용됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "출력 단자를 클릭한 다음 대상의 입력 단자를 클릭해 회로를 배선하세요.");
-  $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount || factory.wireStart ? "warning" : "ok");
+  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) 배치 · 상·우·하 잭이 다른 블록의 반대쪽 잭과 맞닿는 위치를 고르세요. 남은 RAM " + freeRam + "." :
+    factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · BUS 레일 바로 오른쪽 또는 가동 블록의 상·우·하에 맞닿게 놓으면 자동 결합됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "블록을 BUS 레일 또는 다른 블록의 상·우·하에 맞닿게 배치하세요. 결합은 자동입니다.");
+  $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount ? "warning" : "ok");
 }
 function placePending(index) {
   if (!factory.pending || !isPlaceable(index)) return;
+  const pendingFootprint = partFootprint(factory.pending);
+  const position = positionOf(index);
+  ensureBoardSpace(position.col + pendingFootprint.width - 1);
   if (!canPlacePart(index, factory.pending)) {
     $("#board-message").textContent = "해당 위치에는 이 부품의 전체 크기만큼 빈 공간이 필요합니다.";
     $("#board-message").className = "board-message warning";
     return;
   }
-  const projectedRam = pendingPlacementUsage(index, factory.pending, evaluateClassFactory());
+  const projectedRam = pendingPlacementUsage(index, factory.pending);
   if (projectedRam > ramCapacity()) {
-    $("#board-message").textContent = "RAM 부족 · 이 위치는 링크 비용을 포함해 " + projectedRam + "/" + ramCapacity() + " RAM입니다. 기존 모듈을 보관하거나 다른 셀을 선택하세요.";
+    $("#board-message").textContent = "RAM 부족 · 이 위치는 자동 결합 링크 비용을 포함해 " + projectedRam + "/" + ramCapacity() + " RAM입니다. 기존 모듈을 회수하세요.";
     $("#board-message").className = "board-message warning";
     return;
   }
   const placed = ensurePartPorts(factory.pending);
   const def = partDefinition(placed);
-  const position = positionOf(index);
   board[index] = placed;
+  rebuildPhysicalWires();
   if (partKind(placed) === "tool" && placed.fromInventory) factory.toolInventory[placed.type] = Math.max(0, (factory.toolInventory[placed.type] || 0) - 1);
   delete placed.fromInventory;
+  delete placed.fromBoard;
   factory.pending = null;
   factory.selectedIndex = null;
   factory.lastPlacedId = placed.id;
-  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 설치 완료. 입력과 출력을 직접 배선하세요.";
-  ensureBoardSpace(position.col + partFootprint(placed).width - 1);
+  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 설치 완료. 맞닿은 상·우·하 잭이 자동 결합되었습니다.";
   renderFactoryBoard();
 }
 
 function moveBoardModule(from, to) {
   const anchor = anchorIndexAt(from);
-  if (anchor < 0 || !isPlaceable(to) || anchor === to) {
-    factory.selectedIndex = null;
-    renderFactoryBoard();
-    return;
-  }
+  if (anchor < 0 || !isPlaceable(to) || anchor === to) return;
   const moving = board[anchor];
+  ensureBoardSpace(positionOf(to).col + partFootprint(moving).width - 1);
   if (!canPlacePart(to, moving, moving.id)) {
-    factory.selectedIndex = null;
     factory.placementNotice = "이 위치에는 " + partFootprint(moving).width + "×" + partFootprint(moving).height + " 빈 공간이 필요합니다.";
     renderFactoryBoard();
     return;
   }
   board[anchor] = null;
   board[to] = moving;
-  const projectedOutput = evaluateClassFactory();
-  if (ramUsage(projectedOutput) > ramCapacity()) {
+  rebuildPhysicalWires();
+  if (ramUsage(evaluateClassFactory()) > ramCapacity()) {
     board[to] = null;
     board[anchor] = moving;
-    factory.selectedIndex = null;
-    factory.placementNotice = "이 이동은 새 링크 비용 때문에 RAM을 초과합니다. 다른 행이나 보관함을 사용하세요.";
+    rebuildPhysicalWires();
+    factory.placementNotice = "이 위치는 새 자동 결합 링크로 RAM을 초과합니다. PICK 버튼으로 회수해 다시 배치하세요.";
     renderFactoryBoard();
     return;
   }
   factory.selectedIndex = null;
   factory.lastPlacedId = moving.id;
-  factory.placementNotice = partDefinition(moving).name + " 위치를 옮겼습니다. 단자와 기존 배선은 유지됩니다.";
-  ensureBoardSpace(positionOf(to).col + partFootprint(moving).width - 1);
+  factory.placementNotice = partDefinition(moving).name + " 위치를 옮겼습니다. 물리적으로 닿는 잭만 다시 결합됩니다.";
+  renderFactoryBoard();
+}
+
+function liftBoardPart(index) {
+  const anchor = anchorIndexAt(index);
+  if (anchor < 0 || !board[anchor] || factory.pending) return;
+  const lifted = board[anchor];
+  board[anchor] = null;
+  rebuildPhysicalWires();
+  factory.pending = ensurePartPorts({ ...lifted, kind: partKind(lifted), fromBoard: true });
+  factory.selectedIndex = null;
+  factory.lastPlacedId = null;
+  factory.placementNotice = partDefinition(lifted).name + "을 들었습니다. 원하는 빈 셀을 클릭해 바로 옮기세요. 맞닿은 잭만 다시 결합됩니다.";
   renderFactoryBoard();
 }
 
@@ -1029,12 +1099,12 @@ function storeBoardModule(index) {
   const stored = board[anchor];
   board[anchor] = null;
   const isTool = partKind(stored) === "tool";
-  clearWiresFor(stored.id);
+  rebuildPhysicalWires();
   if (isTool) factory.toolInventory[stored.type] = (factory.toolInventory[stored.type] || 0) + 1;
   else factory.reserve.push({ ...stored, kind: "module" });
   factory.selectedIndex = null;
   factory.lastPlacedId = null;
-  factory.placementNotice = partDefinition(stored).name + (isTool ? "를 회수했습니다. 드랍 도구 인벤토리로 돌아갑니다." : "을 보관했습니다.") + " 연결은 해제되었습니다.";
+  factory.placementNotice = partDefinition(stored).name + (isTool ? "를 회수했습니다. 드랍 도구 인벤토리로 돌아갑니다." : "을 회수했습니다. STORAGE에서 다시 배치할 수 있습니다.") + " 물리 결합은 자동으로 해제되었습니다.";
   renderFactoryBoard();
 }
 
@@ -1042,9 +1112,10 @@ function archivePending() {
   if (!factory.pending) return;
   const stored = factory.pending;
   const isTool = partKind(stored) === "tool";
-  if (!isTool) factory.reserve.push({ ...stored, kind: "module" });
+  if (isTool && stored.fromBoard) factory.toolInventory[stored.type] = (factory.toolInventory[stored.type] || 0) + 1;
+  else if (!isTool) factory.reserve.push({ ...stored, kind: "module" });
   factory.pending = null;
-  factory.placementNotice = partDefinition(stored).name + (isTool ? " 선택을 취소했습니다. 도구는 인벤토리에 남습니다." : "을 장착하지 않고 보관했습니다.");
+  factory.placementNotice = partDefinition(stored).name + (isTool ? " 선택을 취소했습니다. 도구는 인벤토리에 남습니다." : "을 STORAGE에 보관했습니다.");
   renderFactoryBoard();
 }
 
@@ -1071,7 +1142,7 @@ function selectToolBlueprint(type) {
 function rotateBoardTool(index) {
   const part = partAt(index);
   if (!part || partKind(part) !== "tool") return;
-  factory.placementNotice = "단자 위치는 드랍 시 무작위로 결정되어 고정됩니다. 다른 위치로 옮기거나 다시 배선하세요.";
+  factory.placementNotice = "이 보드의 잭은 상·우·하 방향으로 고정됩니다. PICK으로 회수한 뒤 다른 위치에 맞닿게 재배치하세요.";
   renderFactoryBoard();
 }
 
@@ -2688,12 +2759,16 @@ function advanceAuditProjectiles(frames, dt) {
 function wireInstalledParts(parts) {
   factory.wires = [];
   factory.wireStart = null;
-  let previous = BUS_SOURCE_ID;
+  board.fill(null);
+  let column = 1;
   for (const part of parts) {
-    ensurePartPorts(part);
-    connectPorts(previous, part.id);
-    previous = part.id;
+    const installed = ensurePartPorts(part);
+    const footprint = partFootprint(installed);
+    while (column + footprint.width > boardCols) extendBoard();
+    board[indexOf(column, 0)] = installed;
+    column += footprint.width;
   }
+  rebuildPhysicalWires();
 }
 
 function installAuditSequence(classId, reverse) {
@@ -2743,13 +2818,16 @@ function runFactoryToolAudits() {
     const install = (parts) => {
       board.fill(null);
       factory.wires = [];
-      const installed = parts.map((part, index) => {
+      let column = 1;
+      const installed = parts.map((part) => {
         const next = ensurePartPorts({ ...part, index: undefined });
-        board[next.index ?? indexOf(index + 1, 0)] = next;
+        const footprint = partFootprint(next);
+        while (column + footprint.width > boardCols) extendBoard();
+        board[indexOf(column, 0)] = next;
+        column += footprint.width;
         return next;
       });
-      let previous = BUS_SOURCE_ID;
-      installed.forEach((part) => { connectPorts(previous, part.id); previous = part.id; });
+      rebuildPhysicalWires();
       return { installed, output: evaluateClassFactory() };
     };
     const core = { id: 9702, kind: "module", type: "m_mark", index: indexOf(1, 0) };
@@ -2763,15 +2841,14 @@ function runFactoryToolAudits() {
     const terminalFreeActive = sourceCircuit.traits.has("m_mark") && sourceCircuit.connectedCount === 1;
     const toolProcessed = ampCircuit.recipes.get(9702)?.mode === "OVERDRIVE" && ampCircuit.primary.damage > sourceCircuit.primary.damage;
     const branchA = { id: 9703, kind: "module", type: "m_guard", index: indexOf(1, 0) };
-    const branchB = { id: 9704, kind: "module", type: "m_spin", index: indexOf(3, 0) };
+    const branchB = { id: 9704, kind: "module", type: "m_spin", index: indexOf(1, 3) };
     board.fill(null);
     factory.wires = [];
     const splitA = ensurePartPorts({ ...branchA });
     const splitB = ensurePartPorts({ ...branchB });
     board[splitA.index] = splitA;
     board[splitB.index] = splitB;
-    connectPorts(BUS_SOURCE_ID, splitA.id);
-    connectPorts(BUS_SOURCE_ID, splitB.id);
+    rebuildPhysicalWires();
     const branchLinesApply = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().traits.has("m_spin") && evaluateClassFactory().connectedCount === 2;
     factory.toolInventory = Object.fromEntries(TOOL_TYPES.map((type) => [type, 0]));
     game.mode = "factory";
@@ -2792,14 +2869,10 @@ function runFactoryToolAudits() {
       return Boolean(rarity) && footprint.width === rarity.width && footprint.height === rarity.height && [1, 2, 4].includes(footprint.width);
     });
     const firstPortPart = createPart("module", "m_mark");
-    const randomStablePorts = moduleTypes.every((type) => {
+    const threeWayJackLayout = moduleTypes.every((type) => {
       const part = createPart("module", type);
-      const footprint = partFootprint(part);
-      const inputSpan = part.ports.input.edge === "top" || part.ports.input.edge === "bottom" ? footprint.width : footprint.height;
-      const outputSpan = part.ports.output.edge === "top" || part.ports.output.edge === "bottom" ? footprint.width : footprint.height;
-      return part.ports.input.edge && part.ports.output.edge && Number.isInteger(part.ports.input.offset) && Number.isInteger(part.ports.output.offset) &&
-        part.ports.input.offset >= 0 && part.ports.input.offset < inputSpan && part.ports.output.offset >= 0 && part.ports.output.offset < outputSpan;
-    }) && JSON.stringify(firstPortPart.ports) === JSON.stringify(ensurePartPorts(firstPortPart).ports);
+      return part.ports.layout === "lego-three-way" && ["top", "right", "bottom", "left"].every((edge) => portOffsets(part, edge).length === (edge === "top" || edge === "bottom" ? partFootprint(part).width : partFootprint(part).height));
+    }) && ensurePartPorts(firstPortPart).ports.layout === "lego-three-way";
     board.fill(null);
     const legendary = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "legendary"));
     const rare = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "rare"));
@@ -2809,9 +2882,10 @@ function runFactoryToolAudits() {
     const rewired = install([core]);
     const removed = disconnectWire(factory.wires[0]?.id);
     const disconnected = !evaluateClassFactory().traits.has("m_mark");
-    const restored = connectPorts(BUS_SOURCE_ID, rewired.installed[0].id) && evaluateClassFactory().traits.has("m_mark");
+    rebuildPhysicalWires();
+    const restored = evaluateClassFactory().traits.has("m_mark") && factory.wires.length === 1;
     const rewireable = removed && disconnected && restored;
-    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, randomStablePorts, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
+    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, threeWayJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
     report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
   } finally {
     boardCols = savedCols;
@@ -3792,56 +3866,25 @@ $("#reserve-parts").addEventListener("click", (event) => {
 });
 
 $("#factory-board").addEventListener("click", (event) => {
-  const wireHit = event.target.closest("[data-wire-id]");
-  if (wireHit) {
-    event.stopPropagation();
-    if (disconnectWire(Number(wireHit.dataset.wireId))) factory.placementNotice = "연결을 해제했습니다. 새 단자를 선택해 다시 배선할 수 있습니다.";
-    renderFactoryBoard();
-    return;
-  }
-  const port = event.target.closest("[data-port-owner]");
-  if (port) {
-    event.stopPropagation();
-    const owner = port.dataset.portOwner;
-    const kind = port.dataset.portKind;
-    if (kind === "output") {
-      factory.wireStart = factory.wireStart?.id === owner ? null : { id: owner, kind: "output" };
-      factory.placementNotice = factory.wireStart ? "출력 단자를 선택했습니다. 대상 입력 단자를 클릭하세요." : "단자 선택을 취소했습니다.";
-    } else if (factory.wireStart) {
-      const connected = connectPorts(factory.wireStart.id, owner);
-      factory.placementNotice = connected ? "입력 신호를 연결했습니다. BUS IN에서 도달한 라인 전체가 즉시 가동됩니다." : "이 단자는 연결할 수 없습니다.";
-      factory.wireStart = null;
-    } else {
-      factory.placementNotice = "먼저 BUS IN 또는 부품의 출력 단자를 클릭하세요.";
-    }
-    renderFactoryBoard();
-    return;
-  }
   const storeButton = event.target.closest("[data-store-index]");
   if (storeButton) {
     event.stopPropagation();
     storeBoardModule(Number(storeButton.dataset.storeIndex));
     return;
   }
+  if (event.target.closest("[data-port-owner]")) return;
   const cell = event.target.closest("[data-cell-index]");
   if (!cell) return;
   const index = Number(cell.dataset.cellIndex);
   if (!isPlaceable(index)) return;
   if (factory.pending) { placePending(index); return; }
-  if (factory.selectedIndex !== null) { moveBoardModule(factory.selectedIndex, index); return; }
-  const anchor = anchorIndexAt(index);
-  if (anchor >= 0) {
-    factory.selectedIndex = anchor;
-    renderFactoryBoard();
-  }
+  if (anchorIndexAt(index) >= 0) liftBoardPart(index);
 });
 $("#factory-board").addEventListener("dragstart", (event) => {
-  const token = event.target.closest("[data-part-id]");
-  if (!token) return;
-  const partId = Number(token.dataset.partId);
-  const index = board.findIndex((part) => part && part.id === partId);
-  factory.dragged = index >= 0 ? { kind: "board", index } : null;
-  event.dataTransfer.effectAllowed = "move";
+  if (!event.target.closest("[data-part-id]")) return;
+  event.preventDefault();
+  factory.placementNotice = "블록을 클릭해 바로 들고 원하는 셀에 놓으세요. STORAGE 보관은 PICK 버튼을 사용합니다.";
+  renderFactoryBoard();
 });
 
 $("#factory-board").addEventListener("contextmenu", (event) => {
@@ -3873,8 +3916,12 @@ $("#factory-board").addEventListener("drop", (event) => {
   event.preventDefault();
   const target = Number(cell.dataset.cellIndex);
   if (factory.dragged.kind === "pending") placePending(target);
-  if (factory.dragged.kind === "board") moveBoardModule(factory.dragged.index, target);
   factory.dragged = null;
+});
+$("#board-expand").addEventListener("click", () => {
+  extendBoard();
+  factory.placementNotice = "보드를 " + EXTEND_BY + "칸 확장했습니다. 오른쪽으로 계속 배치할 수 있습니다.";
+  renderFactoryBoard();
 });
 
 window.addEventListener("keydown", (event) => {

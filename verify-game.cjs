@@ -26,10 +26,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-13") && html.includes("game.js?v=prototype-13"), "회로도 화면 캐시 버전 prototype-13 누락");
+check(html.includes("styles.css?v=prototype-14") && html.includes("game.js?v=prototype-14"), "레고 회로 화면 캐시 버전 prototype-14 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("connectPorts"), "드랍 기반 단자 회로 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch"), "물리 레고 단자 회로 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -47,7 +47,7 @@ check(!/\.game\s*\{[^}]*min-width:\s*920px/.test(styles), "좁은 화면을 강�
 check(/\.overlay\s*\{[^}]*overflow:\s*auto/.test(styles), "긴 오버레이의 양방향 스크롤 보호 누락");
 check(/\.factory-layout\s*\{[^}]*overflow-x:\s*auto/.test(styles), "좁은 공장 3열의 가로 스크롤 보호 누락");
 check(styles.includes(".augment-card .placement-hint { position: static;") && styles.includes(".build-affinity { position: static;"), "증강 카드 설명·태그 고정 배치 겹침 위험");
-check(styles.includes(".circuit-port") && styles.includes(".circuit-wires") && styles.includes("--footprint-w") && styles.includes("Schematic circuit-board reskin") && styles.includes("schematic-flow"), "다중 크기 단자·회로도 UI 누락");
+check(styles.includes(".circuit-port") && styles.includes(".circuit-wires") && styles.includes("--footprint-w") && styles.includes("Schematic circuit-board reskin") && styles.includes("Lego proximity circuit controls") && html.includes('id="board-expand"'), "다중 크기 레고 단자·확장 회로도 UI 누락");
 check(/\.board-message\s*\{[^}]*position:\s*sticky[^}]*white-space:\s*normal/.test(styles), "긴 보드 메시지 줄바꿈·고정 보호 누락");
 check(/\.factory-action-bar\s*\{[^}]*position:\s*sticky/.test(styles) && html.includes('class="factory-action-bar"'), "공장 적용 버튼 고정 영역 누락");
 check([980, 760, 560].every((width) => styles.includes(`@media (max-width: ${width}px)`)), "핵심 반응형 UX 구간 누락");
@@ -149,21 +149,29 @@ try {
     game.enemies = [];
     openFactory(true);
     const first = indexOf(1, 0);
-    const moved = indexOf(3, 0);
     factory.pending = createPart("module", "m_guard");
     const factoryOpened = game.mode === "factory" && !document.querySelector("#factory-overlay").hidden;
     placePending(first);
     const placedRare = board[first]?.type === "m_guard" && partFootprint(board[first]).width === 2 && partFootprint(board[first]).height === 2;
     const moduleId = board[first].id;
-    const unwiredInactive = !evaluateClassFactory().traits.has("m_guard");
-    connectPorts(BUS_SOURCE_ID, moduleId);
-    const terminalFreeActive = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().connectedCount === 1;
-    moveBoardModule(first, moved);
-    const movedAndRewireable = board[moved]?.type === "m_guard" && factory.wires.length === 1 && evaluateClassFactory().traits.has("m_guard");
+    const autoLegoActive = evaluateClassFactory().traits.has("m_guard") && factory.wires.length === 1 && factory.wires[0]?.fromId === BUS_SOURCE_ID && factory.wires[0]?.toEdge === "left";
+    storeBoardModule(first);
+    const storedForRedeploy = factory.reserve.some((part) => part.id === moduleId) && !board[first];
+    activateReserve(moduleId);
+    const pickupAndRedeploy = factory.pending?.id === moduleId;
+    placePending(first);
+    const redeployedActive = evaluateClassFactory().traits.has("m_guard") && factory.wires.length === 1;
     const branch = createPart("module", "m_spin");
-    board[indexOf(6, 3)] = branch;
-    connectPorts(BUS_SOURCE_ID, branch.id);
-    const branchLinesApply = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().traits.has("m_spin") && evaluateClassFactory().connectedCount === 2;
+    board[indexOf(1, 3)] = branch;
+    const neighbor = createPart("module", "m_mark");
+    board[indexOf(3, 0)] = neighbor;
+    rebuildPhysicalWires();
+    const neighborWire = factory.wires.find((wire) => wire.fromId === moduleId && wire.toId === neighbor.id);
+    const branchLinesApply = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().traits.has("m_spin") && factory.wires.filter((wire) => wire.fromId === BUS_SOURCE_ID).length === 2;
+    const proximityOnly = Boolean(neighborWire) && neighborWire.fromEdge === "right" && neighborWire.toEdge === "left" && !findPhysicalPortMatch(neighbor.id, moduleId) && !connectPorts(moduleId, branch.id);
+    const colsBeforeExtend = boardCols;
+    extendBoard();
+    const boardExtends = boardCols === colsBeforeExtend + EXTEND_BY && board.length === boardCols * ROWS;
     const noDropNoTool = factory.toolInventory.amplifier === 0;
     selectToolBlueprint("amplifier");
     const unlimitedToolBlocked = factory.pending === null;
@@ -176,12 +184,12 @@ try {
     const toolRecovered = factory.toolInventory.amplifier === 1;
     const raritySizes = ["common", "rare", "legendary"].every((rarity) => moduleTypes.some((type) => MODULE_RARITIES[type] === rarity)) &&
       JSON.stringify([RARITIES.common.width, RARITIES.rare.width, RARITIES.legendary.width]) === JSON.stringify([1, 2, 4]);
-    const randomPorts = (() => { const a = createPart("module", "m_mark"); const b = createPart("module", "m_mark"); return a.ports.input.edge && a.ports.output.edge && JSON.stringify(a.ports) !== JSON.stringify(b.ports); })();
+    const threeWayPorts = (() => { const part = createPart("module", "m_mark"); return part.ports.layout === "lego-three-way" && ["top", "right", "bottom"].every((edge) => portOffsets(part, edge).length) && portOffsets(part, "left").length; })();
     commitFactory();
     const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_guard");
     const capacities = [1, 2, 4, 8].map((level) => { game.player.level = level; return ramCapacity(); });
     const capacityProgression = JSON.stringify(capacities) === JSON.stringify([10, 12, 16, 24]);
-    return { factoryOpened, placedRare, unwiredInactive, terminalFreeActive, movedAndRewireable, branchLinesApply, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, raritySizes, randomPorts, committed, capacityProgression };
+    return { factoryOpened, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, branchLinesApply, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, raritySizes, threeWayPorts, committed, capacityProgression };
   })()`, runtime, { timeout: 1500 });
   check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);
   const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
@@ -211,5 +219,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · 6/6 monster-drop tools · BUS IN line circuit · 9/9 playstyles · aspect-fit UI scaling · combat rendering");
+  console.log("30/30 augments · 6/6 monster-drop tools · 3-way LEGO circuit · PICK/redeploy · 9/9 playstyles · aspect-fit UI scaling · combat rendering");
 }
