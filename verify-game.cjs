@@ -26,10 +26,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-15") && html.includes("game.js?v=prototype-15"), "랜덤 증강 단자 화면 캐시 버전 prototype-15 누락");
+check(html.includes("styles.css?v=prototype-17") && html.includes("game.js?v=prototype-17") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-17 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO"), "랜덤 물리 단자·전투 템포 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "도구 진행·드래그·물리 단자·전투 템포·치명타 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -171,6 +171,28 @@ try {
     };
   })()`, runtime, { timeout: 1000 });
   check(Object.values(tempoAudit).every(Boolean), `전투 템포 런타임 검증 실패: ${JSON.stringify(tempoAudit)}`);
+  const criticalAudit = vm.runInContext(`(() => {
+    game.mode = "start";
+    selectClass("melee");
+    startGame();
+    game.enemies = [];
+    spawnEnemy("drone", game.player.x + 180, game.player.y);
+    const enemy = game.enemies[0];
+    const hpBefore = enemy.hp;
+    const previousRandom = Math.random;
+    try {
+      Math.random = () => 0;
+      damageEnemy(enemy, 10, { ...game.output.primary, crit: 1, critMultiplier: 2, knockback: 0, stun: 0 }, 0, true);
+    } finally {
+      Math.random = previousRandom;
+    }
+    return {
+      visibleChance: game.output.primary.crit >= .12,
+      doubleDamage: Math.abs(enemy.hp - (hpBefore - 20)) < .001,
+      impactFeedback: game.criticalHits === 1 && game.hitStop > 0 && game.floaters.some((floater) => floater.critical) && enemy.critical > 0
+    };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(criticalAudit).every(Boolean), `치명타 런타임 검증 실패: ${JSON.stringify(criticalAudit)}`);
   const circuitAudit = vm.runInContext(`(() => {
     game.selectedClass = "melee";
     startGame();
@@ -212,6 +234,10 @@ try {
     const toolConsumed = factory.toolInventory.amplifier === 0 && board[indexOf(6, 0)]?.type === "amplifier";
     storeBoardModule(indexOf(6, 0));
     const toolRecovered = factory.toolInventory.amplifier === 1;
+    const paletteTarget = indexOf(7, 0);
+    factory.dragged = { kind: "tool-palette", type: "amplifier" };
+    const toolPaletteDrag = dragTargetIsValid(paletteTarget) && completeFactoryDrop(paletteTarget) && board[paletteTarget]?.type === "amplifier" && factory.toolInventory.amplifier === 0;
+    storeBoardModule(paletteTarget);
     const raritySizes = ["common", "rare", "legendary"].every((rarity) => moduleTypes.some((type) => MODULE_RARITIES[type] === rarity)) &&
       JSON.stringify([RARITIES.common.width, RARITIES.rare.width, RARITIES.legendary.width]) === JSON.stringify([1, 2, 4]);
     const portLayouts = (() => {
@@ -224,7 +250,7 @@ try {
     const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_guard");
     const capacities = [1, 2, 4, 8].map((level) => { game.player.level = level; return ramCapacity(); });
     const capacityProgression = JSON.stringify(capacities) === JSON.stringify([10, 12, 16, 24]);
-    return { factoryOpened, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, branchLinesApply, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, raritySizes, portLayouts, committed, capacityProgression };
+    return { factoryOpened, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, branchLinesApply, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, toolPaletteDrag, raritySizes, portLayouts, committed, capacityProgression };
   })()`, runtime, { timeout: 1500 });
   check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);
   const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
@@ -254,5 +280,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · 6/6 monster-drop tools · tool 3-way / random 2+ augment jacks · PICK/redeploy · 9/9 playstyles · fast combat rendering");
+  console.log("30/30 augments · T1→T3 staged tools · tool 3-way / random 2+ augment jacks · drag/PICK/redeploy · 9/9 playstyles · high-tempo combat + crit impact rendering");
 }

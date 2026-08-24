@@ -17,7 +17,7 @@ const UI_REFERENCE_ANCHORS = [
 ];
 const UI_SCALE_MIN = .56;
 const UI_SCALE_MAX = 1.6;
-const COMBAT_TEMPO = Object.freeze({ unitMove: 1.28, attackRate: 1.32, projectile: 1.36 });
+const COMBAT_TEMPO = Object.freeze({ unitMove: 1.42, attackRate: 1.52, projectile: 1.62 });
 
 const CLASS_PROFILES = {
   melee: {
@@ -198,32 +198,46 @@ const RARITIES = {
 
 const TOOLS = {
   router: {
-    name: "회전 라우터", code: "↪", color: "#58d7d3", ram: 1, rotatable: true,
-    description: "들어온 신호를 화살표 방향으로 꺾습니다.", tradeoff: "복잡한 배선 · 출력 손실 없음"
-  },
-  splitter: {
-    name: "직각 분배기", code: "Y", color: "#d9ef59", ram: 2, rotatable: true,
-    description: "화살표 방향과 그 오른쪽 방향으로 신호를 복제합니다.", tradeoff: "두 갈래 활성 · 각 갈래 처리량 72%"
+    name: "직선 라우터", code: "→", color: "#58d7d3", ram: 1, tier: 1, unlockRoom: 1, complexity: "BASIC",
+    description: "닿아 있는 전방 잭으로 신호를 그대로 통과시킵니다.", tradeoff: "기초 배선 · 손실 없이 연결"
   },
   amplifier: {
-    name: "과급 증폭기", code: "+", color: "#ff714f", ram: 2,
-    description: "다음 핵심 증강의 출력 강도를 높입니다.", tradeoff: "피해·효과 +32% · 공격 주기 +12%"
-  },
-  repeater: {
-    name: "지연 리피터", code: "Ⅱ", color: "#a48cff", ram: 2,
-    description: "다음 핵심 증강의 공정을 지연 복제합니다.", tradeoff: "후속 공격 생성 · 공격 주기 +10%"
+    name: "과급 증폭기", code: "+", color: "#ff714f", ram: 1, tier: 1, unlockRoom: 1, complexity: "BASIC", power: 1, heat: .62,
+    description: "다음 핵심 증강 하나의 출력만 단순하게 증폭합니다.", tradeoff: "피해·효과 상승 · 짧은 과열"
   },
   focuser: {
-    name: "집속 렌즈", code: "◇", color: "#f6dc66", ram: 1,
-    description: "다음 핵심 증강의 신호를 좁고 멀리 집속합니다.", tradeoff: "피해·사거리 증가 · 공격 폭 감소"
+    name: "집속 렌즈", code: "◇", color: "#f6dc66", ram: 2, tier: 2, unlockRoom: 3, complexity: "TACTICAL", focus: 1,
+    description: "다음 증강을 좁고 먼 정밀 신호로 가공합니다.", tradeoff: "사거리·피해 상승 · 공격 폭 감소"
+  },
+  splitter: {
+    name: "병렬 분배기", code: "Y", color: "#d9ef59", ram: 2, tier: 2, unlockRoom: 4, complexity: "TACTICAL", splitThroughput: .78,
+    description: "맞닿은 여러 전방 잭으로 신호를 복제해 병렬 라인을 만듭니다.", tradeoff: "다중 활성 · 갈래당 처리량 78%"
+  },
+  repeater: {
+    name: "위상 리피터", code: "Ⅱ", color: "#a48cff", ram: 3, tier: 3, unlockRoom: 6, complexity: "ADVANCED", echo: 1, heat: .72,
+    description: "다음 증강을 지연 복제해 한 번의 입력을 두 번 작동시킵니다.", tradeoff: "후속 공격 생성 · 설계된 과열"
   },
   inverter: {
-    name: "극성 반전기", code: "±", color: "#71efad", ram: 1,
-    description: "다음 핵심 증강을 공격 대신 제어·방어 성향으로 반전합니다.", tradeoff: "피해 감소 · 범위·방어·상태 지속 증가"
+    name: "극성 반전기", code: "±", color: "#71efad", ram: 3, tier: 3, unlockRoom: 8, complexity: "ADVANCED", utility: 1,
+    description: "다음 증강을 제어·방어 회로로 반전해 범위와 생존력을 강화합니다.", tradeoff: "복합 보정 · 직접 피해 감소"
   }
 };
 
 const TOOL_TYPES = Object.keys(TOOLS);
+const TOOL_TIER_LABELS = { 1: "초기", 2: "중급", 3: "고급" };
+
+function isToolUnlocked(type, room = game.room) {
+  return Boolean(TOOLS[type]) && room >= TOOLS[type].unlockRoom;
+}
+
+function availableToolTypes(room = game.room) {
+  return TOOL_TYPES.filter((type) => isToolUnlocked(type, room));
+}
+
+function nextToolUnlock(room = game.room) {
+  return TOOL_TYPES.map((type) => TOOLS[type]).filter((tool) => tool.unlockRoom > room)
+    .sort((a, b) => a.unlockRoom - b.unlockRoom)[0] || null;
+}
 const DIRECTIONS = [
   { dc: 1, dr: 0, glyph: "→", name: "오른쪽" },
   { dc: 0, dr: 1, glyph: "↓", name: "아래" },
@@ -503,6 +517,13 @@ function flashDamageFeedback() {
   flash.classList.add("hit");
 }
 
+function flashCriticalFeedback() {
+  const flash = $("#critical-flash");
+  flash.classList.remove("critical");
+  void flash.offsetWidth;
+  flash.classList.add("critical");
+}
+
 function selectClass(classId) {
   if (!CLASS_PROFILES[classId] || game.mode !== "start") return;
   game.selectedClass = classId;
@@ -531,7 +552,7 @@ function renderTestModuleButtons() {
 }
 
 const factory = {
-  pending: null, selectedIndex: null, dragged: null, manual: false,
+  pending: null, selectedIndex: null, dragged: null, pointerCandidate: null, ignoreBoardClickUntil: 0, manual: false,
   choiceSelection: null, lastPlacedId: null, placementNotice: null, reserve: [],
   wires: [], wireStart: null, toolInventory: Object.fromEntries(TOOL_TYPES.map((type) => [type, 0])),
   nextId: 1, nextWireId: 1
@@ -543,7 +564,7 @@ const game = {
   enemyBullets: [], playerShots: [], zones: [], delayedAttacks: [], orbitals: [], toolDrops: [],
   particles: [], floaters: [], echoes: [], keys: new Set(),
   mouse: { x: innerWidth * .7, y: innerHeight * .5 }, dashRequested: false,
-  attackRequested: false, output: null, nextEnemyId: 1, shake: 0,
+  attackRequested: false, output: null, nextEnemyId: 1, shake: 0, hitStop: 0, criticalHits: 0,
   pulses: [], hitConfirm: 0, missPulse: 0, augmentEvents: {}, protocolEvents: {},
   cameraOffsetX: 0, cameraOffsetY: 0, cursorX: innerWidth * .7, cursorY: innerHeight * .5,
   nextDropId: 1
@@ -595,7 +616,7 @@ function toolsOnBoard() {
 function createAttackProfile(name, damage, range, arc) {
   return {
     name, damage, range, arc, cooldown: .5, knockback: 24, stun: .08,
-    burn: 0, bleed: 0, chain: 0, crit: .05, critMultiplier: 1.75,
+    burn: 0, bleed: 0, chain: 0, crit: .12, critMultiplier: 2,
     explosion: 0, phase: false, repeats: 1, modules: new Set()
   };
 }
@@ -809,12 +830,12 @@ function evaluateClassFactory() {
     activeToolIds.add(part.id);
     statuses.set(part.id, "tool-active");
     const nextMods = { ...signal.mods };
-    if (part.type === "amplifier") { nextMods.power += 1; nextMods.heat += 1; }
-    if (part.type === "repeater") { nextMods.echo += 1; nextMods.heat += .84; }
-    if (part.type === "focuser") nextMods.focus += 1;
+    if (part.type === "amplifier") { nextMods.power += tool.power || 1; nextMods.heat += tool.heat || 0; }
+    if (part.type === "repeater") { nextMods.echo += tool.echo || 1; nextMods.heat += tool.heat || 0; }
+    if (part.type === "focuser") nextMods.focus += tool.focus || 1;
     if (part.type === "inverter") nextMods.inverted = !nextMods.inverted;
     const nextWires = (circuit.outgoing.get(part.id) || []).filter((wire) => circuit.operationalIds.has(wire.toId));
-    const throughput = part.type === "splitter" && nextWires.length > 1 ? signal.throughput * .72 : signal.throughput;
+    const throughput = part.type === "splitter" && nextWires.length > 1 ? signal.throughput * (tool.splitThroughput || .72) : signal.throughput;
     for (const wire of nextWires) {
       queue.push({ wire, lastModule: signal.lastModule, mods: { ...nextMods }, throughput, toolIds: [...signal.toolIds, part.id], path: [...signal.path, part.id] });
     }
@@ -828,11 +849,16 @@ function evaluateClassFactory() {
   primary.range *= tuning.rangeMult;
   primary.arc *= tuning.areaMult;
   primary.stun *= tuning.controlMult;
+  const classCritBonus = classId === "sniper" ? .06 : classId === "artillery" ? .04 : .025;
+  primary.crit = clamp(.12 + classCritBonus + tuning.focus * .045 + tuning.power * .025, .12, .42);
+  primary.critMultiplier = 2 + tuning.power * .13 + tuning.focus * .08;
   primary.classId = classId;
   primary.modules = new Set(activeIds);
   primary.blastRadius = classId === "artillery" ? 86 * tuning.areaMult : 0;
   const echo = createAttackProfile("조합 프로토콜", Math.round(classProfile.damage * .55), classProfile.range, classProfile.arc);
   echo.cooldown = 0;
+  echo.crit = Math.max(.04, primary.crit * .65);
+  echo.critMultiplier = primary.critMultiplier;
   echo.modules = new Set(activeIds);
   const guard = createGuardProfile();
   guard.modules = new Set(placedModules.filter((module) => activeIds.has(module.id)).map((module) => module.id));
@@ -903,7 +929,7 @@ function partToken(part, status, index) {
   const actionLabel = kind === "tool" ? "도구 인벤토리 회수" : "보관함으로 회수";
   const tokenClass = kind === "tool" ? "tool-token" : "module-token module-" + part.type;
   const sizeLabel = footprint.width + "×" + footprint.height;
-  return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' size-' + footprint.width + ' ' + status + isNew + '" draggable="true" data-part-id="' +
+  return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' size-' + footprint.width + ' ' + status + isNew + '" draggable="false" data-part-id="' +
     part.id + '" data-label="' + def.name + (rarity ? " · " + rarity.label + " " + sizeLabel : " · 공정 도구") + '" style="--module-color:' + def.color + ';--footprint-w:' + footprint.width + ';--footprint-h:' + footprint.height + ';--footprint-width:' + footprintCssSize(footprint.width) + ';--footprint-height:' + footprintCssSize(footprint.height) + '">' +
     '<span class="part-type">' + (kind === "tool" ? "PROCESS TOOL" : "AUGMENT NODE") + '</span><span class="part-code">' + def.code + '</span><span class="part-name">' + def.name + '</span>' +
     (rarity ? '<span class="rarity-badge" style="--rarity-color:' + rarity.color + '">' + rarity.label + ' ' + sizeLabel + '</span>' : '<span class="rarity-badge tool-badge">DROP</span>') +
@@ -922,9 +948,10 @@ function renderPendingPart() {
   const isTool = partKind(factory.pending) === "tool";
   const footprint = partFootprint(factory.pending);
   const rarity = footprint.rarity;
+  const toolTier = isTool ? TOOLS[factory.pending.type].tier : 0;
   target.innerHTML = '<div class="pending-module ' + (isTool ? "pending-tool" : "module-" + factory.pending.type) +
-    '" draggable="true" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
-    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 상·우·하 방향 레고 잭' : '드랍 공정 도구 · 상·우·하 방향 레고 잭') + '</span><span>' + def.description + '</span></div>';
+    '" draggable="false" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + (isTool ? "T" + toolTier + " " : "") + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
+    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 상·우·하 방향 레고 잭' : '드랍 공정 도구 · 빈 셀로 끌어 놓기') + '</span><span>' + def.description + '</span></div>';
   $("#pending-archive").textContent = isTool ? "드랍 도구 선택 취소" : "장착하지 않고 보관";
   $("#pending-archive").hidden = false;
 }
@@ -933,14 +960,19 @@ function renderToolPalette() {
   const target = $("#factory-tools");
   const total = TOOL_TYPES.reduce((sum, type) => sum + (factory.toolInventory[type] || 0), 0);
   const label = document.querySelector(".tool-palette > header span");
-  if (label) label.textContent = total + " DROPS";
+  const next = nextToolUnlock();
+  if (label) label.textContent = "R" + game.room + " · " + total + " DROPS" + (next ? " · NEXT R" + next.unlockRoom : " · ALL OPEN");
   target.innerHTML = TOOL_TYPES.map((type) => {
     const tool = TOOLS[type];
     const count = factory.toolInventory[type] || 0;
+    const unlocked = isToolUnlocked(type);
     const selected = factory.pending?.kind === "tool" && factory.pending.type === type;
-    return '<button type="button" data-tool-type="' + type + '" class="' + (selected ? "selected" : "") +
-      '" style="--tool-color:' + tool.color + '" aria-pressed="' + selected + '" ' + (count ? "" : "disabled") + ' title="' + tool.description + '"><b>' + tool.code + '</b><span>' + tool.name +
-      '</span><em>×' + count + '</em><small>' + tool.tradeoff + '</small></button>';
+    const state = !unlocked ? " locked" : selected ? " selected" : "";
+    const availability = !unlocked || !count ? "disabled" : "";
+    const detail = unlocked ? tool.tradeoff : "R" + tool.unlockRoom + " 도달 시 해금";
+    return '<button type="button" data-tool-type="' + type + '" draggable="false" class="tool-tier-' + tool.tier + state +
+      '" style="--tool-color:' + tool.color + '" aria-pressed="' + selected + '" ' + availability + ' title="' + tool.description + '"><b>' + tool.code + '</b><span>' + tool.name +
+      '</span><em>' + (unlocked ? "×" + count : "LOCK") + '</em><small>T' + tool.tier + " " + TOOL_TIER_LABELS[tool.tier] + " · " + tool.complexity + "<br>" + detail + '</small></button>';
   }).join("");
 }
 
@@ -952,7 +984,7 @@ function renderReserveParts() {
       const def = MODULES[module.type];
       const footprint = partFootprint(module);
       const rarity = footprint.rarity;
-      return '<button type="button" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '"><b>' + def.code + '</b><span>' + def.name + ' · ' + rarity.label + ' ' + footprint.width + '×' + footprint.height + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
+      return '<button type="button" draggable="false" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '" title="' + def.description + '"><b>' + def.code + '</b><span>' + def.name + ' · ' + rarity.label + ' ' + footprint.width + '×' + footprint.height + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
     }).join("")
     : '<span class="reserve-empty">비어 있음</span>';
 }
@@ -1062,8 +1094,8 @@ function renderFactoryBoard() {
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "회로 적용 · 전투 복귀";
   $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
   const pendingDef = factory.pending ? partDefinition(factory.pending) : null;
-  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) 배치 · 상·우·하 잭이 다른 블록의 반대쪽 잭과 맞닿는 위치를 고르세요. 남은 RAM " + freeRam + "." :
-    factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · BUS 레일 바로 오른쪽 또는 가동 블록의 상·우·하에 맞닿게 놓으면 자동 결합됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "블록을 BUS 레일 또는 다른 블록의 상·우·하에 맞닿게 배치하세요. 결합은 자동입니다.");
+  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM)을 빈 셀로 끌어 놓으세요 · 상·우·하 잭이 반대쪽 잭과 맞닿으면 자동 결합됩니다. 남은 RAM " + freeRam + "." :
+    factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · BUS 레일 바로 오른쪽 또는 가동 블록의 상·우·하에 맞닿게 드래그하면 자동 결합됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "부품을 빈 셀로 끌어 놓아 배치하세요. 클릭으로 들어 올린 뒤 놓는 방식도 사용할 수 있습니다.");
   $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount ? "warning" : "ok");
 }
 function placePending(index) {
@@ -1132,7 +1164,7 @@ function liftBoardPart(index) {
   factory.pending = ensurePartPorts({ ...lifted, kind: partKind(lifted), fromBoard: true });
   factory.selectedIndex = null;
   factory.lastPlacedId = null;
-  factory.placementNotice = partDefinition(lifted).name + "을 들었습니다. 원하는 빈 셀을 클릭해 바로 옮기세요. 맞닿은 잭만 다시 결합됩니다.";
+  factory.placementNotice = partDefinition(lifted).name + "을 들었습니다. 원하는 빈 셀에 끌어 놓거나 클릭해 옮기세요. 맞닿은 잭만 다시 결합됩니다.";
   renderFactoryBoard();
 }
 
@@ -1164,6 +1196,11 @@ function archivePending() {
 
 function selectToolBlueprint(type) {
   if (game.mode !== "factory" || !TOOLS[type]) return;
+  if (!isToolUnlocked(type)) {
+    factory.placementNotice = TOOLS[type].name + "은 R" + TOOLS[type].unlockRoom + "부터 해금됩니다.";
+    renderFactoryBoard();
+    return;
+  }
   if (factory.pending && partKind(factory.pending) === "module") {
     factory.placementNotice = "먼저 신규 핵심 증강을 배치하거나 보관하세요.";
     renderFactoryBoard();
@@ -1201,6 +1238,117 @@ function activateReserve(moduleId) {
   factory.selectedIndex = null;
   factory.placementNotice = null;
   renderFactoryBoard();
+}
+
+function draggedPart() {
+  const drag = factory.dragged;
+  if (!drag) return null;
+  if (drag.kind === "board") return board[drag.from] || null;
+  if (drag.kind === "pending") return factory.pending;
+  if (drag.kind === "tool-palette") return { id: -1, kind: "tool", type: drag.type };
+  if (drag.kind === "reserve") return factory.reserve.find((part) => part.id === drag.id) || null;
+  return null;
+}
+
+function movingPlacementUsage(index, part, sourceAnchor) {
+  if (!canPlacePart(index, part, part.id)) return Infinity;
+  if (anchorIndexAt(index) === sourceAnchor) return ramUsage(evaluateClassFactory());
+  const savedWires = factory.wires.slice();
+  const sourcePart = board[sourceAnchor];
+  const targetPart = board[index];
+  board[sourceAnchor] = null;
+  board[index] = part;
+  rebuildPhysicalWires();
+  const projected = ramUsage(evaluateClassFactory());
+  board[index] = targetPart || null;
+  board[sourceAnchor] = sourcePart;
+  factory.wires = savedWires;
+  return projected;
+}
+
+function dragTargetIsValid(index) {
+  const drag = factory.dragged;
+  const part = draggedPart();
+  if (!drag || !part || !isPlaceable(index)) return false;
+  if (drag.kind === "board" && anchorIndexAt(index) === drag.from) return true;
+  if (!canPlacePart(index, part, drag.kind === "board" ? part.id : undefined)) return false;
+  const projected = drag.kind === "board" ? movingPlacementUsage(index, part, drag.from) : pendingPlacementUsage(index, part);
+  return projected <= ramCapacity();
+}
+
+function clearDragFeedback() {
+  document.querySelectorAll(".factory-cell.drop-target, .factory-cell.drop-valid, .factory-cell.drop-invalid").forEach((cell) => cell.classList.remove("drop-target", "drop-valid", "drop-invalid"));
+}
+
+function showDragFeedback(cell, valid) {
+  clearDragFeedback();
+  cell.classList.add("drop-target", valid ? "drop-valid" : "drop-invalid");
+}
+
+function finishFactoryDrag() {
+  factory.dragged = null;
+  clearDragFeedback();
+  document.querySelectorAll(".module-token.is-dragging, .tool-token.is-dragging, .pending-module.is-dragging, #factory-tools button.is-dragging, #reserve-parts button.is-dragging").forEach((part) => part.classList.remove("is-dragging"));
+}
+
+function placeDraggedPaletteTool(type, index) {
+  if (factory.pending || !isToolUnlocked(type) || !(factory.toolInventory[type] || 0)) return;
+  factory.pending = { ...createPart("tool", type), fromInventory: true };
+  placePending(index);
+}
+
+function placeDraggedReservePart(id, index) {
+  if (factory.pending) return;
+  const reserveIndex = factory.reserve.findIndex((part) => part.id === id);
+  if (reserveIndex < 0) return;
+  factory.pending = ensurePartPorts({ ...factory.reserve.splice(reserveIndex, 1)[0], kind: "module" });
+  placePending(index);
+}
+
+function completeFactoryDrop(target) {
+  const drag = factory.dragged;
+  if (!drag || !dragTargetIsValid(target)) {
+    factory.placementNotice = "이 위치는 공간 또는 RAM 조건을 만족하지 않습니다. 밝게 표시된 빈 셀에 놓으세요.";
+    renderFactoryBoard();
+    finishFactoryDrag();
+    return false;
+  }
+  if (drag.kind === "board") moveBoardModule(drag.from, target);
+  if (drag.kind === "pending") placePending(target);
+  if (drag.kind === "tool-palette") placeDraggedPaletteTool(drag.type, target);
+  if (drag.kind === "reserve") placeDraggedReservePart(drag.id, target);
+  finishFactoryDrag();
+  return true;
+}
+
+function queuePointerDrag(event, drag, source) {
+  if (event.button !== 0) return;
+  factory.pointerCandidate = { ...drag, startX: event.clientX, startY: event.clientY, source, active: false };
+}
+
+function updatePointerDrag(event) {
+  const candidate = factory.pointerCandidate;
+  if (!candidate) return;
+  if (!candidate.active && Math.hypot(event.clientX - candidate.startX, event.clientY - candidate.startY) < 7) return;
+  if (!candidate.active) {
+    candidate.active = true;
+    factory.dragged = { kind: candidate.kind, from: candidate.from, id: candidate.id, type: candidate.type };
+    candidate.source.classList.add("is-dragging");
+  }
+  const cell = event.target.closest?.("[data-cell-index]");
+  if (cell && isPlaceable(Number(cell.dataset.cellIndex))) showDragFeedback(cell, dragTargetIsValid(Number(cell.dataset.cellIndex)));
+  else clearDragFeedback();
+}
+
+function finishPointerDrag(event) {
+  const candidate = factory.pointerCandidate;
+  factory.pointerCandidate = null;
+  if (!candidate?.active) return;
+  factory.ignoreBoardClickUntil = performance.now() + 90;
+  const element = document.elementFromPoint?.(event.clientX, event.clientY) || event.target;
+  const cell = element?.closest?.("[data-cell-index]");
+  if (cell && isPlaceable(Number(cell.dataset.cellIndex))) completeFactoryDrop(Number(cell.dataset.cellIndex));
+  else finishFactoryDrag();
 }
 
 function openFactory(manual) {
@@ -1437,6 +1585,8 @@ function resetGame() {
   game.pulses = [];
   game.hitConfirm = 0;
   game.missPulse = 0;
+  game.hitStop = 0;
+  game.criticalHits = 0;
   game.nextEnemyId = 1;
   game.shake = 0;
   game.cameraOffsetX = 0;
@@ -1445,6 +1595,8 @@ function resetGame() {
   game.cursorY = game.mouse.y;
   $("#game").classList.remove("low-health");
   $("#damage-flash").classList.remove("hit");
+  $("#critical-flash").classList.remove("critical");
+  canvas.dataset.criticalHits = "0";
   $("#system-toast").classList.remove("show");
   game.output = evaluateClassFactory();
   enterRoom(1);
@@ -1520,7 +1672,7 @@ function spawnEnemy(type, x, y) {
     shootCooldown: (1 + Math.random()) / COMBAT_TEMPO.attackRate, chargeCooldown: 1.8 / COMBAT_TEMPO.attackRate,
     shootWindup: 0, chargeWindup: 0, chargeTime: 0, chargeAngle: 0,
     burnTime: 0, burnDps: 0, bleedTime: 0, bleedDps: 0,
-    stun: 0, flash: 0, dead: false
+    stun: 0, flash: 0, critical: 0, dead: false
   });
 }
 
@@ -1538,6 +1690,18 @@ function addParticles(x, y, color, count, speed) {
   }
 }
 
+function addCriticalSparks(x, y) {
+  for (let index = 0; index < 14; index += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const force = 145 + Math.random() * 185;
+    const life = .22 + Math.random() * .16;
+    game.particles.push({
+      x, y, vx: Math.cos(angle) * force, vy: Math.sin(angle) * force,
+      life, maxLife: life, size: 3 + Math.random() * 3, color: index % 3 ? "#f6dc66" : "#fff5b8", spark: true
+    });
+  }
+}
+
 function addPulse(x, y, color, radius, duration) {
   game.pulses.push({
     x, y, color, radius: radius || 46,
@@ -1545,26 +1709,34 @@ function addPulse(x, y, color, radius, duration) {
   });
 }
 
-function addFloater(x, y, text, color) {
-  game.floaters.push({ x, y, text, color: color || "#c9f05a", life: .85, maxLife: .85 });
+function addFloater(x, y, text, color, options) {
+  const settings = options || {};
+  const life = settings.life || .85;
+  game.floaters.push({
+    x, y, text, color: color || "#c9f05a", life, maxLife: life,
+    critical: Boolean(settings.critical)
+  });
 }
 
 function spawnToolDrop(enemy) {
   const guaranteed = enemy.type === "guardian";
-  const chance = Math.min(.68, .34 + game.room * .035);
+  const chance = Math.min(.72, .38 + game.room * .035);
   if (!guaranteed && Math.random() > chance) return null;
-  const type = TOOL_TYPES[(enemy.id * 3 + game.room + game.kills) % TOOL_TYPES.length];
-  const drop = { id: game.nextDropId++, type, x: enemy.x, y: enemy.y, radius: 13, life: 22, bob: Math.random() * Math.PI * 2 };
+  const available = availableToolTypes();
+  const type = available[(enemy.id * 3 + game.room + game.kills) % available.length];
+  const tool = TOOLS[type];
+  const drop = { id: game.nextDropId++, type, tier: tool.tier, x: enemy.x, y: enemy.y, radius: 13, life: 22, bob: Math.random() * Math.PI * 2 };
   game.toolDrops.push(drop);
-  addFloater(drop.x, drop.y - 26, "TOOL DROP", TOOLS[type].color);
+  addFloater(drop.x, drop.y - 26, "T" + tool.tier + " TOOL DROP", tool.color);
   return drop;
 }
 
 function collectToolDrop(drop) {
+  const tool = TOOLS[drop.type];
   factory.toolInventory[drop.type] = (factory.toolInventory[drop.type] || 0) + 1;
-  addPulse(drop.x, drop.y, TOOLS[drop.type].color, 34, .26);
-  addFloater(drop.x, drop.y - 22, TOOLS[drop.type].code + " +1", TOOLS[drop.type].color);
-  showSystemToast("PROCESS TOOL ACQUIRED", TOOLS[drop.type].name + " · 공장 보드에서 배치할 수 있습니다.", "success", 2100);
+  addPulse(drop.x, drop.y, tool.color, 34, .26);
+  addFloater(drop.x, drop.y - 22, "T" + tool.tier + " " + tool.code + " +1", tool.color);
+  showSystemToast("PROCESS TOOL ACQUIRED", "T" + tool.tier + " " + tool.name + " · 공장 보드에서 끌어 놓을 수 있습니다.", "success", 2100);
 }
 
 function updateToolDrops(dt) {
@@ -1658,15 +1830,28 @@ function tryNextRoom(force) {
   }
 }
 
+function triggerImpactFeedback(enemy, critical) {
+  const isCritical = Boolean(critical);
+  game.hitStop = Math.max(game.hitStop, isCritical ? .058 : .018);
+  game.shake = Math.max(game.shake, isCritical ? 15 : 7);
+  game.hitConfirm = Math.max(game.hitConfirm, isCritical ? .26 : .16);
+  if (!isCritical) return;
+  enemy.critical = Math.max(enemy.critical || 0, .22);
+  game.criticalHits += 1;
+  canvas.dataset.criticalHits = String(game.criticalHits);
+  flashCriticalFeedback();
+}
+
 function damageEnemy(enemy, damage, profile, angle, canCrit) {
   if (enemy.dead) return;
-  const crit = Boolean(canCrit) && Math.random() < profile.crit;
-  const dealt = damage * (crit ? profile.critMultiplier : 1);
+  const crit = Boolean(canCrit) && Math.random() < clamp(profile.crit || 0, 0, .95);
+  const dealt = damage * (crit ? (profile.critMultiplier || 2) : 1);
   enemy.hp -= dealt;
-  enemy.flash = .12;
+  enemy.flash = crit ? .24 : .12;
   enemy.stun = Math.max(enemy.stun, profile.stun);
   enemy.x += Math.cos(angle) * profile.knockback;
   enemy.y += Math.sin(angle) * profile.knockback;
+  triggerImpactFeedback(enemy, crit);
   if (profile.burn) {
     enemy.burnTime = Math.max(enemy.burnTime, 2.3);
     enemy.burnDps = Math.max(enemy.burnDps, profile.burn);
@@ -1675,9 +1860,10 @@ function damageEnemy(enemy, damage, profile, angle, canCrit) {
     enemy.bleedTime = Math.max(enemy.bleedTime, 2.7);
     enemy.bleedDps = Math.max(enemy.bleedDps, profile.bleed);
   }
-  addFloater(enemy.x, enemy.y - enemy.radius, Math.round(dealt) + (crit ? " CRIT" : ""), crit ? "#f6dc66" : "#e7f2ef");
-  addParticles(enemy.x, enemy.y, crit ? "#f6dc66" : "#8ce1dc", crit ? 10 : 6, 110);
-  addPulse(enemy.x, enemy.y, crit ? "#f6dc66" : "#8ce1dc", crit ? 38 : 24, crit ? .26 : .18);
+  addFloater(enemy.x, enemy.y - enemy.radius, Math.round(dealt) + (crit ? " CRITICAL" : ""), crit ? "#f6dc66" : "#e7f2ef", { critical: crit, life: crit ? 1.05 : .85 });
+  addParticles(enemy.x, enemy.y, crit ? "#f6dc66" : "#8ce1dc", crit ? 14 : 7, crit ? 175 : 125);
+  addPulse(enemy.x, enemy.y, crit ? "#f6dc66" : "#8ce1dc", crit ? 64 : 31, crit ? .34 : .22);
+  if (crit) addCriticalSparks(enemy.x, enemy.y);
   if (enemy.hp <= 0) killEnemy(enemy);
 }
 
@@ -1996,7 +2182,7 @@ function launchGrenade(angle, options) {
     radius: settings.radius || 8, blastRadius: settings.blastRadius || game.output.primary.blastRadius,
     life: 1.5, fragment: Boolean(settings.fragment), dashBomb: Boolean(settings.dashBomb),
     dashAngle: settings.dashAngle ?? angle, supernova: Boolean(settings.supernova), orbital: Boolean(settings.orbital),
-    attachedId: null, color: settings.color || "#ff9b4a"
+    canCrit: settings.canCrit ?? !settings.fragment, attachedId: null, color: settings.color || "#ff9b4a"
   });
 }
 
@@ -2296,6 +2482,7 @@ function updateEnemies(dt) {
     enemy.renderX = (enemy.renderX ?? enemy.x) + (enemy.x - (enemy.renderX ?? enemy.x)) * enemyBlend;
     enemy.renderY = (enemy.renderY ?? enemy.y) + (enemy.y - (enemy.renderY ?? enemy.y)) * enemyBlend;
     enemy.flash -= dt;
+    enemy.critical = Math.max(0, (enemy.critical || 0) - dt);
     enemy.attackCooldown -= dt;
     enemy.shootCooldown -= dt;
     enemy.chargeCooldown -= dt;
@@ -2439,7 +2626,7 @@ function createPlayerExplosion(x, y, damage, radius, options) {
     if (distance > radius + enemy.radius) continue;
     const wasAlive = !enemy.dead;
     const profile = { ...game.output.primary, knockback: settings.source === "melee-shock" ? 34 : 12, stun: .12 };
-    damageEnemy(enemy, damage, profile, Math.atan2(enemy.y - y, enemy.x - x), false);
+    damageEnemy(enemy, damage, profile, Math.atan2(enemy.y - y, enemy.x - x), settings.canCrit ?? primaryExplosion);
     if (wasAlive && enemy.dead) killed.push(enemy);
   }
   if (vacuumed) {
@@ -2540,7 +2727,7 @@ function updatePlayerShots(dt) {
       if (!attached || shot.fuse <= 0) {
         shot.dead = true;
         const livingFuse = !attached && hasSynergy("living_fuse");
-        createPlayerExplosion(shot.x, shot.y, livingFuse ? shot.damage * 1.2 : shot.damage, livingFuse ? shot.blastRadius * 1.35 : shot.blastRadius, { fragment: shot.fragment, dashBomb: shot.dashBomb, supernova: shot.supernova, orbital: shot.orbital, dashAngle: shot.dashAngle, fromSticky: true, livingFuse });
+        createPlayerExplosion(shot.x, shot.y, livingFuse ? shot.damage * 1.2 : shot.damage, livingFuse ? shot.blastRadius * 1.35 : shot.blastRadius, { fragment: shot.fragment, dashBomb: shot.dashBomb, supernova: shot.supernova, orbital: shot.orbital, dashAngle: shot.dashAngle, fromSticky: true, livingFuse, canCrit: shot.canCrit });
         if (livingFuse) noteProtocol("living_fuse");
       }
       continue;
@@ -2579,7 +2766,7 @@ function updatePlayerShots(dt) {
       }
       if (Math.hypot(shot.x - shot.targetX, shot.y - shot.targetY) <= Math.max(18, Math.hypot(shot.vx, shot.vy) * dt) || shot.life <= 0) {
         shot.dead = true;
-        createPlayerExplosion(shot.x, shot.y, shot.damage, shot.blastRadius, { fragment: shot.fragment, dashBomb: shot.dashBomb, supernova: shot.supernova, orbital: shot.orbital, dashAngle: shot.dashAngle });
+        createPlayerExplosion(shot.x, shot.y, shot.damage, shot.blastRadius, { fragment: shot.fragment, dashBomb: shot.dashBomb, supernova: shot.supernova, orbital: shot.orbital, dashAngle: shot.dashAngle, canCrit: shot.canCrit });
       }
       continue;
     }
@@ -2855,10 +3042,11 @@ function runFactoryToolAudits() {
   const savedBoard = board.slice();
   const savedCols = boardCols;
   const savedFactory = { wires: factory.wires.slice(), wireStart: factory.wireStart, toolInventory: { ...factory.toolInventory }, pending: factory.pending, nextId: factory.nextId, nextWireId: factory.nextWireId };
-  const saved = { selectedClass: game.selectedClass, output: game.output, player: game.player, enemies: game.enemies, toolDrops: game.toolDrops, floaters: game.floaters, pulses: game.pulses, mode: game.mode };
+  const saved = { selectedClass: game.selectedClass, output: game.output, player: game.player, enemies: game.enemies, toolDrops: game.toolDrops, floaters: game.floaters, pulses: game.pulses, mode: game.mode, room: game.room, nextDropId: game.nextDropId };
   let report;
   try {
     game.selectedClass = "melee";
+    game.room = 1;
     boardCols = INITIAL_COLS;
     board.length = boardCols * ROWS;
     board.fill(null);
@@ -2887,8 +3075,11 @@ function runFactoryToolAudits() {
     const disconnectedInactive = !evaluateClassFactory().traits.has("m_mark");
     const sourceCircuit = install([core]).output;
     const ampCircuit = install([{ id: 9701, kind: "tool", type: "amplifier", index: indexOf(1, 0) }, { id: 9702, kind: "module", type: "m_mark", index: indexOf(2, 0) }]).output;
+    const repeaterCircuit = install([{ id: 9701, kind: "tool", type: "repeater", index: indexOf(1, 0) }, { id: 9702, kind: "module", type: "m_mark", index: indexOf(2, 0) }]).output;
+    const inverterCircuit = install([{ id: 9701, kind: "tool", type: "inverter", index: indexOf(1, 0) }, { id: 9702, kind: "module", type: "m_mark", index: indexOf(2, 0) }]).output;
     const terminalFreeActive = sourceCircuit.traits.has("m_mark") && sourceCircuit.connectedCount === 1;
     const toolProcessed = ampCircuit.recipes.get(9702)?.mode === "OVERDRIVE" && ampCircuit.primary.damage > sourceCircuit.primary.damage;
+    const advancedToolProcessed = repeaterCircuit.tuning.echo === 1 && inverterCircuit.tuning.utility === 1 && inverterCircuit.guard.armor > 0;
     const branchA = { id: 9703, kind: "module", type: "m_guard", index: indexOf(1, 0) };
     const branchB = { id: 9704, kind: "module", type: "m_spin", index: indexOf(1, 3) };
     board.fill(null);
@@ -2909,6 +3100,19 @@ function runFactoryToolAudits() {
     game.nextDropId = 1;
     const guardianDrop = spawnToolDrop({ id: 711, type: "guardian", x: 300, y: 500 });
     const droppedToWorld = guardianDrop?.type && game.toolDrops.length === 1;
+    const stagedToolUnlocks = TOOL_TYPES.filter((type) => TOOLS[type].tier === 1).every((type) => isToolUnlocked(type, 1)) &&
+      availableToolTypes(1).every((type) => TOOLS[type].tier === 1) && availableToolTypes(3).includes("focuser") &&
+      availableToolTypes(4).includes("splitter") && availableToolTypes(6).includes("repeater") && !availableToolTypes(6).includes("inverter") &&
+      availableToolTypes(8).length === TOOL_TYPES.length && TOOLS[guardianDrop.type].tier === 1;
+    factory.toolInventory.repeater = 1;
+    factory.pending = null;
+    selectToolBlueprint("repeater");
+    const advancedToolLockedEarly = factory.pending === null;
+    game.room = 6;
+    selectToolBlueprint("repeater");
+    const advancedToolUnlockedLater = factory.pending?.type === "repeater";
+    factory.pending = null;
+    game.room = 1;
     const beforeDrop = factory.toolInventory.amplifier;
     collectToolDrop({ id: 1, type: "amplifier", x: 300, y: 500, radius: 12 });
     const droppedToolCollected = factory.toolInventory.amplifier === beforeDrop + 1;
@@ -2938,7 +3142,7 @@ function runFactoryToolAudits() {
     rebuildPhysicalWires();
     const restored = evaluateClassFactory().traits.has("m_mark") && factory.wires.length === 1;
     const rewireable = removed && disconnected && restored;
-    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, toolThreeWayJackLayout, randomAugmentJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
+    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, advancedToolProcessed, noInfiniteTool, droppedToWorld, stagedToolUnlocks, advancedToolLockedEarly, advancedToolUnlockedLater, droppedToolCollected, rarityFootprints, toolThreeWayJackLayout, randomAugmentJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
     report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
   } finally {
     boardCols = savedCols;
@@ -3281,21 +3485,23 @@ function updateEffects(dt) {
 }
 
 function update(dt) {
-  game.time += dt;
-  game.roomBanner -= dt;
-  game.doorPulse += dt;
-  updatePlayer(dt);
-  updateToolDrops(dt);
-  updateEnemies(dt);
-  updateEnemyBullets(dt);
-  updatePlayerShots(dt);
-  updateZones(dt);
-  updateDelayedAttacks(dt);
-  updateEchoes(dt);
+  const combatDt = game.hitStop > 0 ? dt * .14 : dt;
+  game.hitStop = Math.max(0, game.hitStop - dt);
+  game.time += combatDt;
+  game.roomBanner -= combatDt;
+  game.doorPulse += combatDt;
+  updatePlayer(combatDt);
+  updateToolDrops(combatDt);
+  updateEnemies(combatDt);
+  updateEnemyBullets(combatDt);
+  updatePlayerShots(combatDt);
+  updateZones(combatDt);
+  updateDelayedAttacks(combatDt);
+  updateEchoes(combatDt);
   updateEffects(dt);
   game.enemies = game.enemies.filter((enemy) => !enemy.dead);
-  game.shake = Math.max(0, game.shake - dt * 32);
-  const cameraBlend = smoothFactor(26, dt);
+  game.shake = Math.max(0, game.shake - dt * 36);
+  const cameraBlend = smoothFactor(32, dt);
   const shakeX = game.shake > 0 ? (Math.random() - .5) * game.shake : 0;
   const shakeY = game.shake > 0 ? (Math.random() - .5) * game.shake : 0;
   game.cameraOffsetX += (shakeX - game.cameraOffsetX) * cameraBlend;
@@ -3422,10 +3628,12 @@ function drawEnemy(enemy) {
   const drawY = enemy.renderY ?? enemy.y;
   ctx.save();
   ctx.translate(drawX, drawY);
+  const critical = enemy.critical > 0;
   const flash = enemy.flash > 0;
-  ctx.shadowBlur = flash ? 22 : 10;
-  ctx.shadowColor = enemy.color;
-  ctx.fillStyle = flash ? "#ffffff" : enemy.color;
+  if (critical) ctx.scale(1.11, 1.11);
+  ctx.shadowBlur = critical ? 34 : flash ? 22 : 10;
+  ctx.shadowColor = critical ? "#f6dc66" : enemy.color;
+  ctx.fillStyle = critical ? "#fff5b8" : flash ? "#ffffff" : enemy.color;
   if (enemy.type === "drone") {
     ctx.rotate(Math.PI / 4);
     ctx.fillRect(-enemy.radius * .7, -enemy.radius * .7, enemy.radius * 1.4, enemy.radius * 1.4);
@@ -3453,6 +3661,13 @@ function drawEnemy(enemy) {
     ctx.fillRect(enemy.radius * .16, -2, enemy.radius * .18, 4);
   }
   ctx.restore();
+  if (enemy.critical > 0) {
+    ctx.globalAlpha = clamp(enemy.critical / .22, 0, 1);
+    ctx.strokeStyle = "#f6dc66";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(drawX, drawY, enemy.radius + 10, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
   if (enemy.duelMark > 0) {
     ctx.strokeStyle = enemy.markDirection > 0 ? "#58d7d3" : "#a48cff";
     ctx.lineWidth = 2;
@@ -3722,6 +3937,13 @@ function drawEffects() {
       ctx.moveTo(particle.x, particle.y);
       ctx.lineTo(particle.x + particle.vx, particle.y + particle.vy);
       ctx.stroke();
+    } else if (particle.spark) {
+      const radius = particle.size * 1.25;
+      ctx.lineWidth = Math.max(1, particle.size * .46);
+      ctx.beginPath();
+      ctx.moveTo(particle.x - radius, particle.y); ctx.lineTo(particle.x + radius, particle.y);
+      ctx.moveTo(particle.x, particle.y - radius); ctx.lineTo(particle.x, particle.y + radius);
+      ctx.stroke();
     } else {
       ctx.lineCap = "round";
       ctx.lineWidth = particle.size;
@@ -3738,14 +3960,17 @@ function drawEffects() {
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = "center";
-  ctx.font = "700 11px monospace";
   for (const floater of game.floaters) {
     const lifeRatio = clamp(floater.life / floater.maxLife, 0, 1);
     ctx.globalAlpha = lifeRatio * lifeRatio;
     ctx.fillStyle = floater.color;
+    ctx.font = floater.critical ? "900 18px monospace" : "700 11px monospace";
+    ctx.shadowBlur = floater.critical ? 14 : 0;
+    ctx.shadowColor = floater.critical ? "#f6dc66" : "transparent";
     ctx.fillText(floater.text, floater.x, floater.y);
   }
   ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
 }
 
 function drawRoomBanner() {
@@ -3842,7 +4067,7 @@ function updateHud() {
     buildSignature.style.setProperty("--build-color", build?.color || CLASS_PROFILES[game.selectedClass].color);
     $("#build-tier").textContent = tuning.mode + " FACTORY" + (build ? " · TIER " + ["0", "I", "II", "III"][build.tier] : "") + " · " + Math.round(tuning.throughput * 100) + "% FLOW";
     $("#build-name").textContent = build?.name || "가공 증강 " + game.output.activeCount + "기";
-    const buildEffectText = build?.tiers[build.tier - 1] || ("피해 ×" + tuning.damageMult.toFixed(2) + " · 주기 ×" + tuning.cooldownMult.toFixed(2) + (tuning.echo ? " · 지연 복제" : ""));
+    const buildEffectText = (build?.tiers[build.tier - 1] || ("피해 ×" + tuning.damageMult.toFixed(2) + " · 주기 ×" + tuning.cooldownMult.toFixed(2) + (tuning.echo ? " · 지연 복제" : ""))) + " · CRIT " + Math.round(game.output.primary.crit * 100) + "%";
     $("#build-effect").textContent = buildEffectText;
     $("#build-effect").title = buildEffectText;
   }
@@ -3919,6 +4144,7 @@ $("#reserve-parts").addEventListener("click", (event) => {
 });
 
 $("#factory-board").addEventListener("click", (event) => {
+  if (performance.now() < factory.ignoreBoardClickUntil) return;
   const storeButton = event.target.closest("[data-store-index]");
   if (storeButton) {
     event.stopPropagation();
@@ -3933,11 +4159,37 @@ $("#factory-board").addEventListener("click", (event) => {
   if (factory.pending) { placePending(index); return; }
   if (anchorIndexAt(index) >= 0) liftBoardPart(index);
 });
+$("#factory-board").addEventListener("pointerdown", (event) => {
+  const token = event.target.closest("[data-part-id]");
+  if (!token) return;
+  const from = board.findIndex((part) => part?.id === Number(token.dataset.partId));
+  if (from >= 0) queuePointerDrag(event, { kind: "board", from, id: Number(token.dataset.partId) }, token);
+});
+$("#pending-part").addEventListener("pointerdown", (event) => {
+  const pending = event.target.closest("[data-pending-module]");
+  if (pending && factory.pending) queuePointerDrag(event, { kind: "pending" }, pending);
+});
+$("#factory-tools").addEventListener("pointerdown", (event) => {
+  const tool = event.target.closest("[data-tool-type]");
+  const type = tool?.dataset.toolType;
+  if (tool && type && !factory.pending && isToolUnlocked(type) && (factory.toolInventory[type] || 0)) queuePointerDrag(event, { kind: "tool-palette", type }, tool);
+});
+$("#reserve-parts").addEventListener("pointerdown", (event) => {
+  const reserve = event.target.closest("[data-reserve-id]");
+  if (reserve && !factory.pending) queuePointerDrag(event, { kind: "reserve", id: Number(reserve.dataset.reserveId) }, reserve);
+});
+window.addEventListener("pointermove", updatePointerDrag);
+window.addEventListener("pointerup", finishPointerDrag);
+
 $("#factory-board").addEventListener("dragstart", (event) => {
-  if (!event.target.closest("[data-part-id]")) return;
-  event.preventDefault();
-  factory.placementNotice = "블록을 클릭해 바로 들고 원하는 셀에 놓으세요. STORAGE 보관은 PICK 버튼을 사용합니다.";
-  renderFactoryBoard();
+  const token = event.target.closest("[data-part-id]");
+  if (!token) return;
+  const from = board.findIndex((part) => part?.id === Number(token.dataset.partId));
+  if (from < 0) { event.preventDefault(); return; }
+  factory.dragged = { kind: "board", from, id: Number(token.dataset.partId) };
+  event.dataTransfer?.setData("text/plain", "board:" + from);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  token.classList.add("is-dragging");
 });
 
 $("#factory-board").addEventListener("contextmenu", (event) => {
@@ -3951,26 +4203,57 @@ $("#factory-board").addEventListener("contextmenu", (event) => {
 });
 
 $("#pending-part").addEventListener("dragstart", (event) => {
-  if (!event.target.closest("[data-pending-module]") || !factory.pending) return;
+  const pending = event.target.closest("[data-pending-module]");
+  if (!pending || !factory.pending) return;
   factory.dragged = { kind: "pending" };
-  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer?.setData("text/plain", "pending");
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  pending.classList.add("is-dragging");
+});
+
+$("#factory-tools").addEventListener("dragstart", (event) => {
+  const tool = event.target.closest("[data-tool-type]");
+  const type = tool?.dataset.toolType;
+  if (!tool || !type || factory.pending || !isToolUnlocked(type) || !(factory.toolInventory[type] || 0)) { event.preventDefault(); return; }
+  factory.dragged = { kind: "tool-palette", type };
+  event.dataTransfer?.setData("text/plain", "tool:" + type);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  tool.classList.add("is-dragging");
+});
+
+$("#reserve-parts").addEventListener("dragstart", (event) => {
+  const reserve = event.target.closest("[data-reserve-id]");
+  if (!reserve || factory.pending) { event.preventDefault(); return; }
+  factory.dragged = { kind: "reserve", id: Number(reserve.dataset.reserveId) };
+  event.dataTransfer?.setData("text/plain", "reserve:" + reserve.dataset.reserveId);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  reserve.classList.add("is-dragging");
 });
 
 $("#factory-board").addEventListener("dragover", (event) => {
   const cell = event.target.closest("[data-cell-index]");
-  if (!cell || !isPlaceable(Number(cell.dataset.cellIndex))) return;
+  if (!cell || !factory.dragged || !isPlaceable(Number(cell.dataset.cellIndex))) return;
   event.preventDefault();
-  event.dataTransfer.dropEffect = "move";
+  const valid = dragTargetIsValid(Number(cell.dataset.cellIndex));
+  if (event.dataTransfer) event.dataTransfer.dropEffect = valid ? "move" : "none";
+  showDragFeedback(cell, valid);
+});
+
+$("#factory-board").addEventListener("dragleave", (event) => {
+  const cell = event.target.closest("[data-cell-index]");
+  if (cell && !cell.contains(event.relatedTarget)) clearDragFeedback();
 });
 
 $("#factory-board").addEventListener("drop", (event) => {
   const cell = event.target.closest("[data-cell-index]");
   if (!cell || !factory.dragged) return;
   event.preventDefault();
-  const target = Number(cell.dataset.cellIndex);
-  if (factory.dragged.kind === "pending") placePending(target);
-  factory.dragged = null;
+  completeFactoryDrop(Number(cell.dataset.cellIndex));
 });
+
+for (const dragSource of [$("#factory-board"), $("#pending-part"), $("#factory-tools"), $("#reserve-parts")]) {
+  dragSource.addEventListener("dragend", finishFactoryDrag);
+}
 $("#board-expand").addEventListener("click", () => {
   extendBoard();
   factory.placementNotice = "보드를 " + EXTEND_BY + "칸 확장했습니다. 오른쪽으로 계속 배치할 수 있습니다.";

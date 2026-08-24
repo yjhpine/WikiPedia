@@ -99,6 +99,27 @@ async function clickElement(session, selector) {
   await clickPoint(session, point.x, point.y);
 }
 
+async function dragElementToElement(session, sourceSelector, targetSelector) {
+  const points = await evaluate(session, `(() => {
+    const point = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    };
+    return { source: point(${JSON.stringify(sourceSelector)}), target: point(${JSON.stringify(targetSelector)}) };
+  })()`);
+  assert(points.source && points.target, `드래그 대상 누락: ${sourceSelector} → ${targetSelector}`);
+  await session.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.source.x, y: points.source.y });
+  await session.send("Input.dispatchMouseEvent", { type: "mousePressed", x: points.source.x, y: points.source.y, button: "left", buttons: 1, clickCount: 1 });
+  for (const progress of [.2, .45, .7, 1]) {
+    await session.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.source.x + (points.target.x - points.source.x) * progress, y: points.source.y + (points.target.y - points.source.y) * progress, button: "left", buttons: 1 });
+    await sleep(35);
+  }
+  await session.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: points.target.x, y: points.target.y, button: "left", buttons: 0, clickCount: 1 });
+  await sleep(80);
+}
+
 async function auditViewport(session, viewport) {
   await session.send("Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
@@ -129,7 +150,7 @@ async function auditViewport(session, viewport) {
       stage: rect("#ui-stage"),
       card: rect(".start-card"),
       strayUi: [...document.querySelector('#game').children]
-        .filter((element) => !['game-canvas', 'ui-stage', 'screen-noise', 'damage-flash'].includes(element.id || element.className))
+        .filter((element) => !['game-canvas', 'ui-stage', 'screen-noise', 'damage-flash', 'critical-flash'].includes(element.id || element.className))
         .map((element) => element.id || element.className || element.tagName),
       overlayOverflowX: overlay.scrollWidth - overlay.clientWidth,
       documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -205,13 +226,16 @@ async function auditViewport(session, viewport) {
     const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, rails: document.querySelectorAll('[data-port-owner=\"bus-source\"][data-port-row]').length, jacks: document.querySelectorAll('.module-token [data-port-kind=\"jack\"]').length, leftJacks: document.querySelectorAll('.module-token [data-port-edge=\"left\"]').length, hasPickup: Boolean(document.querySelector('.module-token [data-store-index]')), message: document.querySelector('#board-message')?.textContent || null })");
     const connected = circuitState.wires === 1 && circuitState.token?.includes("raw") && circuitState.rails === 5 && circuitState.jacks >= 2 && circuitState.leftJacks >= 1 && circuitState.hasPickup;
     assert(connected, "wide: 인접 레고 결합 또는 PICK 버튼이 동작하지 않음 " + JSON.stringify(circuitState));
+    await dragElementToElement(session, '.module-token .part-code', '#factory-board [data-cell-index="8"]');
+    const movedByDrag = await evaluate(session, "(() => { const token = document.querySelector('.module-token'); return { anchor: Number(token?.closest('[data-cell-index]')?.dataset.cellIndex), wires: document.querySelectorAll('.circuit-wire').length }; })()");
+    assert(movedByDrag.anchor === 8 && movedByDrag.wires === 1, "wide: 설치 블록을 드래그로 옮기지 못함 " + JSON.stringify(movedByDrag));
     await clickElement(session, '.module-token .part-code');
     await sleep(70);
     const lifted = await evaluate(session, "({ pending: Boolean(document.querySelector('#pending-part .pending-module')), token: Boolean(document.querySelector('.module-token')), wires: document.querySelectorAll('.circuit-wire').length })");
     assert(lifted.pending && !lifted.token && lifted.wires === 0, "wide: 블록 클릭으로 바로 들어 올리지 못함 " + JSON.stringify(lifted));
-    await clickElement(session, '#factory-board [data-cell-index="7"]');
+    await dragElementToElement(session, '#pending-part .pending-module', '#factory-board [data-cell-index="7"]');
     await sleep(90);
-    const placedAgain = await evaluate(session, "({ token: document.querySelector('.module-token')?.className || '', wires: document.querySelectorAll('.circuit-wire').length })");
+    const placedAgain = await evaluate(session, "({ token: document.querySelector('.module-token')?.className || '', wires: document.querySelectorAll('.circuit-wire').length, pending: Boolean(document.querySelector('#pending-part .pending-module')), message: document.querySelector('#board-message')?.textContent || '' })");
     assert(placedAgain.token.includes('raw') && placedAgain.wires === 1, "wide: 들어 올린 블록을 바로 재배치하지 못함 " + JSON.stringify(placedAgain));
     const cellsBeforeExtend = await evaluate(session, "document.querySelectorAll('#factory-board [data-cell-index]').length");
     await clickElement(session, '#board-expand');
@@ -222,9 +246,7 @@ async function auditViewport(session, viewport) {
     await sleep(80);
     const stored = await evaluate(session, "({ stored: document.querySelectorAll('#reserve-parts [data-reserve-id]').length, token: Boolean(document.querySelector('.module-token')), wires: document.querySelectorAll('.circuit-wire').length })");
     assert(stored.stored === 1 && !stored.token && stored.wires === 0, "wide: 설치 블록을 STORAGE로 회수하지 못함 " + JSON.stringify(stored));
-    await clickElement(session, '#reserve-parts [data-reserve-id]');
-    await sleep(50);
-    await clickElement(session, '#factory-board [data-cell-index="7"]');
+    await dragElementToElement(session, '#reserve-parts [data-reserve-id]', '#factory-board [data-cell-index="7"]');
     await sleep(100);
     const redeployed = await evaluate(session, "({ token: document.querySelector('.module-token')?.className || '', wires: document.querySelectorAll('.circuit-wire').length })");
     assert(redeployed.token.includes('raw') && redeployed.wires === 1, "wide: STORAGE 블록을 재설치해 자동 결합하지 못함 " + JSON.stringify(redeployed));
