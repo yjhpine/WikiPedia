@@ -189,6 +189,12 @@ const MODULE_RAM = {
 };
 const PROTOCOL_RAM = 1;
 
+const RARITIES = {
+  common: { id: "common", label: "일반", code: "COMMON", width: 1, height: 1, color: "#a7b8ba" },
+  rare: { id: "rare", label: "희귀", code: "RARE", width: 2, height: 2, color: "#69a9ff" },
+  legendary: { id: "legendary", label: "전설", code: "LEGENDARY", width: 4, height: 4, color: "#ffbd57" }
+};
+
 const TOOLS = {
   router: {
     name: "회전 라우터", code: "↪", color: "#58d7d3", ram: 1, rotatable: true,
@@ -234,6 +240,14 @@ const GUARD_ROW = 3;
 const LANE_NAMES = ["상부 보조선", "상부 공정선", "중앙 버스", "하부 공정선", "하부 보조선"];
 const LANE_CODES = ["AUX", "AUX", "BUS IN", "AUX", "AUX"];
 const moduleTypes = Object.keys(MODULES);
+const MODULE_RARITIES = Object.fromEntries(moduleTypes.map((type, index) => {
+  const slot = index % 10;
+  return [type, slot < 4 ? "common" : slot < 8 ? "rare" : "legendary"];
+}));
+const BUS_SOURCE_ID = "bus-source";
+const BUS_SINK_ID = "bus-sink";
+const BUS_SOURCE_LABEL = "BUS IN";
+const BUS_SINK_LABEL = "BUS OUT";
 const board = Array(boardCols * ROWS).fill(null);
 const indexOf = (col, row) => col * ROWS + row;
 const positionOf = (index) => ({ col: Math.floor(index / ROWS), row: index % ROWS });
@@ -247,6 +261,122 @@ const isPlaceable = (index) => {
   return position.col > 0 && position.col < boardCols && position.row >= 0 && position.row < ROWS;
 };
 
+function moduleRarity(type) {
+  return RARITIES[MODULE_RARITIES[type] || "common"];
+}
+
+function partFootprint(part) {
+  if (partKind(part) === "tool") return { width: 1, height: 1, rarity: null };
+  const rarity = moduleRarity(part?.type);
+  return { width: rarity.width, height: rarity.height, rarity };
+}
+
+function footprintIndices(part, anchorIndex) {
+  const { col, row } = positionOf(anchorIndex);
+  const { width, height } = partFootprint(part);
+  const indices = [];
+  for (let dc = 0; dc < width; dc += 1) {
+    for (let dr = 0; dr < height; dr += 1) indices.push(indexOf(col + dc, row + dr));
+  }
+  return indices;
+}
+
+function partAt(index) {
+  for (let anchor = 0; anchor < board.length; anchor += 1) {
+    const part = board[anchor];
+    if (!part) continue;
+    if (footprintIndices(part, anchor).includes(index)) return part;
+  }
+  return null;
+}
+
+function anchorIndexAt(index) {
+  for (let anchor = 0; anchor < board.length; anchor += 1) {
+    const part = board[anchor];
+    if (part && footprintIndices(part, anchor).includes(index)) return anchor;
+  }
+  return -1;
+}
+
+function canPlacePart(index, part, ignorePartId) {
+  if (!isPlaceable(index) || !part) return false;
+  const { col, row } = positionOf(index);
+  const { width, height } = partFootprint(part);
+  if (col + width > boardCols || row + height > ROWS) return false;
+  return footprintIndices(part, index).every((cellIndex) => {
+    const occupant = partAt(cellIndex);
+    return !occupant || occupant.id === ignorePartId;
+  });
+}
+
+function stableHash(value) {
+  let hash = 2166136261;
+  for (const char of String(value)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return hash >>> 0;
+}
+
+function randomPort(part, kind, salt) {
+  const { width, height } = partFootprint(part);
+  const seed = salt === undefined ? Math.floor(Math.random() * 0x7fffffff) : stableHash(String(part.id) + ":" + part.type + ":" + kind + ":" + salt);
+  const edge = ["top", "right", "bottom", "left"][seed % 4];
+  const span = edge === "top" || edge === "bottom" ? width : height;
+  return { edge, offset: Math.floor(seed / 7) % span };
+}
+
+function ensurePartPorts(part) {
+  if (!part) return part;
+  if (!part.ports) part.ports = {};
+  if (!part.ports.input) part.ports.input = randomPort(part, "input", "fallback-in");
+  if (!part.ports.output) part.ports.output = randomPort(part, "output", "fallback-out");
+  if (part.ports.input.edge === part.ports.output.edge && part.ports.input.offset === part.ports.output.offset) {
+    const { width, height } = partFootprint(part);
+    const opposite = { top: "bottom", right: "left", bottom: "top", left: "right" };
+    part.ports.output = { edge: opposite[part.ports.output.edge], offset: part.ports.output.edge === "top" || part.ports.output.edge === "bottom" ? Math.min(part.ports.output.offset, width - 1) : Math.min(part.ports.output.offset, height - 1) };
+  }
+  return part;
+}
+
+function createPart(kind, type) {
+  const part = { id: factory.nextId++, kind, type };
+  if (kind === "tool") part.dir = 0;
+  part.ports = { input: randomPort(part, "input"), output: randomPort(part, "output") };
+  ensurePartPorts(part);
+  return part;
+}
+
+function wireKey(fromId, toId) {
+  return String(fromId) + ">" + String(toId);
+}
+
+function clearWiresFor(partId) {
+  factory.wires = factory.wires.filter((wire) => wire.fromId !== partId && wire.toId !== partId);
+  if (factory.wireStart?.id === partId) factory.wireStart = null;
+}
+
+function circuitId(id) {
+  if (id === BUS_SOURCE_ID || id === BUS_SINK_ID) return id;
+  const numeric = Number(id);
+  return Number.isFinite(numeric) && String(numeric) === String(id) ? numeric : id;
+}
+
+function connectPorts(fromId, toId) {
+  fromId = circuitId(fromId);
+  toId = circuitId(toId);
+  if (fromId === toId || !fromId || !toId) return false;
+  const fromValid = fromId === BUS_SOURCE_ID || partsOnBoard().some((part) => part.id === fromId);
+  const toValid = toId === BUS_SINK_ID || partsOnBoard().some((part) => part.id === toId);
+  if (!fromValid || !toValid || toId === BUS_SOURCE_ID || fromId === BUS_SINK_ID) return false;
+  factory.wires = factory.wires.filter((wire) => wire.toId !== toId && wireKey(wire.fromId, wire.toId) !== wireKey(fromId, toId));
+  factory.wires.push({ id: factory.nextWireId++, fromId, toId });
+  return true;
+}
+
+function disconnectWire(wireId) {
+  const before = factory.wires.length;
+  factory.wires = factory.wires.filter((wire) => wire.id !== wireId);
+  return factory.wires.length !== before;
+}
+
 function ramCapacity() {
   const level = game.player?.level || 1;
   return Math.min(24, 8 + level * 2);
@@ -258,8 +388,8 @@ function ramUsage(output) {
 }
 
 function pendingPlacementUsage(index, type, currentOutput) {
-  if (!isPlaceable(index) || board[index]) return Infinity;
   const pending = typeof type === "string" ? { id: -1, kind: "module", type } : type;
+  if (!canPlacePart(index, pending)) return Infinity;
   board[index] = pending;
   const projected = ramUsage(evaluateClassFactory());
   board[index] = null;
@@ -311,18 +441,21 @@ function renderTestModuleButtons() {
 
 const factory = {
   pending: null, selectedIndex: null, dragged: null, manual: false,
-  choiceSelection: null, lastPlacedId: null, placementNotice: null, reserve: [], nextId: 1
+  choiceSelection: null, lastPlacedId: null, placementNotice: null, reserve: [],
+  wires: [], wireStart: null, toolInventory: Object.fromEntries(TOOL_TYPES.map((type) => [type, 0])),
+  nextId: 1, nextWireId: 1
 };
 const game = {
   mode: "start", selectedClass: null, width: innerWidth, height: innerHeight, time: 0, room: 1,
   kills: 0, xp: 0, xpNext: 28, levelUpQueued: false, roomCleared: false,
   doorOpen: false, doorPulse: 0, roomBanner: 0, player: null, enemies: [],
-  enemyBullets: [], playerShots: [], zones: [], delayedAttacks: [], orbitals: [],
+  enemyBullets: [], playerShots: [], zones: [], delayedAttacks: [], orbitals: [], toolDrops: [],
   particles: [], floaters: [], echoes: [], keys: new Set(),
   mouse: { x: innerWidth * .7, y: innerHeight * .5 }, dashRequested: false,
   attackRequested: false, output: null, nextEnemyId: 1, shake: 0,
   pulses: [], hitConfirm: 0, missPulse: 0, augmentEvents: {}, protocolEvents: {},
-  cameraOffsetX: 0, cameraOffsetY: 0, cursorX: innerWidth * .7, cursorY: innerHeight * .5
+  cameraOffsetX: 0, cameraOffsetY: 0, cursorX: innerWidth * .7, cursorY: innerHeight * .5,
+  nextDropId: 1
 };
 let toastTimer = 0;
 
@@ -348,7 +481,11 @@ function partRamCost(part) {
 }
 
 function partsOnBoard() {
-  return board.flatMap((part, index) => part ? [{ ...part, kind: partKind(part), index, ...positionOf(index) }] : []);
+  return board.flatMap((part, index) => {
+    if (!part) return [];
+    ensurePartPorts(part);
+    return [{ ...part, kind: partKind(part), index, ...positionOf(index), ...partFootprint(part) }];
+  });
 }
 
 function modulesOnBoard() {
@@ -470,12 +607,55 @@ function buildFactoryTuning(recipes, activeTools) {
   return { throughput, power, echo, focus, utility, heat, splitters, damageMult, cooldownMult, rangeMult, areaMult, controlMult, mode };
 }
 
+function operationalCircuit(parts) {
+  const partIds = new Set(parts.map((part) => part.id));
+  const validWires = factory.wires.filter((wire) =>
+    (wire.fromId === BUS_SOURCE_ID || partIds.has(wire.fromId)) &&
+    (wire.toId === BUS_SINK_ID || partIds.has(wire.toId)) &&
+    wire.fromId !== wire.toId
+  );
+  const outgoing = new Map();
+  const incoming = new Map();
+  for (const wire of validWires) {
+    if (!outgoing.has(wire.fromId)) outgoing.set(wire.fromId, []);
+    if (!incoming.has(wire.toId)) incoming.set(wire.toId, []);
+    outgoing.get(wire.fromId).push(wire);
+    incoming.get(wire.toId).push(wire);
+  }
+  const fromSource = new Set([BUS_SOURCE_ID]);
+  const forwardQueue = [BUS_SOURCE_ID];
+  while (forwardQueue.length) {
+    const id = forwardQueue.shift();
+    for (const wire of outgoing.get(id) || []) {
+      if (!fromSource.has(wire.toId)) {
+        fromSource.add(wire.toId);
+        forwardQueue.push(wire.toId);
+      }
+    }
+  }
+  const toSink = new Set([BUS_SINK_ID]);
+  const backwardQueue = [BUS_SINK_ID];
+  while (backwardQueue.length) {
+    const id = backwardQueue.shift();
+    for (const wire of incoming.get(id) || []) {
+      if (!toSink.has(wire.fromId)) {
+        toSink.add(wire.fromId);
+        backwardQueue.push(wire.fromId);
+      }
+    }
+  }
+  const operationalIds = new Set(parts.filter((part) => fromSource.has(part.id) && toSink.has(part.id)).map((part) => part.id));
+  return { validWires, outgoing, incoming, fromSource, toSink, operationalIds };
+}
+
 function evaluateClassFactory() {
   const classId = game.selectedClass || "melee";
   const classProfile = CLASS_PROFILES[classId];
-  const placedModules = modulesOnBoard().filter((module) => MODULES[module.type]?.classId === classId);
-  const placedTools = toolsOnBoard();
-  const statuses = new Map(partsOnBoard().map((part) => [part.id, "inactive"]));
+  const parts = partsOnBoard();
+  const partById = new Map(parts.map((part) => [part.id, part]));
+  const placedModules = parts.filter((part) => part.kind === "module" && MODULES[part.type]?.classId === classId);
+  const placedTools = parts.filter((part) => part.kind === "tool");
+  const statuses = new Map(parts.map((part) => [part.id, "inactive"]));
   const activeIds = new Set();
   const activeToolIds = new Set();
   const activeTypes = new Set();
@@ -483,29 +663,25 @@ function evaluateClassFactory() {
   const flowDirections = new Map();
   const protocolRoutes = [];
   const protocolKeys = new Set();
-  const queue = [{
-    col: 1, row: MAIN_ROW, dir: 0, sourceRow: MAIN_ROW, lastModule: null,
-    mods: emptyProcessState(), throughput: 1, toolIds: [], path: []
-  }];
+  const circuit = operationalCircuit(parts);
+  const queue = (circuit.outgoing.get(BUS_SOURCE_ID) || [])
+    .filter((wire) => circuit.operationalIds.has(wire.toId))
+    .map((wire) => ({ wire, lastModule: null, mods: emptyProcessState(), throughput: 1, toolIds: [], path: [] }));
   const visited = new Set();
   let processed = 0;
 
-  while (queue.length && processed < 240) {
+  while (queue.length && processed < 400) {
     const signal = queue.shift();
-    if (signal.col <= 0 || signal.col >= boardCols || signal.row < 0 || signal.row >= ROWS || signal.throughput < .16) continue;
-    const index = indexOf(signal.col, signal.row);
-    const part = board[index];
-    if (!part) continue;
-    const key = [index, signal.dir, signal.sourceRow, signal.lastModule?.id || 0, signal.mods.power, signal.mods.echo,
-      signal.mods.focus, Number(signal.mods.inverted), signal.throughput.toFixed(2)].join(":");
-    if (visited.has(key)) continue;
-    visited.add(key);
+    const part = partById.get(signal.wire.toId);
+    if (!part || !circuit.operationalIds.has(part.id) || signal.throughput < .16) continue;
+    const visitKey = [signal.wire.id, signal.lastModule?.id || 0, signal.mods.power, signal.mods.echo, signal.mods.focus,
+      Number(signal.mods.inverted), signal.throughput.toFixed(2)].join(":");
+    if (visited.has(visitKey)) continue;
+    visited.add(visitKey);
     processed += 1;
-    const kind = partKind(part);
-    if (!flowDirections.has(part.id)) flowDirections.set(part.id, new Set());
-    flowDirections.get(part.id).add(signal.dir);
+    if (!flowDirections.has(part.id)) flowDirections.set(part.id, new Set([0]));
 
-    if (kind === "module") {
+    if (part.kind === "module") {
       if (MODULES[part.type]?.classId !== classId) continue;
       activeIds.add(part.id);
       activeTypes.add(part.type);
@@ -532,17 +708,15 @@ function evaluateClassFactory() {
           protocolKeys.add(routeKey);
           protocolRoutes.push({
             kind: synergy.kind, fromId: signal.lastModule.id, toId: part.id,
-            fromRow: signal.lastModule.row, fromCol: signal.lastModule.col, toRow: signal.row, toCol: signal.col,
-            row: signal.lastModule.row, col: signal.lastModule.col, path: [...signal.path, index], toolIds: [...signal.toolIds]
+            fromRow: signal.lastModule.row, fromCol: signal.lastModule.col, toRow: part.row, toCol: part.col,
+            row: signal.lastModule.row, col: signal.lastModule.col, path: [...signal.path, part.id], toolIds: [...signal.toolIds]
           });
         }
       }
-      const direction = DIRECTIONS[signal.dir];
-      queue.push({
-        ...signal, col: signal.col + direction.dc, row: signal.row + direction.dr,
-        lastModule: { id: part.id, type: part.type, row: signal.row, col: signal.col },
-        mods: emptyProcessState(), toolIds: [], path: []
-      });
+      const next = { lastModule: part, mods: emptyProcessState(), toolIds: [], path: [] };
+      for (const wire of circuit.outgoing.get(part.id) || []) {
+        if (wire.toId !== BUS_SINK_ID && circuit.operationalIds.has(wire.toId)) queue.push({ ...next, wire, throughput: signal.throughput });
+      }
       continue;
     }
 
@@ -550,29 +724,16 @@ function evaluateClassFactory() {
     if (!tool) continue;
     activeToolIds.add(part.id);
     statuses.set(part.id, "tool-active");
-    const nextSignal = {
-      ...signal, mods: { ...signal.mods }, toolIds: [...signal.toolIds, part.id], path: [...signal.path, index]
-    };
-    let outputDirections = [signal.dir];
-    if (part.type === "amplifier") {
-      nextSignal.mods.power += 1;
-      nextSignal.mods.heat += 1;
-    }
-    if (part.type === "repeater") {
-      nextSignal.mods.echo += 1;
-      nextSignal.mods.heat += .84;
-    }
-    if (part.type === "focuser") nextSignal.mods.focus += 1;
-    if (part.type === "inverter") nextSignal.mods.inverted = !nextSignal.mods.inverted;
-    if (part.type === "router") outputDirections = [part.dir ?? 0];
-    if (part.type === "splitter") {
-      const primaryDirection = part.dir ?? 0;
-      outputDirections = [primaryDirection, (primaryDirection + 1) % DIRECTIONS.length];
-      nextSignal.throughput *= .72;
-    }
-    for (const dir of outputDirections) {
-      const direction = DIRECTIONS[dir];
-      queue.push({ ...nextSignal, dir, col: signal.col + direction.dc, row: signal.row + direction.dr });
+    const nextMods = { ...signal.mods };
+    if (part.type === "amplifier") { nextMods.power += 1; nextMods.heat += 1; }
+    if (part.type === "repeater") { nextMods.echo += 1; nextMods.heat += .84; }
+    if (part.type === "focuser") nextMods.focus += 1;
+    if (part.type === "inverter") nextMods.inverted = !nextMods.inverted;
+    const nextWires = (circuit.outgoing.get(part.id) || []).filter((wire) => wire.toId === BUS_SINK_ID || circuit.operationalIds.has(wire.toId));
+    const throughput = part.type === "splitter" && nextWires.length > 1 ? signal.throughput * .72 : signal.throughput;
+    for (const wire of nextWires) {
+      if (wire.toId === BUS_SINK_ID) continue;
+      queue.push({ wire, lastModule: signal.lastModule, mods: { ...nextMods }, throughput, toolIds: [...signal.toolIds, part.id], path: [...signal.path, part.id] });
     }
   }
 
@@ -591,7 +752,7 @@ function evaluateClassFactory() {
   echo.cooldown = 0;
   echo.modules = new Set(activeIds);
   const guard = createGuardProfile();
-  guard.modules = new Set(placedModules.filter((module) => activeIds.has(module.id) && module.row === GUARD_ROW).map((module) => module.id));
+  guard.modules = new Set(placedModules.filter((module) => activeIds.has(module.id)).map((module) => module.id));
   guard.maxHpBonus += Math.round(tuning.utility * 24);
   guard.armor += tuning.utility * .12;
   guard.dashCooldown *= 1 - tuning.utility * .16;
@@ -613,67 +774,87 @@ function evaluateClassFactory() {
   const lineReactors = evaluateLineReactors(protocolRoutes);
   const sequenceDepth = lineReactors.reactors.reduce((maximum, reactor) => Math.max(maximum, reactor.depth), 0);
   const build = lineReactors.dominant ? {
-    id: lineReactors.dominant.style.id,
-    name: lineReactors.dominant.style.name,
-    color: lineReactors.dominant.style.color,
-    attackName: lineReactors.dominant.style.attackName,
-    identity: lineReactors.dominant.style.identity,
-    tiers: lineReactors.dominant.style.tiers,
-    tier: lineReactors.dominant.tier,
-    depth: lineReactors.dominant.depth,
-    row: lineReactors.dominant.row,
-    moduleIds: lineReactors.dominant.moduleIds
+    id: lineReactors.dominant.style.id, name: lineReactors.dominant.style.name, color: lineReactors.dominant.style.color,
+    attackName: lineReactors.dominant.style.attackName, identity: lineReactors.dominant.style.identity,
+    tiers: lineReactors.dominant.style.tiers, tier: lineReactors.dominant.tier, depth: lineReactors.dominant.depth,
+    row: lineReactors.dominant.row, moduleIds: lineReactors.dominant.moduleIds
   } : null;
   return {
     primary, echo, guard, classId, classProfile, traits: activeTypes, synergyKinds, synergyModuleIds, outgoingModuleIds,
     statuses, synergies, protocolRoutes, sequenceDepth, reactors: lineReactors.reactors, build,
     recipes, tuning, flowDirections, activeToolIds, activeCount: activeIds.size,
-    inactiveCount: placedModules.length - activeIds.size, placedToolCount: placedTools.length, activeToolCount: activeTools.length
+    inactiveCount: placedModules.length - activeIds.size, placedToolCount: placedTools.length, activeToolCount: activeTools.length,
+    wires: circuit.validWires, operationalIds: circuit.operationalIds, connectedCount: circuit.operationalIds.size
   };
 }
+function portStyle(port, footprint) {
+  const horizontal = port.edge === "top" || port.edge === "bottom";
+  const offset = (port.offset + .5) / (horizontal ? footprint.width : footprint.height) * 100;
+  const left = port.edge === "left" ? 0 : port.edge === "right" ? 100 : offset;
+  const top = port.edge === "top" ? 0 : port.edge === "bottom" ? 100 : offset;
+  return "--port-left:" + left.toFixed(2) + "%;--port-top:" + top.toFixed(2) + "%";
+}
 
-function partToken(part, status, index, flowDirections) {
+function footprintCssSize(cells) {
+  return "calc(" + Array.from({ length: cells }, () => "var(--cell)").join(" + ") + " + " + Math.max(0, cells - 1) * 6 + "px - 8px)";
+}
+
+function portButton(part, kind) {
+  const footprint = partFootprint(part);
+  const port = ensurePartPorts(part).ports[kind];
+  const label = kind === "input" ? "입력" : "출력";
+  const selected = factory.wireStart?.id === part.id && factory.wireStart?.kind === kind;
+  return '<button type="button" class="circuit-port ' + kind + (selected ? " selected" : "") + '" data-port-owner="' + part.id +
+    '" data-port-kind="' + kind + '" style="' + portStyle(port, footprint) + '" aria-label="' + partDefinition(part).name + ' ' + label + ' 단자"></button>';
+}
+
+function partToken(part, status, index) {
   const kind = partKind(part);
   const def = partDefinition(part);
+  const footprint = partFootprint(part);
+  const rarity = footprint.rarity;
   const isNew = part.id === factory.lastPlacedId ? " is-new" : "";
-  const directions = [...(flowDirections || [])].map((dir) => DIRECTIONS[dir].glyph).join("");
-  const rotate = kind === "tool" && def.rotatable
-    ? '<button class="part-rotate" type="button" data-rotate-index="' + index + '" aria-label="' + def.name + ' 회전">' + DIRECTIONS[part.dir ?? 0].glyph + '</button>'
-    : "";
-  const actionLabel = kind === "tool" ? "해체" : "보관";
+  const actionLabel = kind === "tool" ? "회수" : "보관";
   const tokenClass = kind === "tool" ? "tool-token" : "module-token module-" + part.type;
-  return '<div class="' + tokenClass + ' ' + status + isNew + '" draggable="true" data-part-id="' +
-    part.id + '" data-label="' + def.name + (kind === "tool" ? ' · ' + def.tradeoff : '') + '" style="--module-color:' + def.color + '">' +
-    def.code + '<span class="module-ram">' + partRamCost(part) + 'R</span>' +
-    (directions ? '<span class="flow-glyph">' + directions + '</span>' : '') + '</div>' + rotate +
-    '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' ' + actionLabel + '">' + actionLabel + '</button>';
+  const sizeLabel = footprint.width + "×" + footprint.height;
+  return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' ' + status + isNew + '" draggable="true" data-part-id="' +
+    part.id + '" data-label="' + def.name + (rarity ? " · " + rarity.label + " " + sizeLabel : " · 공정 도구") + '" style="--module-color:' + def.color + ';--footprint-w:' + footprint.width + ';--footprint-h:' + footprint.height + ';--footprint-width:' + footprintCssSize(footprint.width) + ';--footprint-height:' + footprintCssSize(footprint.height) + '">' +
+    '<span class="part-code">' + def.code + '</span>' +
+    (rarity ? '<span class="rarity-badge" style="--rarity-color:' + rarity.color + '">' + rarity.label + ' ' + sizeLabel + '</span>' : '<span class="rarity-badge tool-badge">DROP</span>') +
+    '<span class="module-ram">' + partRamCost(part) + 'R</span>' + portButton(part, "input") + portButton(part, "output") +
+    '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' ' + actionLabel + '">' + actionLabel + '</button></div>';
 }
 
 function renderPendingPart() {
   const target = $("#pending-part");
   if (!factory.pending) {
-    target.innerHTML = '<div class="pending-empty">신규 부품 없음<br />보관함 부품을 다시 장착할 수 있습니다.</div>';
+    target.innerHTML = '<div class="pending-empty">신규 부품 없음<br />보관 부품·드랍 도구를 배치할 수 있습니다.</div>';
     $("#pending-archive").hidden = true;
     return;
   }
   const def = partDefinition(factory.pending);
   const isTool = partKind(factory.pending) === "tool";
+  const footprint = partFootprint(factory.pending);
+  const rarity = footprint.rarity;
   target.innerHTML = '<div class="pending-module ' + (isTool ? "pending-tool" : "module-" + factory.pending.type) +
-    '" draggable="true" data-pending-module="true" style="--module-color:' + def.color +
-    '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
-    '</b><span>' + def.description + '</span><span>' + (isTool ? def.tradeoff : def.hint) + '</span></div>';
-  $("#pending-archive").textContent = isTool ? "도구 설계 취소" : "장착하지 않고 보관";
+    '" draggable="true" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
+    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 랜덤 입·출력 단자' : '드랍 공정 도구 · 랜덤 입·출력 단자') + '</span><span>' + def.description + '</span></div>';
+  $("#pending-archive").textContent = isTool ? "드랍 도구 선택 취소" : "장착하지 않고 보관";
   $("#pending-archive").hidden = false;
 }
 
 function renderToolPalette() {
   const target = $("#factory-tools");
+  const total = TOOL_TYPES.reduce((sum, type) => sum + (factory.toolInventory[type] || 0), 0);
+  const label = document.querySelector(".tool-palette > header span");
+  if (label) label.textContent = total + " DROPS";
   target.innerHTML = TOOL_TYPES.map((type) => {
     const tool = TOOLS[type];
+    const count = factory.toolInventory[type] || 0;
     const selected = factory.pending?.kind === "tool" && factory.pending.type === type;
     return '<button type="button" data-tool-type="' + type + '" class="' + (selected ? "selected" : "") +
-      '" style="--tool-color:' + tool.color + '" aria-pressed="' + selected + '" title="' + tool.description + '"><b>' + tool.code + '</b><span>' + tool.name +
-      '</span><em>' + tool.ram + 'R</em><small>' + tool.tradeoff + '</small></button>';
+      '" style="--tool-color:' + tool.color + '" aria-pressed="' + selected + '" ' + (count ? "" : "disabled") + ' title="' + tool.description + '"><b>' + tool.code + '</b><span>' + tool.name +
+      '</span><em>×' + count + '</em><small>' + tool.tradeoff + '</small></button>';
   }).join("");
 }
 
@@ -683,11 +864,12 @@ function renderReserveParts() {
   target.innerHTML = factory.reserve.length
     ? factory.reserve.map((module) => {
       const def = MODULES[module.type];
-      return '<button type="button" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '"><b>' + def.code + '</b><span>' + def.name + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
+      const footprint = partFootprint(module);
+      const rarity = footprint.rarity;
+      return '<button type="button" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '"><b>' + def.code + '</b><span>' + def.name + ' · ' + rarity.label + ' ' + footprint.width + '×' + footprint.height + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
     }).join("")
     : '<span class="reserve-empty">비어 있음</span>';
 }
-
 function outputChangeSummary(previous, next) {
   if (!previous) return "새 생산 라인이 적용되었습니다.";
   if (previous.tuning?.mode !== next.tuning?.mode) {
@@ -704,6 +886,30 @@ function outputChangeSummary(previous, next) {
   return "행동 조합 배치가 변경되었습니다.";
 }
 
+function renderCircuitWires(output) {
+  const boardElement = $("#factory-board");
+  if (!boardElement?.getBoundingClientRect || !boardElement.querySelector) return;
+  const boardRect = boardElement.getBoundingClientRect();
+  if (!boardRect.width || !boardRect.height) return;
+  const portCenter = (owner, kind) => {
+    const port = boardElement.querySelector('[data-port-owner="' + owner + '"][data-port-kind="' + kind + '"]');
+    if (!port?.getBoundingClientRect) return null;
+    const rect = port.getBoundingClientRect();
+    return { x: rect.left - boardRect.left + rect.width * .5, y: rect.top - boardRect.top + rect.height * .5 };
+  };
+  const paths = output.wires.map((wire) => {
+    const from = portCenter(wire.fromId, "output");
+    const to = portCenter(wire.toId, "input");
+    if (!from || !to) return "";
+    const bend = Math.max(22, Math.abs(to.x - from.x) * .42);
+    const active = (wire.fromId === BUS_SOURCE_ID || output.operationalIds.has(wire.fromId)) && (wire.toId === BUS_SINK_ID || output.operationalIds.has(wire.toId));
+    const selected = factory.wireStart?.id === wire.fromId;
+    const pathData = "M " + from.x.toFixed(1) + " " + from.y.toFixed(1) + " C " + (from.x + bend).toFixed(1) + " " + from.y.toFixed(1) + ", " + (to.x - bend).toFixed(1) + " " + to.y.toFixed(1) + ", " + to.x.toFixed(1) + " " + to.y.toFixed(1);
+    return '<path class="circuit-wire ' + (active ? "active" : "inactive") + (selected ? " selected" : "") + '" d="' + pathData + '"></path><path class="wire-hit" data-wire-id="' + wire.id + '" d="' + pathData + '"></path>';
+  }).join("");
+  if (paths) boardElement.insertAdjacentHTML("beforeend", '<svg class="circuit-wires" viewBox="0 0 ' + boardRect.width + ' ' + boardRect.height + '" aria-label="증강 회로 연결">' + paths + '</svg>');
+}
+
 function renderFactoryBoard() {
   const output = evaluateClassFactory();
   const boardElement = $("#factory-board");
@@ -715,26 +921,27 @@ function renderFactoryBoard() {
     const position = { col: order % boardCols, row: Math.floor(order / boardCols) };
     const index = indexOf(position.col, position.row);
     const fixed = position.col === 0;
-    const laneClass = position.row === MAIN_ROW ? "main-lane" :
-      position.row === ECHO_ROW || position.row === GUARD_ROW ? "branch-lane" : "service-lane";
-    const powered = Boolean(board[index] && output.statuses.get(board[index].id) !== "inactive");
-    const sequenceOut = Boolean(board[index] && output.outgoingModuleIds.has(board[index].id));
-    const reactorCore = Boolean(board[index] && output.build?.moduleIds.has(board[index].id));
-    const selected = factory.selectedIndex === index;
+    const laneClass = position.row === MAIN_ROW ? "main-lane" : position.row === ECHO_ROW || position.row === GUARD_ROW ? "branch-lane" : "service-lane";
+    const part = partAt(index);
+    const anchor = part ? anchorIndexAt(index) : -1;
+    const isAnchor = anchor === index;
+    const powered = Boolean(part && output.statuses.get(part.id) !== "inactive");
+    const sequenceOut = Boolean(part && output.outgoingModuleIds.has(part.id));
+    const reactorCore = Boolean(part && output.build?.moduleIds.has(part.id));
+    const selected = factory.selectedIndex === anchor;
     const projectedRam = factory.pending ? pendingPlacementUsage(index, factory.pending, output) : 0;
-    const validTarget = Boolean(factory.pending) && !fixed && !board[index] && projectedRam <= ramCapacity();
-    const invalidTarget = Boolean(factory.pending) && !fixed && (!validTarget || Boolean(board[index]));
-    const fixedText = position.col === 0 ? LANE_CODES[position.row] : "";
-    const status = board[index] ? output.statuses.get(board[index].id) : "";
-    return '<div class="factory-cell ' + laneClass + (powered ? " powered" : "") + (sequenceOut ? " sequence-out" : "") +
-      (reactorCore ? " reactor-core" : "") +
-      (fixed ? " fixed" : "") + (selected ? " selected" : "") + (validTarget ? " valid-target" : "") +
-      (invalidTarget ? " invalid-target" : "") + '" data-cell-index="' + index + '" aria-label="' +
-      LANE_NAMES[position.row] + ' ' + (position.col + 1) + '열">' +
-      (fixedText ? '<span class="fixed-node">' + fixedText + '</span>' : "") +
-      (board[index] ? partToken(board[index], status, index, output.flowDirections.get(board[index].id)) : "") +
-      (sequenceOut ? '<span class="sequence-arrow">◆</span>' : "") + '</div>';
+    const validTarget = Boolean(factory.pending) && !fixed && canPlacePart(index, factory.pending) && projectedRam <= ramCapacity();
+    const invalidTarget = Boolean(factory.pending) && !fixed && !validTarget;
+    let fixedText = "";
+    if (position.col === 0 && position.row === MAIN_ROW) fixedText = '<span class="fixed-node">' + BUS_SOURCE_LABEL + '</span><button type="button" class="circuit-port output bus-port" data-port-owner="' + BUS_SOURCE_ID + '" data-port-kind="output" aria-label="BUS 입력 출력 단자"></button>';
+    if (position.col === 0 && position.row === 0) fixedText = '<span class="fixed-node">' + BUS_SINK_LABEL + '</span><button type="button" class="circuit-port input bus-port" data-port-owner="' + BUS_SINK_ID + '" data-port-kind="input" aria-label="BUS 출력 입력 단자"></button>';
+    const status = part ? output.statuses.get(part.id) : "";
+    return '<div class="factory-cell ' + laneClass + (part ? " occupied" : "") + (powered ? " powered" : "") + (sequenceOut ? " sequence-out" : "") +
+      (reactorCore ? " reactor-core" : "") + (fixed ? " fixed" : "") + (selected ? " selected" : "") + (validTarget ? " valid-target" : "") +
+      (invalidTarget ? " invalid-target" : "") + '" data-cell-index="' + index + '" aria-label="' + LANE_NAMES[position.row] + ' ' + (position.col + 1) + '열">' +
+      fixedText + (isAnchor ? partToken(part, status, index) : "") + '</div>';
   }).join("");
+  renderCircuitWires(output);
   renderPendingPart();
   renderReserveParts();
   renderToolPalette();
@@ -746,52 +953,36 @@ function renderFactoryBoard() {
   const moduleCost = modulesOnBoard().reduce((sum, module) => sum + partRamCost(module), 0);
   const toolCost = toolsOnBoard().reduce((sum, tool) => sum + partRamCost(tool), 0);
   const tuning = output.tuning;
-  const tuningSummary = '<article class="lane-summary tuning-summary" style="--lane-color:#58d7d3"><header><b>' + tuning.mode + ' 공정</b><span>' +
-    Math.round(tuning.throughput * 100) + '% FLOW</span></header><p>피해 ×' + tuning.damageMult.toFixed(2) + ' · 주기 ×' + tuning.cooldownMult.toFixed(2) +
-    ' · 거리 ×' + tuning.rangeMult.toFixed(2) + ' · 범위 ×' + tuning.areaMult.toFixed(2) + (tuning.echo ? ' · 지연 복제 ' + tuning.echo + '회' : '') + '</p></article>';
+  const tuningSummary = '<article class="lane-summary tuning-summary" style="--lane-color:#58d7d3"><header><b>' + tuning.mode + ' 공정</b><span>' + Math.round(tuning.throughput * 100) + '% FLOW</span></header><p>피해 ×' + tuning.damageMult.toFixed(2) + ' · 주기 ×' + tuning.cooldownMult.toFixed(2) + ' · 거리 ×' + tuning.rangeMult.toFixed(2) + ' · 범위 ×' + tuning.areaMult.toFixed(2) + (tuning.echo ? ' · 지연 복제 ' + tuning.echo + '회' : '') + '</p></article>';
   const buildSummary = build
     ? '<article class="lane-summary build-summary" style="--lane-color:' + build.color + '"><header><b>' + build.name + '</b><span>TIER ' + ["0", "I", "II", "III"][build.tier] + ' · ' + build.depth + ' MODULE</span></header><p>' + build.identity + '</p><strong>' + build.tiers[build.tier - 1] + '</strong></article>'
-    : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>신호 경로에서 정의된 순서의 핵심 증강 2개를 통과시키면 기본 공격 규칙이 바뀝니다.</p></article>';
+    : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>BUS IN에서 시작해 각 증강의 입력과 출력을 모두 연결하면 전용 행동이 가동됩니다.</p></article>';
   $("#factory-summary").innerHTML =
-    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
-    tuningSummary +
-    buildSummary +
-    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' +
-      (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
-    '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' +
-      (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '신호가 지정 증강을 순서대로 통과하도록 배선하세요.') + '</p></article>';
+    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
+    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' WIRE</span></header><p>녹색 선만 BUS IN에서 BUS OUT까지 왕복하는 유효 경로입니다. 선을 클릭하면 연결을 제거합니다.</p></article>' +
+    tuningSummary + buildSummary +
+    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' + (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
+    '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' + (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '입력·출력이 모두 이어진 핵심 증강의 순서가 프로토콜을 만듭니다.') + '</p></article>';
   const recipeItems = [...output.recipes.values()];
   $("#factory-recipe-list").innerHTML = recipeItems.length
-    ? recipeItems.map((recipe) => {
-      const def = MODULES[recipe.type];
-      const tags = [recipe.mode, Math.round(recipe.throughput * 100) + "%"];
-      if (recipe.power) tags.push("AMP×" + recipe.power);
-      if (recipe.echo) tags.push("ECHO×" + recipe.echo);
-      if (recipe.focus) tags.push("FOCUS×" + recipe.focus);
-      return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>';
-    }).join("")
-    : '<span class="no-synergy">BUS IN에 핵심 증강을 연결하세요.</span>';
-  $("#factory-synergy-list").innerHTML = output.synergies.length
-    ? output.synergies.map((item) => '<div class="synergy-chip"><b>→ ' + item.name + '</b>' + item.description + '</div>').join("")
-    : '<span class="no-synergy">활성 신호 경로의 순서 프로토콜 없음</span>';
+    ? recipeItems.map((recipe) => { const def = MODULES[recipe.type]; const tags = [recipe.mode, Math.round(recipe.throughput * 100) + "%"]; if (recipe.power) tags.push("AMP×" + recipe.power); if (recipe.echo) tags.push("ECHO×" + recipe.echo); if (recipe.focus) tags.push("FOCUS×" + recipe.focus); return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>'; }).join("")
+    : '<span class="no-synergy">BUS IN → 입력 단자 → 출력 단자 → BUS OUT으로 배선하세요.</span>';
+  $("#factory-synergy-list").innerHTML = output.synergies.length ? output.synergies.map((item) => '<div class="synergy-chip"><b>→ ' + item.name + '</b>' + item.description + '</div>').join("") : '<span class="no-synergy">유효 회로의 순서 프로토콜 없음</span>';
   const commit = $("#factory-commit");
   commit.disabled = Boolean(factory.pending);
-  commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "라인 적용 · 전투 복귀";
-  $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." :
-    "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
+  commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "회로 적용 · 전투 복귀";
+  $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
   const pendingDef = factory.pending ? partDefinition(factory.pending) : null;
-  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) 배치 · 남은 RAM " + freeRam + ". 밝은 셀만 예산 안에서 설치할 수 있습니다." :
-    factory.selectedIndex !== null ? "이동할 셀을 선택하세요. 회전 도구는 R 또는 화살표 버튼으로 방향을 바꿉니다." :
-      factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · 중앙 BUS IN까지 빈칸 없이 연결해야 효과가 적용됩니다." :
-        build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "중앙 BUS IN에서 시작해 도구와 핵심 증강을 끊기지 않게 연결하세요.");
-  $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount ? "warning" : "ok");
+  $("#board-message").textContent = factory.wireStart ? "선택한 " + (factory.wireStart.id === BUS_SOURCE_ID ? BUS_SOURCE_LABEL : partDefinition(partsOnBoard().find((part) => String(part.id) === String(factory.wireStart.id))).name) + " 출력 단자입니다. 다음 부품의 입력 단자 또는 BUS OUT을 클릭하세요." :
+    factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) 배치 · " + partFootprint(factory.pending).width + "×" + partFootprint(factory.pending).height + " 공간과 남은 RAM " + freeRam + "을 확인하세요." :
+      factory.selectedIndex !== null ? "이동할 시작 셀을 선택하세요. 연결선은 유지되며, 단자는 각 부품에 고정됩니다." :
+        factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · 각 부품의 입력과 출력을 BUS IN부터 BUS OUT까지 연결해야 효과가 적용됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "출력 단자를 클릭한 다음 대상의 입력 단자를 클릭해 회로를 배선하세요.");
+  $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount || factory.wireStart ? "warning" : "ok");
 }
-
 function placePending(index) {
   if (!factory.pending || !isPlaceable(index)) return;
-  const position = positionOf(index);
-  if (board[index]) {
-    $("#board-message").textContent = "해당 셀에 부품이 있습니다. 먼저 기존 부품을 옮기세요.";
+  if (!canPlacePart(index, factory.pending)) {
+    $("#board-message").textContent = "해당 위치에는 이 부품의 전체 크기만큼 빈 공간이 필요합니다.";
     $("#board-message").className = "board-message warning";
     return;
   }
@@ -801,49 +992,64 @@ function placePending(index) {
     $("#board-message").className = "board-message warning";
     return;
   }
-  const placed = factory.pending;
+  const placed = ensurePartPorts(factory.pending);
   const def = partDefinition(placed);
+  const position = positionOf(index);
   board[index] = placed;
+  if (partKind(placed) === "tool" && placed.fromInventory) factory.toolInventory[placed.type] = Math.max(0, (factory.toolInventory[placed.type] || 0) - 1);
+  delete placed.fromInventory;
   factory.pending = null;
   factory.selectedIndex = null;
   factory.lastPlacedId = placed.id;
-  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 설치 완료. 신호와 공정 결과를 확인하세요.";
-  ensureBoardSpace(position.col);
+  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 설치 완료. 입력과 출력을 직접 배선하세요.";
+  ensureBoardSpace(position.col + partFootprint(placed).width - 1);
   renderFactoryBoard();
 }
 
 function moveBoardModule(from, to) {
-  if (!isPlaceable(from) || !isPlaceable(to) || from === to) {
+  const anchor = anchorIndexAt(from);
+  if (anchor < 0 || !isPlaceable(to) || anchor === to) {
     factory.selectedIndex = null;
     renderFactoryBoard();
     return;
   }
-  const moving = board[from];
-  [board[from], board[to]] = [board[to], board[from]];
+  const moving = board[anchor];
+  if (!canPlacePart(to, moving, moving.id)) {
+    factory.selectedIndex = null;
+    factory.placementNotice = "이 위치에는 " + partFootprint(moving).width + "×" + partFootprint(moving).height + " 빈 공간이 필요합니다.";
+    renderFactoryBoard();
+    return;
+  }
+  board[anchor] = null;
+  board[to] = moving;
   const projectedOutput = evaluateClassFactory();
   if (ramUsage(projectedOutput) > ramCapacity()) {
-    [board[from], board[to]] = [board[to], board[from]];
+    board[to] = null;
+    board[anchor] = moving;
     factory.selectedIndex = null;
     factory.placementNotice = "이 이동은 새 링크 비용 때문에 RAM을 초과합니다. 다른 행이나 보관함을 사용하세요.";
     renderFactoryBoard();
     return;
   }
   factory.selectedIndex = null;
-  factory.lastPlacedId = moving ? moving.id : null;
-  factory.placementNotice = moving ? partDefinition(moving).name + " · " + LANE_NAMES[positionOf(to).row] + "로 이동했습니다." : null;
-  ensureBoardSpace(positionOf(to).col);
+  factory.lastPlacedId = moving.id;
+  factory.placementNotice = partDefinition(moving).name + " 위치를 옮겼습니다. 단자와 기존 배선은 유지됩니다.";
+  ensureBoardSpace(positionOf(to).col + partFootprint(moving).width - 1);
   renderFactoryBoard();
 }
 
 function storeBoardModule(index) {
-  if (!isPlaceable(index) || !board[index]) return;
-  const stored = board[index];
-  board[index] = null;
+  const anchor = anchorIndexAt(index);
+  if (anchor < 0 || !board[anchor]) return;
+  const stored = board[anchor];
+  board[anchor] = null;
   const isTool = partKind(stored) === "tool";
-  if (!isTool) factory.reserve.push({ ...stored, kind: "module" });
+  clearWiresFor(stored.id);
+  if (isTool) factory.toolInventory[stored.type] = (factory.toolInventory[stored.type] || 0) + 1;
+  else factory.reserve.push({ ...stored, kind: "module" });
   factory.selectedIndex = null;
   factory.lastPlacedId = null;
-  factory.placementNotice = partDefinition(stored).name + (isTool ? "를 해체했습니다." : "을 보관했습니다.") + " RAM이 반환되었습니다.";
+  factory.placementNotice = partDefinition(stored).name + (isTool ? "를 회수했습니다. 드랍 도구 인벤토리로 돌아갑니다." : "을 보관했습니다.") + " 연결은 해제되었습니다.";
   renderFactoryBoard();
 }
 
@@ -853,7 +1059,7 @@ function archivePending() {
   const isTool = partKind(stored) === "tool";
   if (!isTool) factory.reserve.push({ ...stored, kind: "module" });
   factory.pending = null;
-  factory.placementNotice = partDefinition(stored).name + (isTool ? " 설계를 취소했습니다." : "을 장착하지 않고 보관했습니다.");
+  factory.placementNotice = partDefinition(stored).name + (isTool ? " 선택을 취소했습니다. 도구는 인벤토리에 남습니다." : "을 장착하지 않고 보관했습니다.");
   renderFactoryBoard();
 }
 
@@ -866,28 +1072,21 @@ function selectToolBlueprint(type) {
   }
   if (factory.pending?.kind === "tool" && factory.pending.type === type) {
     factory.pending = null;
-    factory.placementNotice = TOOLS[type].name + " 설계를 취소했습니다.";
+    factory.placementNotice = TOOLS[type].name + " 선택을 취소했습니다.";
+  } else if (!(factory.toolInventory[type] || 0)) {
+    factory.placementNotice = TOOLS[type].name + " 드랍이 없습니다. 적을 처치해 공정 도구를 회수하세요.";
   } else {
-    factory.pending = { id: factory.nextId++, kind: "tool", type, dir: 0 };
+    factory.pending = { ...createPart("tool", type), fromInventory: true };
     factory.selectedIndex = null;
-    factory.placementNotice = TOOLS[type].name + " 배치 위치를 선택하세요.";
+    factory.placementNotice = TOOLS[type].name + " 드랍 도구를 배치할 위치를 선택하세요.";
   }
   renderFactoryBoard();
 }
 
 function rotateBoardTool(index) {
-  if (!isPlaceable(index)) return;
-  const part = board[index];
-  if (!part || partKind(part) !== "tool" || !TOOLS[part.type]?.rotatable) return;
-  const previousDirection = part.dir ?? 0;
-  part.dir = (previousDirection + 1) % DIRECTIONS.length;
-  if (ramUsage(evaluateClassFactory()) > ramCapacity()) {
-    part.dir = previousDirection;
-    factory.placementNotice = "회전으로 활성 프로토콜이 늘어 RAM을 초과합니다.";
-  } else {
-    factory.lastPlacedId = part.id;
-    factory.placementNotice = TOOLS[part.type].name + " · " + DIRECTIONS[part.dir].name + " 출력으로 회전했습니다.";
-  }
+  const part = partAt(index);
+  if (!part || partKind(part) !== "tool") return;
+  factory.placementNotice = "단자 위치는 드랍 시 무작위로 결정되어 고정됩니다. 다른 위치로 옮기거나 다시 배선하세요.";
   renderFactoryBoard();
 }
 
@@ -899,7 +1098,7 @@ function activateReserve(moduleId) {
   }
   const index = factory.reserve.findIndex((module) => module.id === moduleId);
   if (index < 0) return;
-  factory.pending = { ...factory.reserve.splice(index, 1)[0], kind: "module" };
+  factory.pending = ensurePartPorts({ ...factory.reserve.splice(index, 1)[0], kind: "module" });
   factory.selectedIndex = null;
   factory.placementNotice = null;
   renderFactoryBoard();
@@ -907,15 +1106,17 @@ function activateReserve(moduleId) {
 
 function openFactory(manual) {
   if (manual && !["playing", "paused", "factory"].includes(game.mode)) return;
+  if (game.mode !== "factory") factory.returnMode = game.mode === "paused" ? "paused" : "playing";
   factory.manual = Boolean(manual);
   factory.selectedIndex = null;
   factory.lastPlacedId = null;
   factory.placementNotice = null;
+  factory.wireStart = null;
   game.mode = "factory";
   $("#pause-overlay").hidden = true;
   $("#factory-overlay").hidden = false;
   const title = $(".factory-header h2");
-  if (title) title.textContent = CLASS_PROFILES[game.selectedClass].name + " 증강 라인";
+  if (title) title.textContent = CLASS_PROFILES[game.selectedClass].name + " 회로 보드";
   renderFactoryBoard();
 }
 
@@ -943,12 +1144,13 @@ function commitFactory() {
   factory.selectedIndex = null;
   factory.lastPlacedId = null;
   factory.placementNotice = null;
+  factory.wireStart = null;
   $("#factory-overlay").hidden = true;
-  game.mode = "playing";
+  game.mode = factory.returnMode === "paused" ? "paused" : "playing";
+  if (game.mode === "paused") $("#pause-overlay").hidden = false;
   updateHud();
-  showSystemToast("LINE UPDATED", outputChangeSummary(previousOutput, nextOutput), "success", 2600);
+  showSystemToast("CIRCUIT UPDATED", outputChangeSummary(previousOutput, nextOutput), "success", 2600);
 }
-
 function ownedCount(type) {
   return board.filter((module) => module && module.type === type).length +
     factory.reserve.filter((module) => module.type === type).length +
@@ -1008,7 +1210,7 @@ function previewAugmentChoice(type) {
 function confirmAugmentChoice() {
   const type = factory.choiceSelection;
   if (game.mode !== "choice" || !MODULES[type]) return;
-  factory.pending = { id: factory.nextId++, kind: "module", type };
+  factory.pending = createPart("module", type);
   factory.choiceSelection = null;
   $("#choice-overlay").hidden = true;
   openFactory(false);
@@ -1087,7 +1289,12 @@ function resetGame() {
   factory.lastPlacedId = null;
   factory.placementNotice = null;
   factory.reserve = [];
+  factory.wires = [];
+  factory.wireStart = null;
+  factory.toolInventory = Object.fromEntries(TOOL_TYPES.map((type) => [type, 0]));
   factory.nextId = 1;
+  factory.nextWireId = 1;
+  factory.returnMode = "playing";
   game.time = 0;
   game.room = 1;
   game.kills = 0;
@@ -1123,6 +1330,8 @@ function resetGame() {
   game.zones = [];
   game.delayedAttacks = [];
   game.orbitals = [];
+  game.toolDrops = [];
+  game.nextDropId = 1;
   game.particles = [];
   game.floaters = [];
   game.echoes = [];
@@ -1241,6 +1450,65 @@ function addFloater(x, y, text, color) {
   game.floaters.push({ x, y, text, color: color || "#c9f05a", life: .85, maxLife: .85 });
 }
 
+function spawnToolDrop(enemy) {
+  const guaranteed = enemy.type === "guardian";
+  const chance = Math.min(.68, .34 + game.room * .035);
+  if (!guaranteed && Math.random() > chance) return null;
+  const type = TOOL_TYPES[(enemy.id * 3 + game.room + game.kills) % TOOL_TYPES.length];
+  const drop = { id: game.nextDropId++, type, x: enemy.x, y: enemy.y, radius: 13, life: 22, bob: Math.random() * Math.PI * 2 };
+  game.toolDrops.push(drop);
+  addFloater(drop.x, drop.y - 26, "TOOL DROP", TOOLS[type].color);
+  return drop;
+}
+
+function collectToolDrop(drop) {
+  factory.toolInventory[drop.type] = (factory.toolInventory[drop.type] || 0) + 1;
+  addPulse(drop.x, drop.y, TOOLS[drop.type].color, 34, .26);
+  addFloater(drop.x, drop.y - 22, TOOLS[drop.type].code + " +1", TOOLS[drop.type].color);
+  showSystemToast("PROCESS TOOL ACQUIRED", TOOLS[drop.type].name + " · 공장 보드에서 배치할 수 있습니다.", "success", 2100);
+}
+
+function updateToolDrops(dt) {
+  if (!game.player) return;
+  for (const drop of game.toolDrops) {
+    drop.life -= dt;
+    drop.bob += dt * 3.4;
+    if (distanceSquared(drop, game.player) <= (drop.radius + game.player.radius + 16) ** 2) {
+      drop.picked = true;
+      collectToolDrop(drop);
+    }
+  }
+  game.toolDrops = game.toolDrops.filter((drop) => !drop.picked && drop.life > 0);
+}
+
+function drawToolDrops() {
+  for (const drop of game.toolDrops) {
+    const y = drop.y + Math.sin(drop.bob) * 4;
+    const tool = TOOLS[drop.type];
+    ctx.save();
+    ctx.translate(drop.x, y);
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = tool.color;
+    ctx.fillStyle = "#101719";
+    ctx.strokeStyle = tool.color;
+    ctx.lineWidth = 2;
+    ctx.rotate(Math.PI / 4);
+    ctx.fillRect(-10, -10, 20, 20);
+    ctx.strokeRect(-10, -10, 20, 20);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = tool.color;
+    ctx.font = "900 12px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(tool.code, 0, 1);
+    ctx.restore();
+    ctx.fillStyle = tool.color;
+    ctx.font = "700 8px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("DROP", drop.x, y + 23);
+  }
+}
+
 function killEnemy(enemy) {
   if (enemy.dead) return;
   enemy.dead = true;
@@ -1249,6 +1517,7 @@ function killEnemy(enemy) {
   addParticles(enemy.x, enemy.y, enemy.color, enemy.type === "guardian" ? 28 : 13, 190);
   addPulse(enemy.x, enemy.y, enemy.color, enemy.type === "guardian" ? 82 : 48, .38);
   addFloater(enemy.x, enemy.y - enemy.radius, "XP +" + enemy.xp);
+  spawnToolDrop(enemy);
   game.shake = Math.max(game.shake, enemy.type === "guardian" ? 10 : 4);
   if (game.xp >= game.xpNext) game.levelUpQueued = true;
 }
@@ -2431,6 +2700,18 @@ function advanceAuditProjectiles(frames, dt) {
   }
 }
 
+function wireInstalledParts(parts) {
+  factory.wires = [];
+  factory.wireStart = null;
+  let previous = BUS_SOURCE_ID;
+  for (const part of parts) {
+    ensurePartPorts(part);
+    connectPorts(previous, part.id);
+    previous = part.id;
+  }
+  if (parts.length) connectPorts(previous, BUS_SINK_ID);
+}
+
 function installAuditSequence(classId, reverse) {
   const definitions = SYNERGY_DEFINITIONS[classId];
   const sequence = [definitions[0].types[0], ...definitions.map((item) => item.types[1])];
@@ -2438,9 +2719,12 @@ function installAuditSequence(classId, reverse) {
   boardCols = Math.max(INITIAL_COLS, sequence.length + 2);
   board.length = boardCols * ROWS;
   board.fill(null);
-  sequence.forEach((type, index) => {
-    board[indexOf(index + 1, MAIN_ROW)] = { id: 9000 + index, type };
+  const parts = sequence.map((type, index) => {
+    const part = { id: 9000 + index, kind: "module", type };
+    board[indexOf(index + 1, MAIN_ROW)] = part;
+    return part;
   });
+  wireInstalledParts(parts);
 }
 
 function installPlaystyleSequence(classId, styleId, linkCount) {
@@ -2451,98 +2735,100 @@ function installPlaystyleSequence(classId, styleId, linkCount) {
   boardCols = INITIAL_COLS;
   board.length = boardCols * ROWS;
   board.fill(null);
-  sequence.forEach((type, index) => {
-    board[indexOf(index + 1, MAIN_ROW)] = { id: 9500 + index, type };
+  const parts = sequence.map((type, index) => {
+    const part = { id: 9500 + index, kind: "module", type };
+    board[indexOf(index + 1, MAIN_ROW)] = part;
+    return part;
   });
+  wireInstalledParts(parts);
 }
 
 function runFactoryToolAudits() {
   const savedBoard = board.slice();
   const savedCols = boardCols;
-  const saved = {
-    selectedClass: game.selectedClass, output: game.output, player: game.player, enemies: game.enemies,
-    enemyBullets: game.enemyBullets, playerShots: game.playerShots, zones: game.zones,
-    delayedAttacks: game.delayedAttacks, orbitals: game.orbitals, particles: game.particles,
-    floaters: game.floaters, pulses: game.pulses, echoes: game.echoes, mouse: game.mouse,
-    mode: game.mode, attackRequested: game.attackRequested, dashRequested: game.dashRequested
-  };
+  const savedFactory = { wires: factory.wires.slice(), wireStart: factory.wireStart, toolInventory: { ...factory.toolInventory }, pending: factory.pending, nextId: factory.nextId, nextWireId: factory.nextWireId };
+  const saved = { selectedClass: game.selectedClass, output: game.output, player: game.player, enemies: game.enemies, toolDrops: game.toolDrops, floaters: game.floaters, pulses: game.pulses, mode: game.mode };
   let report;
   try {
     game.selectedClass = "melee";
     boardCols = INITIAL_COLS;
     board.length = boardCols * ROWS;
     board.fill(null);
-    const variantOutput = (toolType) => {
+    factory.wires = [];
+    factory.nextWireId = 1;
+    const install = (parts, sink = true) => {
       board.fill(null);
-      if (toolType) {
-        board[indexOf(1, MAIN_ROW)] = { id: 9701, kind: "tool", type: toolType, dir: 0 };
-        board[indexOf(2, MAIN_ROW)] = { id: 9702, kind: "module", type: "m_mark" };
-      } else {
-        board[indexOf(1, MAIN_ROW)] = { id: 9702, kind: "module", type: "m_mark" };
-      }
-      return evaluateClassFactory();
+      factory.wires = [];
+      const installed = parts.map((part, index) => {
+        const next = ensurePartPorts({ ...part, index: undefined });
+        board[next.index ?? indexOf(index + 1, 0)] = next;
+        return next;
+      });
+      let previous = BUS_SOURCE_ID;
+      installed.forEach((part) => { connectPorts(previous, part.id); previous = part.id; });
+      if (sink && installed.length) connectPorts(previous, BUS_SINK_ID);
+      return { installed, output: evaluateClassFactory() };
     };
-    const rawVariant = variantOutput(null);
-    const ampVariant = variantOutput("amplifier");
-    const echoVariant = variantOutput("repeater");
-    const focusVariant = variantOutput("focuser");
-    const utilityVariant = variantOutput("inverter");
-    const sameCoreVariants =
-      rawVariant.recipes.get(9702)?.mode === "RAW" &&
-      ampVariant.recipes.get(9702)?.mode === "OVERDRIVE" && ampVariant.primary.damage > rawVariant.primary.damage &&
-      echoVariant.recipes.get(9702)?.mode === "ECHO" && echoVariant.tuning.echo === 1 &&
-      focusVariant.recipes.get(9702)?.mode === "PRECISION" && focusVariant.primary.range > rawVariant.primary.range && focusVariant.primary.arc < rawVariant.primary.arc &&
-      utilityVariant.recipes.get(9702)?.mode === "UTILITY" && utilityVariant.guard.armor > rawVariant.guard.armor && utilityVariant.primary.damage < rawVariant.primary.damage;
-    board.fill(null);
-    board[indexOf(1, MAIN_ROW)] = { id: 9801, kind: "tool", type: "splitter", dir: 0 };
-    board[indexOf(2, MAIN_ROW)] = { id: 9802, kind: "tool", type: "amplifier" };
-    board[indexOf(3, MAIN_ROW)] = { id: 9803, kind: "module", type: "m_step" };
-    board[indexOf(4, MAIN_ROW)] = { id: 9804, kind: "tool", type: "router", dir: 1 };
-    board[indexOf(4, MAIN_ROW + 1)] = { id: 9805, kind: "module", type: "m_mark" };
-    board[indexOf(1, MAIN_ROW + 1)] = { id: 9806, kind: "tool", type: "repeater" };
-    board[indexOf(1, MAIN_ROW + 2)] = { id: 9807, kind: "module", type: "m_blood" };
-    const output = evaluateClassFactory();
-    const stepRecipe = output.recipes.get(9803);
-    const bloodRecipe = output.recipes.get(9807);
-    const branched = output.activeCount === 3 && output.activeToolCount === 4 && output.tuning.splitters === 1;
-    const toolProcessed = stepRecipe?.mode === "OVERDRIVE" && bloodRecipe?.mode === "ECHO";
-    const throughputPaid = Math.abs(stepRecipe?.throughput - .72) < .001 && Math.abs(bloodRecipe?.throughput - .72) < .001;
-    const routedProtocol = output.synergyKinds.has("first_mark") && output.build?.id === "pursuit";
-    const unpoweredIndex = indexOf(6, 0);
-    board[unpoweredIndex] = { id: 9808, kind: "module", type: "m_guard" };
-    const unpoweredRejected = !evaluateClassFactory().traits.has("m_guard");
-    board[unpoweredIndex] = null;
-    game.output = output;
+    const core = { id: 9702, kind: "module", type: "m_mark", index: indexOf(1, 0) };
+    const inputOnly = install([core], false).output;
+    const fullCircuit = install([core]).output;
+    const ampCircuit = install([{ id: 9701, kind: "tool", type: "amplifier", index: indexOf(1, 0) }, { id: 9702, kind: "module", type: "m_mark", index: indexOf(2, 0) }]).output;
+    const inactiveUntilOutputConnected = !inputOnly.traits.has("m_mark") && fullCircuit.traits.has("m_mark");
+    const toolProcessed = ampCircuit.recipes.get(9702)?.mode === "OVERDRIVE" && ampCircuit.primary.damage > fullCircuit.primary.damage;
+    factory.toolInventory = Object.fromEntries(TOOL_TYPES.map((type) => [type, 0]));
+    game.mode = "factory";
+    factory.pending = null;
+    selectToolBlueprint("router");
+    const noInfiniteTool = factory.pending === null;
     game.player = createAuditPlayer();
-    game.enemies = [];
-    game.enemyBullets = [];
-    game.playerShots = [];
-    game.zones = [];
-    game.delayedAttacks = [];
-    game.orbitals = [];
-    game.particles = [];
-    game.floaters = [];
-    game.pulses = [];
-    game.echoes = [];
-    game.mouse = { x: 620, y: 500 };
-    game.mode = "playing";
-    startSlash(0);
-    const echoCombat = game.delayedAttacks.some((attack) => attack.kind === "factory-echo");
-    report = {
-      sameCoreVariants, branched, toolProcessed, throughputPaid, routedProtocol, unpoweredRejected, echoCombat,
-      damageChanged: Math.abs(output.primary.damage - CLASS_PROFILES.melee.damage) > .1,
-      pass: false
-    };
+    game.toolDrops = [];
+    game.nextDropId = 1;
+    const guardianDrop = spawnToolDrop({ id: 711, type: "guardian", x: 300, y: 500 });
+    const droppedToWorld = guardianDrop?.type && game.toolDrops.length === 1;
+    const beforeDrop = factory.toolInventory.amplifier;
+    collectToolDrop({ id: 1, type: "amplifier", x: 300, y: 500, radius: 12 });
+    const droppedToolCollected = factory.toolInventory.amplifier === beforeDrop + 1;
+    const rarityFootprints = moduleTypes.every((type) => {
+      const footprint = partFootprint({ kind: "module", type });
+      const rarity = RARITIES[MODULE_RARITIES[type]];
+      return Boolean(rarity) && footprint.width === rarity.width && footprint.height === rarity.height && [1, 2, 4].includes(footprint.width);
+    });
+    const firstPortPart = createPart("module", "m_mark");
+    const randomStablePorts = moduleTypes.every((type) => {
+      const part = createPart("module", type);
+      const footprint = partFootprint(part);
+      const inputSpan = part.ports.input.edge === "top" || part.ports.input.edge === "bottom" ? footprint.width : footprint.height;
+      const outputSpan = part.ports.output.edge === "top" || part.ports.output.edge === "bottom" ? footprint.width : footprint.height;
+      return part.ports.input.edge && part.ports.output.edge && Number.isInteger(part.ports.input.offset) && Number.isInteger(part.ports.output.offset) &&
+        part.ports.input.offset >= 0 && part.ports.input.offset < inputSpan && part.ports.output.offset >= 0 && part.ports.output.offset < outputSpan;
+    }) && JSON.stringify(firstPortPart.ports) === JSON.stringify(ensurePartPorts(firstPortPart).ports);
+    board.fill(null);
+    const legendary = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "legendary"));
+    const rare = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "rare"));
+    const legendaryFits = canPlacePart(indexOf(1, 0), legendary);
+    board[indexOf(1, 0)] = legendary;
+    const footprintCollisionBlocked = !canPlacePart(indexOf(2, 1), rare) && partFootprint(legendary).width === 4 && partFootprint(rare).width === 2;
+    const rewired = install([core]);
+    const removed = disconnectWire(factory.wires[0]?.id);
+    const disconnected = !evaluateClassFactory().traits.has("m_mark");
+    const restored = connectPorts(BUS_SOURCE_ID, rewired.installed[0].id) && evaluateClassFactory().traits.has("m_mark");
+    const rewireable = removed && disconnected && restored;
+    report = { inactiveUntilOutputConnected, toolProcessed, noInfiniteTool, droppedToWorld, droppedToolCollected, rarityFootprints, randomStablePorts, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
     report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
   } finally {
     boardCols = savedCols;
     board.length = savedBoard.length;
     savedBoard.forEach((part, index) => { board[index] = part; });
+    factory.wires = savedFactory.wires;
+    factory.wireStart = savedFactory.wireStart;
+    factory.toolInventory = savedFactory.toolInventory;
+    factory.pending = savedFactory.pending;
+    factory.nextId = savedFactory.nextId;
+    factory.nextWireId = savedFactory.nextWireId;
     Object.assign(game, saved);
   }
   return report;
 }
-
 function runPlaystyleAudits() {
   const savedBoard = board.slice();
   const savedCols = boardCols;
@@ -2829,7 +3115,7 @@ function runAllAugmentAudits() {
   canvas.dataset.auditReport = JSON.stringify({ pass, reports, playstyles, factoryTools });
   canvas.dataset.auditStatus = pass ? "pass" : "fail";
   const result = $("#test-audit-result");
-  result.textContent = pass ? "30 증강 · 6 도구 · 신호 그래프 · 9 빌드 PASS" : "FAIL · 콘솔 진단 확인";
+  result.textContent = pass ? "30 증강 · 드랍 도구 6종 · 단자 회로 · 9 빌드 PASS" : "FAIL · 콘솔 진단 확인";
   result.classList.toggle("failed", !pass);
   return { pass, reports, playstyles, factoryTools };
 }
@@ -2874,6 +3160,7 @@ function update(dt) {
   game.roomBanner -= dt;
   game.doorPulse += dt;
   updatePlayer(dt);
+  updateToolDrops(dt);
   updateEnemies(dt);
   updateEnemyBullets(dt);
   updatePlayerShots(dt);
@@ -3386,6 +3673,7 @@ function draw() {
   ctx.translate(game.cameraOffsetX, game.cameraOffsetY);
   drawArena();
   drawZones();
+  drawToolDrops();
   drawEnemyTelegraphs();
   for (const enemy of game.enemies) drawEnemy(enemy);
   drawProjectiles();
@@ -3506,10 +3794,29 @@ $("#reserve-parts").addEventListener("click", (event) => {
 });
 
 $("#factory-board").addEventListener("click", (event) => {
-  const rotateButton = event.target.closest("[data-rotate-index]");
-  if (rotateButton) {
+  const wireHit = event.target.closest("[data-wire-id]");
+  if (wireHit) {
     event.stopPropagation();
-    rotateBoardTool(Number(rotateButton.dataset.rotateIndex));
+    if (disconnectWire(Number(wireHit.dataset.wireId))) factory.placementNotice = "연결을 해제했습니다. 새 단자를 선택해 다시 배선할 수 있습니다.";
+    renderFactoryBoard();
+    return;
+  }
+  const port = event.target.closest("[data-port-owner]");
+  if (port) {
+    event.stopPropagation();
+    const owner = port.dataset.portOwner;
+    const kind = port.dataset.portKind;
+    if (kind === "output") {
+      factory.wireStart = factory.wireStart?.id === owner ? null : { id: owner, kind: "output" };
+      factory.placementNotice = factory.wireStart ? "출력 단자를 선택했습니다. 대상 입력 단자를 클릭하세요." : "단자 선택을 취소했습니다.";
+    } else if (factory.wireStart) {
+      const connected = connectPorts(factory.wireStart.id, owner);
+      factory.placementNotice = connected ? "입력과 출력을 연결했습니다. BUS OUT까지 이어지면 증강이 가동됩니다." : "이 단자는 연결할 수 없습니다.";
+      factory.wireStart = null;
+    } else {
+      factory.placementNotice = "먼저 BUS IN 또는 부품의 출력 단자를 클릭하세요.";
+    }
+    renderFactoryBoard();
     return;
   }
   const storeButton = event.target.closest("[data-store-index]");
@@ -3524,12 +3831,12 @@ $("#factory-board").addEventListener("click", (event) => {
   if (!isPlaceable(index)) return;
   if (factory.pending) { placePending(index); return; }
   if (factory.selectedIndex !== null) { moveBoardModule(factory.selectedIndex, index); return; }
-  if (board[index]) {
-    factory.selectedIndex = index;
+  const anchor = anchorIndexAt(index);
+  if (anchor >= 0) {
+    factory.selectedIndex = anchor;
     renderFactoryBoard();
   }
 });
-
 $("#factory-board").addEventListener("dragstart", (event) => {
   const token = event.target.closest("[data-part-id]");
   if (!token) return;
@@ -3669,7 +3976,7 @@ if (TEST_MODE) {
   $("#test-module-buttons").addEventListener("click", (event) => {
     const button = event.target.closest("[data-test-module]");
     if (!button || game.mode !== "playing") return;
-    factory.pending = { id: factory.nextId++, kind: "module", type: button.dataset.testModule };
+    factory.pending = createPart("module", button.dataset.testModule);
     openFactory(false);
   });
 }

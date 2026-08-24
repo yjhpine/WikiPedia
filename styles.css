@@ -187,6 +187,73 @@ kbd { font-family: var(--mono); }
 .test-panel > div { display: flex; flex-wrap: wrap; gap: 3px; border-left: 1px solid #344248; padding-left: 5px; }
 .test-panel > div button { width: 26px; padding-inline: 0; color: var(--lime); }
 
+/* Circuit board: footprint modules and explicit terminal wiring */
+.factory-board { position: relative; isolation: isolate; }
+.factory-cell.occupied::before { opacity: .16; }
+.factory-cell.occupied { cursor: move; }
+.module-token, .tool-token {
+  position: absolute;
+  z-index: 10;
+  top: 4px;
+  left: 4px;
+  display: grid;
+  width: var(--footprint-width, calc(var(--cell) - 8px));
+  height: var(--footprint-height, calc(var(--cell) - 8px));
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  place-items: center;
+  overflow: visible;
+  cursor: grab;
+}
+.module-token .part-code, .tool-token .part-code { font: 900 clamp(17px, calc(var(--ui-vw) * 2), 29px) var(--mono); }
+.module-token .rarity-badge, .tool-token .rarity-badge {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  border: 1px solid var(--rarity-color, var(--cyan));
+  padding: 2px 4px;
+  color: var(--rarity-color, var(--cyan));
+  background: #0c1416de;
+  font: 700 6px var(--mono);
+  letter-spacing: .06em;
+}
+.tool-token .tool-badge { --rarity-color: var(--module-color); }
+.module-token .module-store, .tool-token .module-store { position: absolute; z-index: 34; top: 5px; right: 5px; }
+.module-token:hover .module-store, .tool-token:hover .module-store, .module-store:focus-visible { opacity: 1; }
+.circuit-port {
+  position: absolute;
+  z-index: 32;
+  left: var(--port-left, 50%);
+  top: var(--port-top, 50%);
+  width: 13px;
+  height: 13px;
+  border: 2px solid #071012;
+  border-radius: 50%;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px #6c7d81, 0 0 12px currentColor;
+  cursor: crosshair;
+}
+.circuit-port.input { color: #58d7d3; background: #58d7d3; }
+.circuit-port.output { color: #ffbd57; background: #ffbd57; }
+.circuit-port:hover, .circuit-port.selected { outline: 2px solid #f2faf7; outline-offset: 2px; transform: translate(-50%, -50%) scale(1.18); }
+.circuit-port.selected { animation: circuit-port-pulse .8s ease-in-out infinite alternate; }
+.factory-cell.fixed .bus-port { top: 50%; left: auto; }
+.factory-cell.fixed .bus-port.output { right: -4px; }
+.factory-cell.fixed .bus-port.input { right: -4px; }
+.circuit-wires { position: absolute; z-index: 7; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.circuit-wire { fill: none; stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
+.circuit-wire.active { stroke: #c9f05a; filter: drop-shadow(0 0 4px #c9f05a); stroke-dasharray: 6 5; animation: circuit-flow .6s linear infinite; }
+.circuit-wire.inactive { stroke: #6c4548; stroke-dasharray: 3 6; opacity: .78; }
+.circuit-wire.selected { stroke: #f6dc66; stroke-width: 3.5; }
+.wire-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.factory-board:has(.circuit-port.selected) .circuit-port:not(.selected) { filter: saturate(.8); }
+.tool-palette button:disabled { opacity: .42; cursor: not-allowed; filter: grayscale(.55); }
+.factory-help li { margin-bottom: 4px; }
+@keyframes circuit-flow { to { stroke-dashoffset: -11; } }
+@keyframes circuit-port-pulse { to { box-shadow: 0 0 0 3px #f2faf7, 0 0 18px currentColor; } }
+
 @keyframes conveyor-flow { from { background-position-x: 0; } to { background-position-x: 14px; } }
 @keyframes overlay-in { from { opacity: 0; } }
 @keyframes panel-rise { from { opacity: 0; transform: translateY(14px) scale(.985); filter: blur(2px); } to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }

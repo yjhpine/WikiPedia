@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-11" />
+    <link rel="stylesheet" href="styles.css?v=prototype-12" />
   </head>
   <body>
     <main class="game" id="game">
@@ -105,8 +105,8 @@
               <span class="panel-label">NEW PART</span>
               <div class="pending-part" id="pending-part"></div>
               <button class="pending-archive" id="pending-archive" type="button" hidden>장착하지 않고 보관</button>
-              <section class="tool-palette" aria-label="공정 도구 설계도">
-                <header><b>PROCESS TOOLS</b><span>∞ BLUEPRINTS</span></header>
+              <section class="tool-palette" aria-label="몬스터에게서 회수한 공정 도구">
+                <header><b>PROCESS TOOL DROPS</b><span>0 DROPS</span></header>
                 <div id="factory-tools"></div>
               </section>
               <section class="reserve-shelf" aria-label="비활성 증강 보관함">
@@ -115,11 +115,11 @@
               </section>
               <div class="factory-help">
                 <b>배치 규칙</b>
-                <p>신호는 중앙 BUS IN에서만 출발합니다. 도구와 핵심 증강이 빈칸 없이 이어져야 가동됩니다.</p>
+                <p>적이 드랍한 공정 도구를 회수해 사용하고, 모든 부품의 입·출력 단자를 직접 연결해야 가동됩니다.</p>
                 <ul>
-                  <li>도구 카드를 눌러 무제한 설계하고 RAM만 지불합니다.</li>
-                  <li>라우터·분배기는 화살표 버튼, 우클릭 또는 R로 회전합니다.</li>
-                  <li>분기는 각 출력이 72%가 되지만 여러 핵심을 병렬 가동합니다.</li>
+                  <li>일반은 1×1, 희귀는 2×2, 전설은 4×4 공간을 차지합니다.</li>
+                  <li>출력 단자 → 대상 입력 단자 순서로 클릭해 BUS IN부터 BUS OUT까지 배선하세요.</li>
+                  <li>공장은 전투 중에도 TAB으로 열 수 있으며, 선을 클릭해 해제·재배치할 수 있습니다.</li>
                 </ul>
               </div>
             </aside>
@@ -180,6 +180,6 @@
       </div>
     </main>
 
-    <script type="module" src="game.js?v=prototype-11"></script>
+    <script type="module" src="game.js?v=prototype-12"></script>
   </body>
 </html>

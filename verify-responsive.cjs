@@ -109,6 +109,7 @@ async function auditViewport(session, viewport) {
   const url = new URL(baseUrl);
   const auditToken = `${viewport.name}-${Date.now()}`;
   url.searchParams.set("responsive-audit", auditToken);
+  url.searchParams.set("test", "1");
   await session.send("Page.navigate", { url: url.href });
   await waitUntil(async () => evaluate(session, `document.readyState === 'complete' && new URLSearchParams(location.search).get('responsive-audit') === ${JSON.stringify(auditToken)} && Boolean(document.querySelector('#ui-stage'))`));
   await sleep(360);
@@ -190,6 +191,46 @@ async function auditViewport(session, viewport) {
   assert(factory.open, `${viewport.name}: 공장 오버레이 열기 실패`);
   assert(rectFits(factory.shell, viewport.width, viewport.height), `${viewport.name}: 공장 셸 잘림 ${JSON.stringify(factory.shell)}`);
   assert(factory.boardScrollable, `${viewport.name}: 공장 레이아웃 스크롤 보호 누락`);
+
+  if (viewport.name === "wide") {
+    await clickElement(session, "#factory-commit");
+    await sleep(80);
+    await clickElement(session, '#test-module-buttons [data-test-module="m_mark"]');
+    await sleep(120);
+    const factoryEntry = await evaluate(session, "({ factoryOpen: !document.querySelector('#factory-overlay').hidden, pending: Boolean(document.querySelector('#pending-part .pending-module')), testPanel: !document.querySelector('#test-panel').hidden, moduleButtons: document.querySelector('#test-module-buttons').children.length })");
+    assert(factoryEntry.factoryOpen && factoryEntry.pending, "wide: 테스트 증강 공장 진입 실패 " + JSON.stringify(factoryEntry));
+    await clickElement(session, '#factory-board [data-cell-index="7"]');
+    await sleep(120);
+    const owner = await evaluate(session, "document.querySelector('.module-token [data-port-kind=\"input\"]')?.dataset.portOwner || null");
+    assert(owner, "wide: 배치된 증강 단자 누락");
+    await clickElement(session, '[data-port-owner="bus-source"][data-port-kind="output"]');
+    await clickElement(session, '[data-port-owner="' + owner + '"][data-port-kind="input"]');
+    await clickElement(session, '[data-port-owner="' + owner + '"][data-port-kind="output"]');
+    await clickElement(session, '[data-port-owner="bus-sink"][data-port-kind="input"]');
+    await sleep(120);
+    const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, message: document.querySelector('#board-message')?.textContent || null })");
+    const connected = circuitState.wires === 2 && circuitState.token?.includes("raw");
+    assert(connected, "wide: 입력·출력 단자 연결 후 증강이 가동되지 않음 " + JSON.stringify(circuitState));
+    await clickElement(session, "#factory-commit");
+    await sleep(80);
+    const applied = await evaluate(session, "({ factoryOpen: !document.querySelector('#factory-overlay').hidden, traits: document.querySelector('#game-canvas').dataset.activeTraits || '', pending: Boolean(document.querySelector('#pending-part .pending-module')) })");
+    assert(!applied.factoryOpen && applied.traits.includes("m_mark"), "wide: 연결된 회로를 전투에 적용하지 못함 " + JSON.stringify(applied));
+    await clickElement(session, '#test-module-buttons [data-test-module="m_guard"]');
+    await sleep(100);
+    await clickElement(session, '#factory-board [data-cell-index="15"]');
+    await sleep(760);
+    const rareState = await evaluate(session, `(() => { const token = document.querySelector('.factory-board .module-m_guard'); const cell = document.querySelector('[data-cell-index="15"]'); const a = token?.getBoundingClientRect(); const b = cell?.getBoundingClientRect(); return { pass: Boolean(a && b && a.width > b.width * 1.6 && a.height > b.height * 1.6), token: a && { width: a.width, height: a.height }, cell: b && { width: b.width, height: b.height }, message: document.querySelector('#board-message')?.textContent, css: token && { width: getComputedStyle(token).width, inline: token.style.getPropertyValue('--footprint-width'), cell: getComputedStyle(document.documentElement).getPropertyValue('--cell') } }; })()`);
+    assert(rareState.pass, "wide: 희귀 2×2 증강의 실제 보드 점유 크기 오류 " + JSON.stringify(rareState));
+    await clickElement(session, "#factory-commit");
+    await sleep(80);
+    await clickElement(session, '#test-module-buttons [data-test-module="m_step"]');
+    await sleep(100);
+    await clickElement(session, '#factory-board [data-cell-index="25"]');
+    await sleep(760);
+    const legendaryFootprint = await evaluate(session, `(() => { const token = document.querySelector('.factory-board .module-m_step'); const cell = document.querySelector('[data-cell-index="25"]'); const a = token?.getBoundingClientRect(); const b = cell?.getBoundingClientRect(); return Boolean(a && b && a.width > b.width * 3.35 && a.height > b.height * 3.35); })()`);
+    assert(legendaryFootprint, "wide: 전설 4×4 증강의 실제 보드 점유 크기 오류");
+    await clickElement(session, "#factory-commit");
+  }
 
   return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}`;
 }

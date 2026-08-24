@@ -26,10 +26,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-11") && html.includes("game.js?v=prototype-11"), "마우스 입력 복구 캐시 버전 prototype-11 누락");
+check(html.includes("styles.css?v=prototype-12") && html.includes("game.js?v=prototype-12"), "마우스 입력 복구 캐시 버전 prototype-12 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("queueFactoryEcho") && source.includes("buildFactoryTuning"), "신호 그래프 전투 가공 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("connectPorts"), "드랍 기반 단자 회로 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -47,7 +47,7 @@ check(!/\.game\s*\{[^}]*min-width:\s*920px/.test(styles), "좁은 화면을 강�
 check(/\.overlay\s*\{[^}]*overflow:\s*auto/.test(styles), "긴 오버레이의 양방향 스크롤 보호 누락");
 check(/\.factory-layout\s*\{[^}]*overflow-x:\s*auto/.test(styles), "좁은 공장 3열의 가로 스크롤 보호 누락");
 check(styles.includes(".augment-card .placement-hint { position: static;") && styles.includes(".build-affinity { position: static;"), "증강 카드 설명·태그 고정 배치 겹침 위험");
-check(/\.part-rotate\s*\{[^}]*left:\s*2px/.test(styles) && /\.module-ram\s*\{[^}]*right:\s*-7px/.test(styles), "회전 버튼과 RAM 배지 분리 누락");
+check(styles.includes(".circuit-port") && styles.includes(".circuit-wires") && styles.includes("--footprint-w"), "다중 크기 단자·회로선 UI 누락");
 check(/\.board-message\s*\{[^}]*position:\s*sticky[^}]*white-space:\s*normal/.test(styles), "긴 보드 메시지 줄바꿈·고정 보호 누락");
 check(/\.factory-action-bar\s*\{[^}]*position:\s*sticky/.test(styles) && html.includes('class="factory-action-bar"'), "공장 적용 버튼 고정 영역 누락");
 check([980, 760, 560].every((width) => styles.includes(`@media (max-width: ${width}px)`)), "핵심 반응형 UX 구간 누락");
@@ -143,57 +143,44 @@ try {
     return Number.isFinite(game.player.facing) && Number.isFinite(game.player.weaponFacing);
   })`, runtime, { timeout: 1000 });
   check(classRenderAudit, "세 클래스 보간 렌더링 스모크 테스트 실패");
-  const placementAudit = vm.runInContext(`(() => {
+  const circuitAudit = vm.runInContext(`(() => {
     game.selectedClass = "melee";
     startGame();
-    factory.pending = { id: factory.nextId++, kind: "module", type: "m_step" };
-    openFactory(false);
-    const first = indexOf(1, MAIN_ROW);
-    const second = indexOf(2, MAIN_ROW);
+    game.enemies = [];
+    openFactory(true);
+    const first = indexOf(1, 0);
+    const moved = indexOf(3, 0);
+    factory.pending = createPart("module", "m_guard");
     const factoryOpened = game.mode === "factory" && !document.querySelector("#factory-overlay").hidden;
     placePending(first);
-    const pendingPlaced = factory.pending === null && board[first]?.type === "m_step" && !document.querySelector("#factory-commit").disabled;
-    moveBoardModule(first, second);
-    const moduleMoved = board[first] === null && board[second]?.type === "m_step" && !evaluateClassFactory().traits.has("m_step");
+    const placedRare = board[first]?.type === "m_guard" && partFootprint(board[first]).width === 2 && partFootprint(board[first]).height === 2;
+    const moduleId = board[first].id;
+    connectPorts(BUS_SOURCE_ID, moduleId);
+    const inputOnlyInactive = !evaluateClassFactory().traits.has("m_guard");
+    connectPorts(moduleId, BUS_SINK_ID);
+    const fullyWiredActive = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().connectedCount === 1;
+    moveBoardModule(first, moved);
+    const movedAndRewireable = board[moved]?.type === "m_guard" && factory.wires.length === 2 && evaluateClassFactory().traits.has("m_guard");
+    const noDropNoTool = factory.toolInventory.amplifier === 0;
     selectToolBlueprint("amplifier");
-    placePending(first);
-    const poweredThroughTool = evaluateClassFactory().traits.has("m_step") && evaluateClassFactory().recipes.get(board[second].id)?.mode === "OVERDRIVE";
-    const third = indexOf(3, MAIN_ROW);
-    selectToolBlueprint("router");
-    placePending(third);
-    factory.selectedIndex = third;
-    rotateBoardTool(third);
-    const toolRotated = board[third]?.type === "router" && board[third].dir === 1;
+    const unlimitedToolBlocked = factory.pending === null;
+    collectToolDrop({ id: 71, type: "amplifier", x: game.player.x, y: game.player.y, radius: 12 });
+    selectToolBlueprint("amplifier");
+    const droppedToolSelected = factory.pending?.type === "amplifier";
+    placePending(indexOf(6, 0));
+    const toolConsumed = factory.toolInventory.amplifier === 0 && board[indexOf(6, 0)]?.type === "amplifier";
+    storeBoardModule(indexOf(6, 0));
+    const toolRecovered = factory.toolInventory.amplifier === 1;
+    const raritySizes = ["common", "rare", "legendary"].every((rarity) => moduleTypes.some((type) => MODULE_RARITIES[type] === rarity)) &&
+      JSON.stringify([RARITIES.common.width, RARITIES.rare.width, RARITIES.legendary.width]) === JSON.stringify([1, 2, 4]);
+    const randomPorts = (() => { const a = createPart("module", "m_mark"); const b = createPart("module", "m_mark"); return a.ports.input.edge && a.ports.output.edge && JSON.stringify(a.ports) !== JSON.stringify(b.ports); })();
     commitFactory();
-    const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_step");
-    return { factoryOpened, pendingPlaced, moduleMoved, poweredThroughTool, toolRotated, committed };
-  })()`, runtime, { timeout: 1000 });
-  check(Object.values(placementAudit).every(Boolean), `증강 배치 흐름 검증 실패: ${JSON.stringify(placementAudit)}`);
-  const ramAudit = vm.runInContext(`(() => {
-    game.selectedClass = "melee";
-    startGame();
-    game.player.level = 1;
-    factory.pending = { id: factory.nextId++, kind: "module", type: "m_step" };
-    openFactory(false);
-    placePending(indexOf(1, MAIN_ROW));
-    factory.pending = { id: factory.nextId++, kind: "module", type: "m_mark" };
-    placePending(indexOf(2, MAIN_ROW));
-    const linkedWithinBudget = ramUsage(evaluateClassFactory()) === 6 && evaluateClassFactory().build?.id === "pursuit";
-    factory.pending = { id: factory.nextId++, kind: "module", type: "m_blood" };
-    placePending(indexOf(3, MAIN_ROW));
-    const thirdCoreAccepted = board[indexOf(3, MAIN_ROW)]?.type === "m_blood" && ramUsage(evaluateClassFactory()) === 9;
-    factory.pending = { id: factory.nextId++, kind: "tool", type: "amplifier", dir: 0 };
-    placePending(indexOf(5, MAIN_ROW));
-    const overBudgetRejected = factory.pending?.type === "amplifier" && board[indexOf(5, MAIN_ROW)] === null;
-    archivePending();
-    const toolCancelIsFree = factory.pending === null && !factory.reserve.some((part) => part.type === "amplifier");
-    storeBoardModule(indexOf(3, MAIN_ROW));
-    const archivedForZeroRam = factory.reserve.some((module) => module.type === "m_blood") && ramUsage(evaluateClassFactory()) === 6;
+    const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_guard");
     const capacities = [1, 2, 4, 8].map((level) => { game.player.level = level; return ramCapacity(); });
     const capacityProgression = JSON.stringify(capacities) === JSON.stringify([10, 12, 16, 24]);
-    return { linkedWithinBudget, thirdCoreAccepted, overBudgetRejected, toolCancelIsFree, archivedForZeroRam, capacityProgression };
-  })()`, runtime, { timeout: 1000 });
-  check(Object.values(ramAudit).every(Boolean), `RAM 제약 검증 실패: ${JSON.stringify(ramAudit)}`);
+    return { factoryOpened, placedRare, inputOnlyInactive, fullyWiredActive, movedAndRewireable, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, raritySizes, randomPorts, committed, capacityProgression };
+  })()`, runtime, { timeout: 1500 });
+  check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);
   const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
   check(fullAudit.pass && fullAudit.playstyles.length === 9 && fullAudit.playstyles.every((report) => report.pass) && fullAudit.factoryTools.pass, `전체 런타임 검증 실패: ${JSON.stringify(fullAudit)}`);
 } catch (error) {
@@ -221,5 +208,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · 6/6 process tools · routed graph · 9/9 playstyles · aspect-fit UI scaling · combat rendering");
+  console.log("30/30 augments · 6/6 monster-drop tools · terminal circuit · 9/9 playstyles · aspect-fit UI scaling · combat rendering");
 }
