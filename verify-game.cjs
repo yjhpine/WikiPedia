@@ -26,10 +26,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-18") && html.includes("game.js?v=prototype-18") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-18 누락");
+check(html.includes("styles.css?v=prototype-19") && html.includes("game.js?v=prototype-19") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-19 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "도구 진행·드래그·물리 단자·전투 템포·치명타·근접 무기 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("offsetSeed % span") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -80,7 +80,8 @@ const documentStub = {
     if (selector.startsWith("#")) return elements.get(selector.slice(1)) || null;
     return makeElement();
   },
-  querySelectorAll() { return []; }
+  querySelectorAll() { return []; },
+  addEventListener() {}
 };
 try {
   const runtime = vm.createContext({
@@ -130,6 +131,19 @@ try {
     return { mouseOnlyStable, bodyFollowsMovement, attackUsesCursor, bodyIsIndependent, renderPass: true };
   })()`, runtime, { timeout: 1000 });
   check(Object.values(facingAudit).every(Boolean), `플레이어 방향 런타임 검증 실패: ${JSON.stringify(facingAudit)}`);
+  const inputResetAudit = vm.runInContext(`(() => {
+    game.keys.add("KeyW");
+    game.keys.add("KeyD");
+    game.keys.add("KeyJ");
+    clearMovementInput();
+    const movementCleared = !game.keys.has("KeyW") && !game.keys.has("KeyD");
+    const nonMovementPreserved = game.keys.has("KeyJ");
+    game.attackRequested = true;
+    game.dashRequested = true;
+    clearAllCombatInput();
+    return { movementCleared, nonMovementPreserved, allKeysCleared: game.keys.size === 0, requestsCleared: !game.attackRequested && !game.dashRequested };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(inputResetAudit).every(Boolean), `우클릭·포커스 입력 정리 검증 실패: ${JSON.stringify(inputResetAudit)}`);
   const classRenderAudit = vm.runInContext(`[
     "melee", "sniper", "artillery"
   ].every((classId) => {
@@ -251,9 +265,14 @@ try {
       JSON.stringify([RARITIES.common.width, RARITIES.rare.width, RARITIES.legendary.width]) === JSON.stringify([1, 2, 4]);
     const portLayouts = (() => {
       const tool = createPart("tool", "router");
-      const augment = createPart("module", "m_mark");
-      return tool.ports.layout === "lego-tool-three-way" && PORT_EDGES.every((edge) => portOffsets(tool, edge).length) &&
-        augment.ports.layout === "lego-augment-random" && augment.ports.edges.length >= 2 && augment.ports.edges.includes("left");
+      const samples = Array.from({ length: 120 }, (_, index) => ensurePartPorts({ id: 24000 + index, kind: "module", type: "m_mark" }));
+      const branches = samples.filter((part) => part.ports.edges.length === 3).length;
+      const legendaryType = moduleTypes.find((type) => MODULE_RARITIES[type] === "legendary");
+      const largeSamples = Array.from({ length: 16 }, (_, index) => ensurePartPorts({ id: 25000 + index, kind: "module", type: legendaryType }));
+      return tool.ports.layout === "lego-tool-three-way" && PORT_EDGES.every((edge) => portOffsets(tool, edge).length === 1) &&
+        samples.every((part) => part.ports.layout === "lego-augment-random" && part.ports.edges.length >= 2 && part.ports.edges.length <= 3 && part.ports.edges.includes("left") && part.ports.edges.every((edge) => portOffsets(part, edge).length === 1)) &&
+        branches >= 12 && branches <= 28 && largeSamples.every((part) => part.ports.edges.every((edge) => portOffsets(part, edge).length === 1)) &&
+        new Set(largeSamples.map((part) => portOffsets(part, "left")[0])).size > 1;
     })();
     commitFactory();
     const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_guard");
@@ -289,5 +308,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · T1→T3 staged tools · tool 3-way / random 2+ augment jacks · drag/PICK/redeploy · 9/9 playstyles · high-tempo combat + crit impact rendering");
+  console.log("30/30 augments · T1→T3 staged tools · tool 4-way / sparse 2+ augment jacks · drag/PICK/redeploy · 9/9 playstyles · high-tempo combat + crit impact rendering");
 }

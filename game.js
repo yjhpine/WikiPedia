@@ -346,7 +346,7 @@ function randomAugmentEdges(part) {
     const swapIndex = seed % (index + 1);
     [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
-  const outputCount = 1 + (seed % 2);
+  const outputCount = seed % 6 === 0 ? 2 : 1;
   const selected = new Set(shuffled.slice(0, outputCount));
   return PORT_EDGES.filter((edge) => edge === "left" || selected.has(edge));
 }
@@ -357,17 +357,31 @@ function hasUsableAugmentPorts(part) {
     edges.some((edge) => OUTPUT_EDGES.includes(edge)) && edges.every((edge) => PORT_EDGES.includes(edge));
 }
 
+function augmentPortOffset(part, edge, span) {
+  if (span <= 1) return 0;
+  const edgeSalt = PORT_EDGES.indexOf(edge) + 1;
+  const offsetSeed = (Math.imul(portSeed(part) ^ Math.imul(edgeSalt, 2654435761), 1664525) + 1013904223) >>> 0;
+  return offsetSeed % span;
+}
+
 function ensurePartPorts(part) {
   if (!part) return part;
   if (partKind(part) === "tool") {
     part.ports = { layout: "lego-tool-three-way", edges: [...PORT_EDGES] };
     return part;
   }
-  if (!hasUsableAugmentPorts(part)) {
-    part.ports = { layout: "lego-augment-random", edges: randomAugmentEdges(part) };
-  } else {
-    part.ports = { layout: "lego-augment-random", edges: PORT_EDGES.filter((edge) => part.ports.edges.includes(edge)) };
-  }
+  const existingPorts = part.ports || {};
+  const edges = hasUsableAugmentPorts(part)
+    ? PORT_EDGES.filter((edge) => existingPorts.edges.includes(edge))
+    : randomAugmentEdges(part);
+  const footprint = partFootprint(part);
+  const offsets = Object.fromEntries(edges.map((edge) => {
+    const span = edge === "top" || edge === "bottom" ? footprint.width : footprint.height;
+    const stored = Number(existingPorts.offsets?.[edge]);
+    const offset = Number.isInteger(stored) && stored >= 0 && stored < span ? stored : augmentPortOffset(part, edge, span);
+    return [edge, offset];
+  }));
+  part.ports = { layout: "lego-augment-random", edges, offsets };
   return part;
 }
 
@@ -376,7 +390,8 @@ function portOffsets(part, edge) {
   if (!part.ports.edges.includes(edge)) return [];
   const footprint = partFootprint(part);
   const span = edge === "top" || edge === "bottom" ? footprint.width : footprint.height;
-  return Array.from({ length: span }, (_, offset) => offset);
+  if (partKind(part) === "tool") return Array.from({ length: span }, (_, offset) => offset);
+  return [part.ports.offsets[edge]];
 }
 
 function portGridPoint(part, edge, offset) {
@@ -952,7 +967,7 @@ function renderPendingPart() {
   const toolTier = isTool ? TOOLS[factory.pending.type].tier : 0;
   target.innerHTML = '<div class="pending-module ' + (isTool ? "pending-tool" : "module-" + factory.pending.type) +
     '" draggable="false" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + (isTool ? "T" + toolTier + " " : "") + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
-    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 상·우·하 방향 레고 잭' : '드랍 공정 도구 · 빈 셀로 끌어 놓기') + '</span><span>' + def.description + '</span></div>';
+    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 희소 단자 2–3개 · 면당 1개' : '드랍 공정 도구 · 빈 셀로 끌어 놓기') + '</span><span>' + def.description + '</span></div>';
   $("#pending-archive").textContent = isTool ? "드랍 도구 선택 취소" : "장착하지 않고 보관";
   $("#pending-archive").hidden = false;
 }
@@ -1095,7 +1110,7 @@ function renderFactoryBoard() {
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "회로 적용 · 전투 복귀";
   $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
   const pendingDef = factory.pending ? partDefinition(factory.pending) : null;
-  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM)을 빈 셀로 끌어 놓으세요 · 상·우·하 잭이 반대쪽 잭과 맞닿으면 자동 결합됩니다. 남은 RAM " + freeRam + "." :
+  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM)을 빈 셀로 끌어 놓으세요 · 희소 단자가 반대쪽 단자와 정확히 맞닿으면 자동 결합됩니다. 남은 RAM " + freeRam + "." :
     factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · BUS 레일 바로 오른쪽 또는 가동 블록의 상·우·하에 맞닿게 드래그하면 자동 결합됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "부품을 빈 셀로 끌어 놓아 배치하세요. 클릭으로 들어 올린 뒤 놓는 방식도 사용할 수 있습니다.");
   $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount ? "warning" : "ok");
 }
@@ -3004,7 +3019,7 @@ function wireInstalledParts(parts) {
 
 function configureAuditPorts(part) {
   const prepared = { ...part };
-  if (partKind(prepared) === "module") prepared.ports = { layout: "lego-augment-random", edges: ["left", "right"] };
+  if (partKind(prepared) === "module") prepared.ports = { layout: "lego-augment-random", edges: ["left", "right"], offsets: { left: 0, right: 0 } };
   return ensurePartPorts(prepared);
 }
 
@@ -3126,11 +3141,17 @@ function runFactoryToolAudits() {
       const part = createPart("tool", type);
       return part.ports.layout === "lego-tool-three-way" && PORT_EDGES.every((edge) => portOffsets(part, edge).length === 1);
     });
-    const randomAugmentJackLayout = moduleTypes.every((type) => {
-      const part = createPart("module", type);
+    const augmentSamples = Array.from({ length: 120 }, (_, index) => ensurePartPorts({ id: 20000 + index, kind: "module", type: "m_mark" }));
+    const branchOutputCount = augmentSamples.filter((part) => part.ports.edges.length === 3).length;
+    const legendaryType = moduleTypes.find((type) => MODULE_RARITIES[type] === "legendary");
+    const legendarySamples = Array.from({ length: 16 }, (_, index) => ensurePartPorts({ id: 22000 + index, kind: "module", type: legendaryType }));
+    const randomAugmentJackLayout = augmentSamples.every((part) => {
       const edges = part.ports.edges;
-      return part.ports.layout === "lego-augment-random" && edges.length >= 2 && edges.length <= 3 && edges.includes("left") && edges.some((edge) => OUTPUT_EDGES.includes(edge));
-    }) && new Set([20001, 20002, 20003, 20004, 20005, 20006].map((id) => ensurePartPorts({ id, kind: "module", type: "m_mark" }).ports.edges.join(","))).size > 1;
+      return part.ports.layout === "lego-augment-random" && edges.length >= 2 && edges.length <= 3 && edges.includes("left") &&
+        edges.some((edge) => OUTPUT_EDGES.includes(edge)) && edges.every((edge) => portOffsets(part, edge).length === 1);
+    }) && branchOutputCount >= 12 && branchOutputCount <= 28 &&
+      legendarySamples.every((part) => part.ports.edges.every((edge) => portOffsets(part, edge).length === 1)) &&
+      new Set(legendarySamples.map((part) => portOffsets(part, "left")[0])).size > 1;
     board.fill(null);
     const legendary = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "legendary"));
     const rare = createPart("module", moduleTypes.find((type) => MODULE_RARITIES[type] === "rare"));
@@ -4308,19 +4329,41 @@ window.addEventListener("keydown", (event) => {
     $("#board-message").className = "board-message warning";
   }
 });
+const MOVEMENT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+function clearMovementInput() {
+  for (const code of MOVEMENT_KEYS) game.keys.delete(code);
+}
+function clearAllCombatInput() {
+  game.keys.clear();
+  game.attackRequested = false;
+  game.dashRequested = false;
+}
 window.addEventListener("keyup", (event) => game.keys.delete(event.code));
-window.addEventListener("blur", () => game.keys.clear());
+window.addEventListener("blur", clearAllCombatInput);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearAllCombatInput();
+});
 canvas.addEventListener("mousemove", (event) => {
   const rect = canvas.getBoundingClientRect();
   game.mouse.x = event.clientX - rect.left;
   game.mouse.y = event.clientY - rect.top;
 });
 canvas.addEventListener("mousedown", (event) => {
+  if (event.button === 2) {
+    event.preventDefault();
+    clearMovementInput();
+    return;
+  }
   if (event.button === 0 && game.mode === "playing") game.attackRequested = true;
+});
+canvas.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  clearMovementInput();
 });
 window.addEventListener("resize", resizeCanvas);
 
 if (TEST_MODE) {
+  canvas.getInputAuditState = () => ({ playerX: game.player?.x ?? null, keys: [...game.keys], dashTime: game.player?.dashTime ?? 0 });
   $("#test-panel").hidden = false;
   renderTestModuleButtons();
   $("#test-scrap").addEventListener("click", () => {

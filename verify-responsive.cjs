@@ -88,6 +88,12 @@ async function clickPoint(session, x, y) {
   await session.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1 });
 }
 
+async function rightClickPoint(session, x, y) {
+  await session.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+  await session.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "right", buttons: 2, clickCount: 1 });
+  await session.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "right", buttons: 0, clickCount: 1 });
+}
+
 async function clickElement(session, selector) {
   const point = await evaluate(session, `(() => {
     const element = document.querySelector(${JSON.stringify(selector)});
@@ -180,6 +186,21 @@ async function auditViewport(session, viewport) {
     const count = await evaluate(session, "Number(document.querySelector('#game-canvas').dataset.swingCount || 0)");
     return count >= 1 ? count : null;
   }, 2000);
+  let rightClickReset = true;
+  if (viewport.name === "wide") {
+    const xBeforeMove = (await evaluate(session, "document.querySelector('#game-canvas').getInputAuditState()" )).playerX;
+    await session.send("Input.dispatchKeyEvent", { type: "keyDown", key: "d", code: "KeyD", windowsVirtualKeyCode: 68, nativeVirtualKeyCode: 68 });
+    await sleep(110);
+    const xWhileMoving = (await evaluate(session, "document.querySelector('#game-canvas').getInputAuditState()" )).playerX;
+    await rightClickPoint(session, canvasPoint.x, canvasPoint.y);
+    const rightClickState = await evaluate(session, "document.querySelector('#game-canvas').getInputAuditState()" );
+    const afterRightClick = { x: rightClickState.playerX, keyHeld: rightClickState.keys.includes("KeyD") };
+    await sleep(120);
+    const xAfterSettling = (await evaluate(session, "document.querySelector('#game-canvas').getInputAuditState()" )).playerX;
+    await session.send("Input.dispatchKeyEvent", { type: "keyUp", key: "d", code: "KeyD", windowsVirtualKeyCode: 68, nativeVirtualKeyCode: 68 });
+    rightClickReset = xWhileMoving > xBeforeMove + 4 && !afterRightClick.keyHeld && Math.abs(xAfterSettling - afterRightClick.x) < 1.5;
+    assert(rightClickReset, "wide: 우클릭 후 이동 입력이 고착됨 " + JSON.stringify({ xBeforeMove, xWhileMoving, afterRightClick, xAfterSettling }));
+  }
   const combat = await evaluate(session, `(() => {
     const rect = (selector) => {
       const value = document.querySelector(selector).getBoundingClientRect();
@@ -268,10 +289,17 @@ async function auditViewport(session, viewport) {
     await sleep(760);
     const legendaryFootprint = await evaluate(session, `(() => { const token = document.querySelector('.factory-board .module-m_step'); const cell = document.querySelector('[data-cell-index="25"]'); const a = token?.getBoundingClientRect(); const b = cell?.getBoundingClientRect(); return Boolean(a && b && a.width > b.width * 3.35 && a.height > b.height * 3.35); })()`);
     assert(legendaryFootprint, "wide: 전설 4×4 증강의 실제 보드 점유 크기 오류");
+    const legendaryPorts = await evaluate(session, `(() => {
+      const token = document.querySelector('.factory-board .module-m_step');
+      const ports = [...(token?.querySelectorAll('[data-port-kind="jack"]') || [])];
+      const counts = Object.fromEntries(['top', 'right', 'bottom', 'left'].map((edge) => [edge, ports.filter((port) => port.dataset.portEdge === edge).length]));
+      return { total: ports.length, counts };
+    })()`);
+    assert(legendaryPorts.total >= 2 && legendaryPorts.total <= 3 && legendaryPorts.counts.left === 1 && Object.values(legendaryPorts.counts).every((count) => count <= 1), "wide: 전설 증강 단자가 면당 1개·총 2–3개 희소 규칙을 벗어남 " + JSON.stringify(legendaryPorts));
     await clickElement(session, "#factory-commit");
   }
 
-  return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}`;
+  return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}${viewport.name === "wide" && rightClickReset ? " · right-click reset" : ""}`;
 }
 
 async function main() {
