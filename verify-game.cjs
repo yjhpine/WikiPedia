@@ -26,10 +26,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-19") && html.includes("game.js?v=prototype-19") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-19 누락");
+check(html.includes("styles.css?v=prototype-20") && html.includes("game.js?v=prototype-20") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-20 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("offsetSeed % span") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("minimum + offsetSeed %") && source.includes("previewPartPlacement") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -221,29 +221,51 @@ try {
     startGame();
     game.enemies = [];
     openFactory(true);
-    const first = indexOf(1, 0);
-    factory.pending = createPart("module", "m_guard");
     const factoryOpened = game.mode === "factory" && !document.querySelector("#factory-overlay").hidden;
+
+    board.fill(null);
+    factory.wires = [];
+    const offCenter = ensurePartPorts({ id: 7000, kind: "module", type: "m_spin", ports: { layout: "lego-augment-random", edges: ["left", "right"], offsets: { left: 0, right: 0 } } });
+    board[indexOf(1, 0)] = offCenter;
+    rebuildPhysicalWires();
+    const offCenterBusBlocked = !evaluateClassFactory().operationalIds.has(offCenter.id) && !factory.wires.some((wire) => wire.fromId === BUS_SOURCE_ID);
+    board.fill(null);
+    rebuildPhysicalWires();
+
+    factory.pending = createPart("module", "m_guard");
+    const validStarts = board.map((_, index) => index).filter((index) => {
+      const preview = previewPartPlacement(index, factory.pending);
+      return preview.connected && preview.ram <= ramCapacity();
+    });
+    const first = validStarts[0];
+    const leftOffset = portOffsets(factory.pending, "left")[0];
+    const centerOnlyStart = validStarts.length === 1 && positionOf(first).col === 1 && positionOf(first).row + leftOffset === MAIN_ROW;
+    const disconnectedTarget = board.map((_, index) => index).find((index) => isPlaceable(index) && canPlacePart(index, factory.pending) && !validStarts.includes(index));
+    placePending(disconnectedTarget);
+    const disconnectedPlacementBlocked = factory.pending?.type === "m_guard" && !board[disconnectedTarget];
     placePending(first);
     const placedRare = board[first]?.type === "m_guard" && partFootprint(board[first]).width === 2 && partFootprint(board[first]).height === 2;
     const moduleId = board[first].id;
-    const autoLegoActive = evaluateClassFactory().traits.has("m_guard") && factory.wires.length === 1 && factory.wires[0]?.fromId === BUS_SOURCE_ID && factory.wires[0]?.toEdge === "left";
+    const autoLegoActive = evaluateClassFactory().traits.has("m_guard") && factory.wires.length === 1 &&
+      factory.wires[0]?.fromId === BUS_SOURCE_ID && factory.wires[0]?.fromRow === MAIN_ROW && factory.wires[0]?.toEdge === "left";
     storeBoardModule(first);
     const storedForRedeploy = factory.reserve.some((part) => part.id === moduleId) && !board[first];
     activateReserve(moduleId);
     const pickupAndRedeploy = factory.pending?.id === moduleId;
     placePending(first);
     const redeployedActive = evaluateClassFactory().traits.has("m_guard") && factory.wires.length === 1;
-    const branch = createPart("module", "m_spin");
-    board[indexOf(1, 3)] = branch;
+
     const toolLink = createPart("tool", "router");
     const neighbor = createPart("tool", "amplifier");
-    board[indexOf(4, 1)] = toolLink;
-    board[indexOf(5, 1)] = neighbor;
+    board[indexOf(6, 0)] = toolLink;
+    board[indexOf(7, 0)] = neighbor;
     rebuildPhysicalWires();
-    const neighborWire = factory.wires.find((wire) => wire.fromId === toolLink.id && wire.toId === neighbor.id);
-    const branchLinesApply = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().traits.has("m_spin") && factory.wires.filter((wire) => wire.fromId === BUS_SOURCE_ID).length === 2;
-    const proximityOnly = Boolean(neighborWire) && neighborWire.fromEdge === "right" && neighborWire.toEdge === "left" && !findPhysicalPortMatch(neighbor.id, toolLink.id) && !connectPorts(toolLink.id, branch.id);
+    const disconnectedPairPhysical = Boolean(findPhysicalPortMatch(toolLink.id, neighbor.id));
+    const proximityOnly = disconnectedPairPhysical && !factory.wires.some((wire) => wire.fromId === toolLink.id || wire.toId === toolLink.id || wire.fromId === neighbor.id || wire.toId === neighbor.id);
+    board[indexOf(6, 0)] = null;
+    board[indexOf(7, 0)] = null;
+    rebuildPhysicalWires();
+
     const colsBeforeExtend = boardCols;
     extendBoard();
     const boardExtends = boardCols === colsBeforeExtend + EXTEND_BY && board.length === boardCols * ROWS;
@@ -253,14 +275,19 @@ try {
     collectToolDrop({ id: 71, type: "amplifier", x: game.player.x, y: game.player.y, radius: 12 });
     selectToolBlueprint("amplifier");
     const droppedToolSelected = factory.pending?.type === "amplifier";
-    placePending(indexOf(6, 0));
-    const toolConsumed = factory.toolInventory.amplifier === 0 && board[indexOf(6, 0)]?.type === "amplifier";
-    storeBoardModule(indexOf(6, 0));
+    const toolTarget = board.map((_, index) => index).find((index) => {
+      const preview = previewPartPlacement(index, factory.pending);
+      return preview.connected && preview.ram <= ramCapacity();
+    });
+    placePending(toolTarget);
+    const toolConsumed = factory.toolInventory.amplifier === 0 && board[toolTarget]?.type === "amplifier";
+    storeBoardModule(toolTarget);
     const toolRecovered = factory.toolInventory.amplifier === 1;
-    const paletteTarget = indexOf(7, 0);
     factory.dragged = { kind: "tool-palette", type: "amplifier" };
-    const toolPaletteDrag = dragTargetIsValid(paletteTarget) && completeFactoryDrop(paletteTarget) && board[paletteTarget]?.type === "amplifier" && factory.toolInventory.amplifier === 0;
+    const paletteTarget = board.map((_, index) => index).find((index) => dragTargetIsValid(index));
+    const toolPaletteDrag = Number.isInteger(paletteTarget) && completeFactoryDrop(paletteTarget) && board[paletteTarget]?.type === "amplifier" && factory.toolInventory.amplifier === 0;
     storeBoardModule(paletteTarget);
+
     const raritySizes = ["common", "rare", "legendary"].every((rarity) => moduleTypes.some((type) => MODULE_RARITIES[type] === rarity)) &&
       JSON.stringify([RARITIES.common.width, RARITIES.rare.width, RARITIES.legendary.width]) === JSON.stringify([1, 2, 4]);
     const portLayouts = (() => {
@@ -272,16 +299,16 @@ try {
       return tool.ports.layout === "lego-tool-three-way" && PORT_EDGES.every((edge) => portOffsets(tool, edge).length === 1) &&
         samples.every((part) => part.ports.layout === "lego-augment-random" && part.ports.edges.length >= 2 && part.ports.edges.length <= 3 && part.ports.edges.includes("left") && part.ports.edges.every((edge) => portOffsets(part, edge).length === 1)) &&
         branches >= 12 && branches <= 28 && largeSamples.every((part) => part.ports.edges.every((edge) => portOffsets(part, edge).length === 1)) &&
-        new Set(largeSamples.map((part) => portOffsets(part, "left")[0])).size > 1;
+        new Set(largeSamples.map((part) => portOffsets(part, "left")[0])).size > 1 &&
+        largeSamples.every((part) => { const offset = portOffsets(part, "left")[0]; const row = MAIN_ROW - offset; return row >= 0 && row + partFootprint(part).height <= ROWS; });
     })();
     commitFactory();
     const committed = game.mode === "playing" && document.querySelector("#factory-overlay").hidden && game.output.traits.has("m_guard");
     const capacities = [1, 2, 4, 8].map((level) => { game.player.level = level; return ramCapacity(); });
     const capacityProgression = JSON.stringify(capacities) === JSON.stringify([10, 12, 16, 24]);
-    return { factoryOpened, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, branchLinesApply, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, toolPaletteDrag, raritySizes, portLayouts, committed, capacityProgression };
-  })()`, runtime, { timeout: 1500 });
-  check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);
-  const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
+    return { factoryOpened, offCenterBusBlocked, centerOnlyStart, disconnectedPlacementBlocked, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, toolPaletteDrag, raritySizes, portLayouts, committed, capacityProgression };
+  })()`, runtime, { timeout: 1800 });
+  check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);  const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
   check(fullAudit.pass && fullAudit.playstyles.length === 9 && fullAudit.playstyles.every((report) => report.pass) && fullAudit.factoryTools.pass, `전체 런타임 검증 실패: ${JSON.stringify(fullAudit)}`);
 } catch (error) {
   failures.push(`초기 화면 런타임 오류: ${error.message}`);

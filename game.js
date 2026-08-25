@@ -361,7 +361,9 @@ function augmentPortOffset(part, edge, span) {
   if (span <= 1) return 0;
   const edgeSalt = PORT_EDGES.indexOf(edge) + 1;
   const offsetSeed = (Math.imul(portSeed(part) ^ Math.imul(edgeSalt, 2654435761), 1664525) + 1013904223) >>> 0;
-  return offsetSeed % span;
+  const minimum = edge === "left" ? Math.max(0, MAIN_ROW + span - ROWS) : 0;
+  const maximum = edge === "left" ? Math.min(span - 1, MAIN_ROW) : span - 1;
+  return minimum + offsetSeed % (maximum - minimum + 1);
 }
 
 function ensurePartPorts(part) {
@@ -378,7 +380,9 @@ function ensurePartPorts(part) {
   const offsets = Object.fromEntries(edges.map((edge) => {
     const span = edge === "top" || edge === "bottom" ? footprint.width : footprint.height;
     const stored = Number(existingPorts.offsets?.[edge]);
-    const offset = Number.isInteger(stored) && stored >= 0 && stored < span ? stored : augmentPortOffset(part, edge, span);
+    const minimum = edge === "left" ? Math.max(0, MAIN_ROW + span - ROWS) : 0;
+    const maximum = edge === "left" ? Math.min(span - 1, MAIN_ROW) : span - 1;
+    const offset = Number.isInteger(stored) && stored >= minimum && stored <= maximum ? stored : augmentPortOffset(part, edge, span);
     return [edge, offset];
   }));
   part.ports = { layout: "lego-augment-random", edges, offsets };
@@ -436,8 +440,8 @@ function findPhysicalPortMatch(fromId, toId, preferred = {}) {
     if ((preferred.fromEdge && preferred.fromEdge !== "right") || toEdge !== "left") return null;
     for (const toOffset of portOffsets(toPart, "left")) {
       const toPoint = portGridPoint(toPart, "left", toOffset);
-      const fromRow = preferred.fromRow ?? toPoint.row;
-      if (toPoint.col === 1 && toPoint.row === fromRow) {
+      const fromRow = preferred.fromRow ?? MAIN_ROW;
+      if (fromRow === MAIN_ROW && toPoint.col === 1 && toPoint.row === MAIN_ROW) {
         return { fromId, toId, fromEdge: "right", fromOffset: 0, fromRow, toEdge, toOffset };
       }
     }
@@ -481,10 +485,19 @@ function connectPorts(fromId, toId, preferred) {
 function rebuildPhysicalWires() {
   const parts = partsOnBoard().sort((a, b) => a.col - b.col || a.row - b.row || a.id - b.id);
   factory.wires = [];
-  for (const target of parts) connectPorts(BUS_SOURCE_ID, target.id);
-  for (const from of parts) {
+  const connectedIds = new Set();
+  for (const target of parts) {
+    if (connectPorts(BUS_SOURCE_ID, target.id, { fromRow: MAIN_ROW })) connectedIds.add(target.id);
+  }
+  const queue = parts.filter((part) => connectedIds.has(part.id));
+  while (queue.length) {
+    const from = queue.shift();
     for (const target of parts) {
-      if (from.id !== target.id) connectPorts(from.id, target.id);
+      if (from.id === target.id || connectedIds.has(target.id)) continue;
+      if (connectPorts(from.id, target.id)) {
+        connectedIds.add(target.id);
+        queue.push(target);
+      }
     }
   }
 }
@@ -505,16 +518,32 @@ function ramUsage(output) {
   return partCost + (output || evaluateClassFactory()).protocolRoutes.length * PROTOCOL_RAM;
 }
 
-function pendingPlacementUsage(index, type) {
-  const pending = typeof type === "string" ? { id: -1, kind: "module", type } : type;
-  if (!canPlacePart(index, pending)) return Infinity;
+function previewPartPlacement(index, part, sourceAnchor = -1) {
+  const candidate = typeof part === "string" ? ensurePartPorts({ id: -1, kind: "module", type: part }) : ensurePartPorts(part);
+  const ignorePartId = sourceAnchor >= 0 ? candidate?.id : undefined;
+  if (!canPlacePart(index, candidate, ignorePartId)) return { fits: false, connected: false, ram: Infinity, output: null };
+  if (sourceAnchor >= 0 && anchorIndexAt(index) === sourceAnchor) {
+    const output = evaluateClassFactory();
+    return { fits: true, connected: output.operationalIds.has(candidate.id), ram: ramUsage(output), output };
+  }
   const savedWires = factory.wires.slice();
-  board[index] = pending;
+  const savedNextWireId = factory.nextWireId;
+  const sourcePart = sourceAnchor >= 0 ? board[sourceAnchor] : null;
+  const targetPart = board[index];
+  if (sourceAnchor >= 0) board[sourceAnchor] = null;
+  board[index] = candidate;
   rebuildPhysicalWires();
-  const projected = ramUsage(evaluateClassFactory());
-  board[index] = null;
+  const output = evaluateClassFactory();
+  const result = { fits: true, connected: output.operationalIds.has(candidate.id), ram: ramUsage(output), output };
+  board[index] = targetPart || null;
+  if (sourceAnchor >= 0) board[sourceAnchor] = sourcePart;
   factory.wires = savedWires;
-  return projected;
+  factory.nextWireId = savedNextWireId;
+  return result;
+}
+
+function pendingPlacementUsage(index, type) {
+  return previewPartPlacement(index, type).ram;
 }
 
 function showSystemToast(label, message, tone, duration) {
@@ -1064,13 +1093,13 @@ function renderFactoryBoard() {
     const sequenceOut = Boolean(part && output.outgoingModuleIds.has(part.id));
     const reactorCore = Boolean(part && output.build?.moduleIds.has(part.id));
     const selected = factory.selectedIndex === anchor;
-    const projectedRam = factory.pending ? pendingPlacementUsage(index, factory.pending, output) : 0;
-    const validTarget = Boolean(factory.pending) && !fixed && canPlacePart(index, factory.pending) && projectedRam <= ramCapacity();
-    const invalidTarget = Boolean(factory.pending) && !fixed && !validTarget;
+    const placementPreview = factory.pending && !fixed ? previewPartPlacement(index, factory.pending) : null;
+    const validTarget = Boolean(factory.pending) && !fixed && placementPreview?.connected && placementPreview.ram <= ramCapacity();
+    const invalidTarget = Boolean(factory.pending) && !fixed && !part && !validTarget;
     let fixedText = "";
-    if (position.col === 0) {
-      fixedText = (position.row === MAIN_ROW ? '<span class="fixed-node"><b>' + BUS_SOURCE_LABEL + '</b><small>LEGO RAIL</small></span>' : '') +
-        '<span class="circuit-port output bus-port" data-port-owner="' + BUS_SOURCE_ID + '" data-port-kind="source" data-port-edge="right" data-port-offset="0" data-port-row="' + position.row + '" style="' + portStyle("right", 0, { width: 1, height: 1 }) + '" aria-label="BUS 신호 레일 ' + LANE_NAMES[position.row] + '"></span>';
+    if (position.col === 0 && position.row === MAIN_ROW) {
+      fixedText = '<span class="fixed-node"><b>' + BUS_SOURCE_LABEL + '</b><small>LEGO RAIL</small></span>' +
+        '<span class="circuit-port output bus-port" data-port-owner="' + BUS_SOURCE_ID + '" data-port-kind="source" data-port-edge="right" data-port-offset="0" data-port-row="' + MAIN_ROW + '" style="' + portStyle("right", 0, { width: 1, height: 1 }) + '" aria-label="중앙 BUS 신호 레일"></span>';
     }
     const status = part ? output.statuses.get(part.id) : "";
     return '<div class="factory-cell ' + laneClass + (part ? " occupied" : "") + (powered ? " powered" : "") + (sequenceOut ? " sequence-out" : "") +
@@ -1096,22 +1125,22 @@ function renderFactoryBoard() {
     : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>BUS IN에서 도달한 증강 라인 전체가 즉시 적용됩니다. 도구를 사이에 두면 성능과 반동이 달라집니다.</p></article>';
   $("#factory-summary").innerHTML =
     '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
-    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>LEGO 회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' LINK</span></header><p>블록의 상·우·하 잭이 바로 맞닿을 때만 자동 결합됩니다. BUS 레일은 왼쪽 입력 잭과만 맞물립니다.</p></article>' +
+    '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>LEGO 회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' LINK</span></header><p>신호는 중앙 BUS IN 한 줄에서만 시작하며, 가동 블록의 맞닿은 단자로 이어집니다.</p></article>' +
     tuningSummary + buildSummary +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' + (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
     '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' + (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '입력·출력이 모두 이어진 핵심 증강의 순서가 프로토콜을 만듭니다.') + '</p></article>';
   const recipeItems = [...output.recipes.values()];
   $("#factory-recipe-list").innerHTML = recipeItems.length
     ? recipeItems.map((recipe) => { const def = MODULES[recipe.type]; const tags = [recipe.mode, Math.round(recipe.throughput * 100) + "%"]; if (recipe.power) tags.push("AMP×" + recipe.power); if (recipe.echo) tags.push("ECHO×" + recipe.echo); if (recipe.focus) tags.push("FOCUS×" + recipe.focus); return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>'; }).join("")
-    : '<span class="no-synergy">BUS 레일 바로 오른쪽에 블록을 놓고, 다른 블록은 상·우·하로 맞닿게 배치하세요. 결합은 자동입니다.</span>';
+    : '<span class="no-synergy">중앙 BUS IN 바로 오른쪽의 밝은 셀에서 회로를 시작하고, 이후 표시되는 결합 셀로 확장하세요.</span>';
   $("#factory-synergy-list").innerHTML = output.synergies.length ? output.synergies.map((item) => '<div class="synergy-chip"><b>→ ' + item.name + '</b>' + item.description + '</div>').join("") : '<span class="no-synergy">유효 회로의 순서 프로토콜 없음</span>';
   const commit = $("#factory-commit");
   commit.disabled = Boolean(factory.pending);
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "회로 적용 · 전투 복귀";
   $("#factory-warning").textContent = factory.pending ? "배치하거나 취소해야 전투로 돌아갈 수 있습니다. 남은 RAM " + freeRam + "." : "RAM " + usedRam + "/" + capacity + " · 가동 핵심 " + output.activeCount + " · 미가동 핵심 " + output.inactiveCount + ".";
   const pendingDef = factory.pending ? partDefinition(factory.pending) : null;
-  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM)을 빈 셀로 끌어 놓으세요 · 희소 단자가 반대쪽 단자와 정확히 맞닿으면 자동 결합됩니다. 남은 RAM " + freeRam + "." :
-    factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · BUS 레일 바로 오른쪽 또는 가동 블록의 상·우·하에 맞닿게 드래그하면 자동 결합됩니다." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "부품을 빈 셀로 끌어 놓아 배치하세요. 클릭으로 들어 올린 뒤 놓는 방식도 사용할 수 있습니다.");
+  $("#board-message").textContent = factory.pending ? pendingDef.name + "(" + partRamCost(factory.pending) + " RAM) · 실제 신호가 이어지는 밝은 결합 셀에만 배치할 수 있습니다. 남은 RAM " + freeRam + "." :
+    factory.placementNotice || (output.inactiveCount ? "미가동 핵심 증강 " + output.inactiveCount + "개 · 중앙 BUS 또는 가동 회로에 이어지는 밝은 결합 셀로 옮기세요." : build ? build.name + " TIER " + ["0", "I", "II", "III"][build.tier] + " · " + tuning.mode + " 공정 가동" : "부품을 선택하면 실제 회로가 이어지는 결합 셀만 밝게 표시됩니다.");
   $("#board-message").className = "board-message " + (factory.pending || output.inactiveCount ? "warning" : "ok");
 }
 function placePending(index) {
@@ -1124,9 +1153,14 @@ function placePending(index) {
     $("#board-message").className = "board-message warning";
     return;
   }
-  const projectedRam = pendingPlacementUsage(index, factory.pending);
-  if (projectedRam > ramCapacity()) {
-    $("#board-message").textContent = "RAM 부족 · 이 위치는 자동 결합 링크 비용을 포함해 " + projectedRam + "/" + ramCapacity() + " RAM입니다. 기존 모듈을 회수하세요.";
+  const preview = previewPartPlacement(index, factory.pending);
+  if (!preview.connected) {
+    $("#board-message").textContent = "증강 라인이 이어지지 않는 위치입니다. 밝게 표시된 결합 셀을 선택하세요.";
+    $("#board-message").className = "board-message warning";
+    return;
+  }
+  if (preview.ram > ramCapacity()) {
+    $("#board-message").textContent = "RAM 부족 · 이 위치는 자동 결합 링크 비용을 포함해 " + preview.ram + "/" + ramCapacity() + " RAM입니다. 기존 모듈을 회수하세요.";
     $("#board-message").className = "board-message warning";
     return;
   }
@@ -1140,7 +1174,7 @@ function placePending(index) {
   factory.pending = null;
   factory.selectedIndex = null;
   factory.lastPlacedId = placed.id;
-  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 설치 완료. 맞닿은 상·우·하 잭이 자동 결합되었습니다.";
+  factory.placementNotice = def.name + " · " + LANE_NAMES[position.row] + " 설치 완료. 가동 회로와 맞닿은 단자가 자동 결합되었습니다.";
   renderFactoryBoard();
 }
 
@@ -1154,17 +1188,20 @@ function moveBoardModule(from, to) {
     renderFactoryBoard();
     return;
   }
-  board[anchor] = null;
-  board[to] = moving;
-  rebuildPhysicalWires();
-  if (ramUsage(evaluateClassFactory()) > ramCapacity()) {
-    board[to] = null;
-    board[anchor] = moving;
-    rebuildPhysicalWires();
+  const preview = previewPartPlacement(to, moving, anchor);
+  if (!preview.connected) {
+    factory.placementNotice = "증강 라인이 이어지지 않는 위치입니다. 밝게 표시된 결합 셀로 옮기세요.";
+    renderFactoryBoard();
+    return;
+  }
+  if (preview.ram > ramCapacity()) {
     factory.placementNotice = "이 위치는 새 자동 결합 링크로 RAM을 초과합니다. PICK 버튼으로 회수해 다시 배치하세요.";
     renderFactoryBoard();
     return;
   }
+  board[anchor] = null;
+  board[to] = moving;
+  rebuildPhysicalWires();
   factory.selectedIndex = null;
   factory.lastPlacedId = moving.id;
   factory.placementNotice = partDefinition(moving).name + " 위치를 옮겼습니다. 물리적으로 닿는 잭만 다시 결합됩니다.";
@@ -1267,19 +1304,7 @@ function draggedPart() {
 }
 
 function movingPlacementUsage(index, part, sourceAnchor) {
-  if (!canPlacePart(index, part, part.id)) return Infinity;
-  if (anchorIndexAt(index) === sourceAnchor) return ramUsage(evaluateClassFactory());
-  const savedWires = factory.wires.slice();
-  const sourcePart = board[sourceAnchor];
-  const targetPart = board[index];
-  board[sourceAnchor] = null;
-  board[index] = part;
-  rebuildPhysicalWires();
-  const projected = ramUsage(evaluateClassFactory());
-  board[index] = targetPart || null;
-  board[sourceAnchor] = sourcePart;
-  factory.wires = savedWires;
-  return projected;
+  return previewPartPlacement(index, part, sourceAnchor).ram;
 }
 
 function dragTargetIsValid(index) {
@@ -1288,8 +1313,8 @@ function dragTargetIsValid(index) {
   if (!drag || !part || !isPlaceable(index)) return false;
   if (drag.kind === "board" && anchorIndexAt(index) === drag.from) return true;
   if (!canPlacePart(index, part, drag.kind === "board" ? part.id : undefined)) return false;
-  const projected = drag.kind === "board" ? movingPlacementUsage(index, part, drag.from) : pendingPlacementUsage(index, part);
-  return projected <= ramCapacity();
+  const preview = previewPartPlacement(index, part, drag.kind === "board" ? drag.from : -1);
+  return preview.connected && preview.ram <= ramCapacity();
 }
 
 function clearDragFeedback() {
@@ -1324,7 +1349,7 @@ function placeDraggedReservePart(id, index) {
 function completeFactoryDrop(target) {
   const drag = factory.dragged;
   if (!drag || !dragTargetIsValid(target)) {
-    factory.placementNotice = "이 위치는 공간 또는 RAM 조건을 만족하지 않습니다. 밝게 표시된 빈 셀에 놓으세요.";
+    factory.placementNotice = "이 위치는 회로 결합·공간·RAM 조건을 만족하지 않습니다. 밝게 표시된 결합 셀에 놓으세요.";
     renderFactoryBoard();
     finishFactoryDrag();
     return false;
@@ -2587,12 +2612,21 @@ function updateEnemyBullets(dt) {
       if (Math.random() < game.output.guard.deflect || parrying) {
         bullet.dead = true;
         addParticles(bullet.x, bullet.y, "#8b7fff", 8, 130);
-        if (parrying) noteAugment("m_guard");
-        if (parrying && hasSynergy("perfect_counter")) {
-          player.riposteReady = true;
+        if (parrying) {
+          noteAugment("m_guard");
           const shooter = game.enemies.filter((enemy) => !enemy.dead).sort((a, b) => distanceSquared(a, bullet) - distanceSquared(b, bullet))[0];
-          if (shooter) spawnRailShot(Math.atan2(shooter.y - bullet.y, shooter.x - bullet.x), { x: bullet.x, y: bullet.y, damage: 18, homing: true, pierce: 0, ricochet: 0, color: "#8b7fff" });
-          noteProtocol("perfect_counter");
+          const perfectCounter = hasSynergy("perfect_counter");
+          if (shooter) {
+            spawnRailShot(Math.atan2(shooter.y - bullet.y, shooter.x - bullet.x), {
+              x: bullet.x, y: bullet.y, damage: perfectCounter ? 18 : Math.max(8, bullet.damage * 1.4),
+              homing: perfectCounter, pierce: 0, ricochet: 0, color: perfectCounter ? "#8b7fff" : "#e8f2f1"
+            });
+            addFloater(bullet.x, bullet.y - 18, perfectCounter ? "PERFECT RETURN" : "BULLET RETURN", perfectCounter ? "#8b7fff" : "#e8f2f1");
+          }
+          if (perfectCounter) {
+            player.riposteReady = true;
+            noteProtocol("perfect_counter");
+          }
         }
         if (game.output.guard.counterShock > 0) {
           const nearest = game.enemies.filter((enemy) => !enemy.dead)
@@ -3011,7 +3045,8 @@ function wireInstalledParts(parts) {
     const installed = configureAuditPorts(part);
     const footprint = partFootprint(installed);
     while (column + footprint.width > boardCols) extendBoard();
-    board[indexOf(column, 0)] = installed;
+    const leftOffset = portOffsets(installed, "left")[0] || 0;
+    board[indexOf(column, MAIN_ROW - leftOffset)] = installed;
     column += footprint.width;
   }
   rebuildPhysicalWires();
@@ -3019,8 +3054,23 @@ function wireInstalledParts(parts) {
 
 function configureAuditPorts(part) {
   const prepared = { ...part };
-  if (partKind(prepared) === "module") prepared.ports = { layout: "lego-augment-random", edges: ["left", "right"], offsets: { left: 0, right: 0 } };
+  if (partKind(prepared) === "module") {
+    const footprint = partFootprint(prepared);
+    const offset = Math.min(MAIN_ROW, footprint.height - 1);
+    prepared.ports = { layout: "lego-augment-random", edges: ["left", "right"], offsets: { left: offset, right: offset } };
+  }
   return ensurePartPorts(prepared);
+}
+
+function auditIsolatedModuleActivation(classId) {
+  return Object.fromEntries(classModuleTypes(classId).map((type, index) => {
+    const part = configureAuditPorts({ id: 8800 + index, kind: "module", type });
+    wireInstalledParts([part]);
+    const output = evaluateClassFactory();
+    const active = output.traits.has(type) && output.operationalIds.has(part.id) && output.recipes.has(part.id) &&
+      factory.wires.some((wire) => wire.fromId === BUS_SOURCE_ID && wire.toId === part.id && wire.fromRow === MAIN_ROW);
+    return [type, active];
+  }));
 }
 
 function installAuditSequence(classId, reverse) {
@@ -3076,7 +3126,8 @@ function runFactoryToolAudits() {
         const next = configureAuditPorts({ ...part, index: undefined });
         const footprint = partFootprint(next);
         while (column + footprint.width > boardCols) extendBoard();
-        board[indexOf(column, 0)] = next;
+        const leftOffset = portOffsets(next, "left")[0] || 0;
+        board[indexOf(column, MAIN_ROW - leftOffset)] = next;
         column += footprint.width;
         return next;
       });
@@ -3096,16 +3147,18 @@ function runFactoryToolAudits() {
     const terminalFreeActive = sourceCircuit.traits.has("m_mark") && sourceCircuit.connectedCount === 1;
     const toolProcessed = ampCircuit.recipes.get(9702)?.mode === "OVERDRIVE" && ampCircuit.primary.damage > sourceCircuit.primary.damage;
     const advancedToolProcessed = repeaterCircuit.tuning.echo === 1 && inverterCircuit.tuning.utility === 1 && inverterCircuit.guard.armor > 0;
-    const branchA = { id: 9703, kind: "module", type: "m_guard", index: indexOf(1, 0) };
-    const branchB = { id: 9704, kind: "module", type: "m_spin", index: indexOf(1, 3) };
+    const root = ensurePartPorts({ id: 9705, kind: "tool", type: "router" });
+    const branchA = ensurePartPorts({ id: 9703, kind: "module", type: "m_guard", ports: { layout: "lego-augment-random", edges: ["left", "bottom"], offsets: { left: 1, bottom: 0 } } });
+    const branchB = ensurePartPorts({ id: 9704, kind: "module", type: "m_spin", ports: { layout: "lego-augment-random", edges: ["left", "top"], offsets: { left: 0, top: 0 } } });
     board.fill(null);
     factory.wires = [];
-    const splitA = ensurePartPorts({ ...branchA });
-    const splitB = ensurePartPorts({ ...branchB });
-    board[splitA.index] = splitA;
-    board[splitB.index] = splitB;
+    board[indexOf(1, MAIN_ROW)] = root;
+    board[indexOf(1, 0)] = branchA;
+    board[indexOf(1, 3)] = branchB;
     rebuildPhysicalWires();
-    const branchLinesApply = evaluateClassFactory().traits.has("m_guard") && evaluateClassFactory().traits.has("m_spin") && evaluateClassFactory().connectedCount === 2;
+    const branchOutput = evaluateClassFactory();
+    const branchLinesApply = branchOutput.traits.has("m_guard") && branchOutput.traits.has("m_spin") && branchOutput.connectedCount === 3 &&
+      factory.wires.filter((wire) => wire.fromId === BUS_SOURCE_ID).length === 1;
     factory.toolInventory = Object.fromEntries(TOOL_TYPES.map((type) => [type, 0]));
     game.mode = "factory";
     factory.pending = null;
@@ -3300,8 +3353,10 @@ function auditMeleeRuntime() {
   damagePlayer(1, attacker.x, attacker.y);
   game.player.attackCooldown = 0;
   startSlash();
+  const reflectedBefore = game.playerShots.length;
   game.enemyBullets = [{ x: game.player.x, y: game.player.y, vx: 0, vy: 0, radius: 5, damage: 1, life: 2, dead: false }];
   updateEnemyBullets(0);
+  const guardReflected = game.enemyBullets.length === 0 && game.playerShots.length > reflectedBefore;
 
   game.player.dashCooldown = 0;
   game.player.dashTime = 0;
@@ -3309,6 +3364,7 @@ function auditMeleeRuntime() {
   updatePlayer(.016);
   game.enemyBullets = [{ x: game.player.x - 10, y: game.player.y, vx: 0, vy: 0, radius: 5, damage: 1, life: 2, dead: false }];
   updateDelayedAttacks(.3);
+  return { m_guard: guardReflected };
 }
 
 function auditSniperRuntime() {
@@ -3403,9 +3459,11 @@ function runAugmentAuditForClass(classId) {
     dashRequested: game.dashRequested, attackRequested: game.attackRequested,
     augmentEvents: game.augmentEvents, protocolEvents: game.protocolEvents
   };
+  const savedFactory = { wires: factory.wires.slice(), wireStart: factory.wireStart, nextWireId: factory.nextWireId };
   let report;
   try {
     game.selectedClass = classId;
+    const isolatedActivation = auditIsolatedModuleActivation(classId);
     installAuditSequence(classId, false);
     game.output = evaluateClassFactory();
     const forwardKinds = [...game.output.synergyKinds];
@@ -3434,7 +3492,7 @@ function runAugmentAuditForClass(classId) {
     game.attackRequested = false;
     game.augmentEvents = {};
     game.protocolEvents = {};
-    if (classId === "melee") auditMeleeRuntime();
+    const runtimeEvidence = classId === "melee" ? auditMeleeRuntime() : {};
     if (classId === "sniper") auditSniperRuntime();
     if (classId === "artillery") auditArtilleryRuntime();
     const moduleIds = classModuleTypes(classId);
@@ -3442,17 +3500,23 @@ function runAugmentAuditForClass(classId) {
     report = {
       classId, modules: moduleIds.length, protocols: protocolIds.length, forwardDepth,
       reverseProtocols: reverseKinds.length,
+      missingActivations: moduleIds.filter((id) => !isolatedActivation[id]),
       missingModules: moduleIds.filter((id) => !game.augmentEvents[id]),
+      missingEffects: moduleIds.filter((id) => !(game.augmentEvents[id] && (runtimeEvidence[id] ?? true))),
       missingProtocols: protocolIds.filter((id) => !game.protocolEvents[id]),
       forwardProtocols: forwardKinds.length,
-      events: { ...game.augmentEvents }, protocolEvents: { ...game.protocolEvents }
+      isolatedActivation, events: { ...game.augmentEvents }, protocolEvents: { ...game.protocolEvents }
     };
     report.pass = report.modules === 10 && report.protocols === 10 && report.forwardProtocols === 10 &&
-      report.forwardDepth === 11 && report.reverseProtocols === 0 && !report.missingModules.length && !report.missingProtocols.length;
+      report.forwardDepth === 11 && report.reverseProtocols === 0 && !report.missingActivations.length &&
+      !report.missingModules.length && !report.missingEffects.length && !report.missingProtocols.length;
   } finally {
     boardCols = savedCols;
     board.length = savedBoard.length;
     savedBoard.forEach((module, index) => { board[index] = module; });
+    factory.wires = savedFactory.wires;
+    factory.wireStart = savedFactory.wireStart;
+    factory.nextWireId = savedFactory.nextWireId;
     Object.assign(game, saved);
   }
   return report;

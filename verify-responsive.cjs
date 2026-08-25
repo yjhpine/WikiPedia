@@ -239,25 +239,36 @@ async function auditViewport(session, viewport) {
     await sleep(80);
     await clickElement(session, '#test-module-buttons [data-test-module="m_mark"]');
     await sleep(120);
-    const factoryEntry = await evaluate(session, "({ factoryOpen: !document.querySelector('#factory-overlay').hidden, pending: Boolean(document.querySelector('#pending-part .pending-module')), testPanel: !document.querySelector('#test-panel').hidden, moduleButtons: document.querySelector('#test-module-buttons').children.length })");
+    const factoryEntry = await evaluate(session, `(() => ({
+      factoryOpen: !document.querySelector('#factory-overlay').hidden,
+      pending: Boolean(document.querySelector('#pending-part .pending-module')),
+      testPanel: !document.querySelector('#test-panel').hidden,
+      moduleButtons: document.querySelector('#test-module-buttons').children.length,
+      validTargets: [...document.querySelectorAll('#factory-board .valid-target')].map((cell) => Number(cell.dataset.cellIndex)),
+      busRows: [...document.querySelectorAll('[data-port-owner="bus-source"][data-port-row]')].map((port) => Number(port.dataset.portRow))
+    }))()`);
     assert(factoryEntry.factoryOpen && factoryEntry.pending, "wide: 테스트 증강 공장 진입 실패 " + JSON.stringify(factoryEntry));
-    await clickElement(session, '#factory-board [data-cell-index="7"]');
+    assert(JSON.stringify(factoryEntry.validTargets) === JSON.stringify([7]), "wide: 빈 보드에서 중앙 BUS 결합 셀만 표시되지 않음 " + JSON.stringify(factoryEntry));
+    assert(JSON.stringify(factoryEntry.busRows) === JSON.stringify([2]), "wide: BUS 시작점이 중앙 한 줄이 아님 " + JSON.stringify(factoryEntry));
+    await clickElement(session, '#factory-board .valid-target');
     await sleep(120);
-    await sleep(120);
-    const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, rails: document.querySelectorAll('[data-port-owner=\"bus-source\"][data-port-row]').length, jacks: document.querySelectorAll('.module-token [data-port-kind=\"jack\"]').length, leftJacks: document.querySelectorAll('.module-token [data-port-edge=\"left\"]').length, hasPickup: Boolean(document.querySelector('.module-token [data-store-index]')), message: document.querySelector('#board-message')?.textContent || null })");
-    const connected = circuitState.wires === 1 && circuitState.token?.includes("raw") && circuitState.rails === 5 && circuitState.jacks >= 2 && circuitState.leftJacks >= 1 && circuitState.hasPickup;
-    assert(connected, "wide: 인접 레고 결합 또는 PICK 버튼이 동작하지 않음 " + JSON.stringify(circuitState));
+    const circuitState = await evaluate(session, "({ wires: document.querySelectorAll('.circuit-wire').length, token: document.querySelector('.module-token')?.className || null, rails: document.querySelectorAll('[data-port-owner=\"bus-source\"][data-port-row]').length, busRow: Number(document.querySelector('[data-port-owner=\"bus-source\"]')?.dataset.portRow), jacks: document.querySelectorAll('.module-token [data-port-kind=\"jack\"]').length, leftJacks: document.querySelectorAll('.module-token [data-port-edge=\"left\"]').length, hasPickup: Boolean(document.querySelector('.module-token [data-store-index]')), message: document.querySelector('#board-message')?.textContent || null })");
+    const connected = circuitState.wires === 1 && circuitState.token?.includes("raw") && circuitState.rails === 1 && circuitState.busRow === 2 && circuitState.jacks >= 2 && circuitState.leftJacks === 1 && circuitState.hasPickup;
+    assert(connected, "wide: 중앙 BUS 레고 결합 또는 PICK 버튼이 동작하지 않음 " + JSON.stringify(circuitState));
+
     await dragElementToElement(session, '.module-token .part-code', '#factory-board [data-cell-index="8"]');
-    const movedByDrag = await evaluate(session, "(() => { const token = document.querySelector('.module-token'); return { anchor: Number(token?.closest('[data-cell-index]')?.dataset.cellIndex), wires: document.querySelectorAll('.circuit-wire').length }; })()");
-    assert(movedByDrag.anchor === 8 && movedByDrag.wires === 1, "wide: 설치 블록을 드래그로 옮기지 못함 " + JSON.stringify(movedByDrag));
+    await sleep(90);
+    const rejectedMove = await evaluate(session, "(() => { const token = document.querySelector('.module-token'); return { anchor: Number(token?.closest('[data-cell-index]')?.dataset.cellIndex), wires: document.querySelectorAll('.circuit-wire').length, message: document.querySelector('#board-message')?.textContent || '' }; })()");
+    assert(rejectedMove.anchor === 7 && rejectedMove.wires === 1 && rejectedMove.message.includes("결합"), "wide: 비연결 위치 드래그가 거부되지 않음 " + JSON.stringify(rejectedMove));
     await clickElement(session, '.module-token .part-code');
     await sleep(70);
-    const lifted = await evaluate(session, "({ pending: Boolean(document.querySelector('#pending-part .pending-module')), token: Boolean(document.querySelector('.module-token')), wires: document.querySelectorAll('.circuit-wire').length })");
-    assert(lifted.pending && !lifted.token && lifted.wires === 0, "wide: 블록 클릭으로 바로 들어 올리지 못함 " + JSON.stringify(lifted));
-    await dragElementToElement(session, '#pending-part .pending-module', '#factory-board [data-cell-index="7"]');
+    const lifted = await evaluate(session, "({ pending: Boolean(document.querySelector('#pending-part .pending-module')), token: Boolean(document.querySelector('.module-token')), wires: document.querySelectorAll('.circuit-wire').length, valid: [...document.querySelectorAll('#factory-board .valid-target')].map((cell) => Number(cell.dataset.cellIndex)) })");
+    assert(lifted.pending && !lifted.token && lifted.wires === 0 && JSON.stringify(lifted.valid) === JSON.stringify([7]), "wide: 블록 PICK 후 중앙 결합 셀 복구 실패 " + JSON.stringify(lifted));
+    await dragElementToElement(session, '#pending-part .pending-module', '#factory-board .valid-target');
     await sleep(90);
     const placedAgain = await evaluate(session, "({ token: document.querySelector('.module-token')?.className || '', wires: document.querySelectorAll('.circuit-wire').length, pending: Boolean(document.querySelector('#pending-part .pending-module')), message: document.querySelector('#board-message')?.textContent || '' })");
-    assert(placedAgain.token.includes('raw') && placedAgain.wires === 1, "wide: 들어 올린 블록을 바로 재배치하지 못함 " + JSON.stringify(placedAgain));
+    assert(placedAgain.token.includes('raw') && placedAgain.wires === 1 && !placedAgain.pending, "wide: 들어 올린 블록을 중앙 결합 셀에 재배치하지 못함 " + JSON.stringify(placedAgain));
+
     const cellsBeforeExtend = await evaluate(session, "document.querySelectorAll('#factory-board [data-cell-index]').length");
     await clickElement(session, '#board-expand');
     await sleep(80);
@@ -265,7 +276,7 @@ async function auditViewport(session, viewport) {
     assert(boardExtended, "wide: 보드 수동 확장이 8열(40칸) 적용되지 않음");
     await clickElement(session, '.module-token [data-store-index]');
     await sleep(80);
-    const stored = await evaluate(session, "({ stored: document.querySelectorAll('#reserve-parts [data-reserve-id]').length, token: Boolean(document.querySelector('.module-token')), wires: document.querySelectorAll('.circuit-wire').length })");
+    const stored = await evaluate(session, "({ stored: document.querySelectorAll('#reserve-parts [data-reserve-id]').length, token: Boolean(document.querySelector('.module-token')), wires: document.querySelectorAll('.circuit-wire').length, valid: document.querySelectorAll('#factory-board .valid-target').length })");
     assert(stored.stored === 1 && !stored.token && stored.wires === 0, "wide: 설치 블록을 STORAGE로 회수하지 못함 " + JSON.stringify(stored));
     await dragElementToElement(session, '#reserve-parts [data-reserve-id]', '#factory-board [data-cell-index="7"]');
     await sleep(100);
@@ -275,20 +286,56 @@ async function auditViewport(session, viewport) {
     await sleep(80);
     const applied = await evaluate(session, "({ factoryOpen: !document.querySelector('#factory-overlay').hidden, traits: document.querySelector('#game-canvas').dataset.activeTraits || '', pending: Boolean(document.querySelector('#pending-part .pending-module')) })");
     assert(!applied.factoryOpen && applied.traits.includes("m_mark"), "wide: 연결된 회로를 전투에 적용하지 못함 " + JSON.stringify(applied));
+
+    await clickElement(session, '#factory-toggle');
+    await sleep(100);
+    await evaluate(session, "document.querySelector('.module-m_mark [data-store-index]').click()");
+    await sleep(100);
+    const clearedMark = await evaluate(session, "({ pending: Boolean(document.querySelector('#pending-part .pending-module')), token: Boolean(document.querySelector('.module-m_mark')), reserve: document.querySelectorAll('#reserve-parts [data-reserve-id]').length })");
+    assert(!clearedMark.pending && !clearedMark.token && clearedMark.reserve >= 1, "wide: 희귀 증강 전 기존 회로 회수 실패 " + JSON.stringify(clearedMark));
+    await clickElement(session, '#factory-commit');
+    await sleep(80);
     await clickElement(session, '#test-module-buttons [data-test-module="m_guard"]');
     await sleep(100);
-    await clickElement(session, '#factory-board [data-cell-index="15"]');
+    const rareTargetState = await evaluate(session, `(() => ({
+      targets: [...document.querySelectorAll('#factory-board .valid-target')].map((cell) => Number(cell.dataset.cellIndex)),
+      pending: document.querySelector('#pending-part .pending-module')?.dataset.pendingModule || null,
+      boardTokens: [...document.querySelectorAll('#factory-board [data-part-id]')].map((token) => token.className),
+      reserve: document.querySelectorAll('#reserve-parts [data-reserve-id]').length,
+      message: document.querySelector('#board-message')?.textContent || '',
+      mode: document.querySelector('#factory-overlay').hidden ? 'closed' : 'factory'
+    }))()`);
+    const rareTargets = rareTargetState.targets;
+    assert(rareTargets.length === 1, "wide: 희귀 증강 중앙 BUS 결합 위치 계산 실패 " + JSON.stringify(rareTargetState));
+    await clickElement(session, '#factory-board .valid-target');
     await sleep(760);
-    const rareState = await evaluate(session, `(() => { const token = document.querySelector('.factory-board .module-m_guard'); const cell = document.querySelector('[data-cell-index="15"]'); const a = token?.getBoundingClientRect(); const b = cell?.getBoundingClientRect(); return { pass: Boolean(a && b && a.width > b.width * 1.6 && a.height > b.height * 1.6), token: a && { width: a.width, height: a.height }, cell: b && { width: b.width, height: b.height }, message: document.querySelector('#board-message')?.textContent, css: token && { width: getComputedStyle(token).width, inline: token.style.getPropertyValue('--footprint-width'), cell: getComputedStyle(document.documentElement).getPropertyValue('--cell') } }; })()`);
-    assert(rareState.pass, "wide: 희귀 2×2 증강의 실제 보드 점유 크기 오류 " + JSON.stringify(rareState));
+    const rareState = await evaluate(session, `(() => {
+      const token = document.querySelector('.factory-board .module-m_guard');
+      const cell = token?.closest('[data-cell-index]');
+      const a = token?.getBoundingClientRect();
+      const b = cell?.getBoundingClientRect();
+      return { pass: Boolean(a && b && a.width > b.width * 1.6 && a.height > b.height * 1.6), anchor: Number(cell?.dataset.cellIndex), token: a && { width: a.width, height: a.height }, cell: b && { width: b.width, height: b.height }, wires: document.querySelectorAll('.circuit-wire').length, message: document.querySelector('#board-message')?.textContent };
+    })()`);
+    assert(rareState.pass && rareState.wires === 1, "wide: 희귀 2×2 증강의 중앙 결합·실제 점유 크기 오류 " + JSON.stringify(rareState));
+    await evaluate(session, "document.querySelector('.module-m_guard [data-store-index]').click()");
+    await sleep(80);
     await clickElement(session, "#factory-commit");
     await sleep(80);
+
     await clickElement(session, '#test-module-buttons [data-test-module="m_step"]');
     await sleep(100);
-    await clickElement(session, '#factory-board [data-cell-index="25"]');
+    const legendaryTargets = await evaluate(session, "[...document.querySelectorAll('#factory-board .valid-target')].map((cell) => Number(cell.dataset.cellIndex))");
+    assert(legendaryTargets.length === 1, "wide: 전설 증강 중앙 BUS 결합 위치 계산 실패 " + JSON.stringify(legendaryTargets));
+    await clickElement(session, '#factory-board .valid-target');
     await sleep(760);
-    const legendaryFootprint = await evaluate(session, `(() => { const token = document.querySelector('.factory-board .module-m_step'); const cell = document.querySelector('[data-cell-index="25"]'); const a = token?.getBoundingClientRect(); const b = cell?.getBoundingClientRect(); return Boolean(a && b && a.width > b.width * 3.35 && a.height > b.height * 3.35); })()`);
-    assert(legendaryFootprint, "wide: 전설 4×4 증강의 실제 보드 점유 크기 오류");
+    const legendaryState = await evaluate(session, `(() => {
+      const token = document.querySelector('.factory-board .module-m_step');
+      const cell = token?.closest('[data-cell-index]');
+      const a = token?.getBoundingClientRect();
+      const b = cell?.getBoundingClientRect();
+      return { footprint: Boolean(a && b && a.width > b.width * 3.35 && a.height > b.height * 3.35), anchor: Number(cell?.dataset.cellIndex), wires: document.querySelectorAll('.circuit-wire').length };
+    })()`);
+    assert(legendaryState.footprint && legendaryState.wires === 1, "wide: 전설 4×4 증강의 중앙 결합·실제 점유 크기 오류 " + JSON.stringify(legendaryState));
     const legendaryPorts = await evaluate(session, `(() => {
       const token = document.querySelector('.factory-board .module-m_step');
       const ports = [...(token?.querySelectorAll('[data-port-kind="jack"]') || [])];
@@ -297,8 +344,17 @@ async function auditViewport(session, viewport) {
     })()`);
     assert(legendaryPorts.total >= 2 && legendaryPorts.total <= 3 && legendaryPorts.counts.left === 1 && Object.values(legendaryPorts.counts).every((count) => count <= 1), "wide: 전설 증강 단자가 면당 1개·총 2–3개 희소 규칙을 벗어남 " + JSON.stringify(legendaryPorts));
     await clickElement(session, "#factory-commit");
-  }
+    await sleep(80);
 
+    await clickElement(session, '#test-audit');
+    await sleep(100);
+    const augmentAudit = await evaluate(session, `(() => {
+      const canvas = document.querySelector('#game-canvas');
+      const report = JSON.parse(canvas.dataset.auditReport || '{}');
+      return { status: canvas.dataset.auditStatus, reports: report.reports?.map((item) => ({ missingActivations: item.missingActivations, missingEffects: item.missingEffects })) || [] };
+    })()`);
+    assert(augmentAudit.status === "pass" && augmentAudit.reports.length === 3 && augmentAudit.reports.every((report) => !report.missingActivations.length && !report.missingEffects.length), "wide: 30개 증강 실제 활성·효과 감사 실패 " + JSON.stringify(augmentAudit));
+  }
   return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}${viewport.name === "wide" && rightClickReset ? " · right-click reset" : ""}`;
 }
 
