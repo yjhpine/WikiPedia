@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-20" />
+    <link rel="stylesheet" href="styles.css?v=prototype-21" />
   </head>
   <body>
     <main class="game" id="game">
@@ -32,6 +32,7 @@
       </section>
 
       <button class="factory-toggle" id="factory-toggle" type="button" aria-label="공장 보드 열기, Tab">
+        <span class="factory-toggle-ram"><small>FRAME RAM</small><strong id="hud-ram-text">0 / 10</strong><i><u id="hud-ram-fill"></u></i></span>
         <b>공장</b><kbd>TAB</kbd>
       </button>
 
@@ -86,6 +87,7 @@
             <span>LEVEL UP / PART DELIVERY</span>
             <h2>신규 증강 1개를 선택하세요</h2>
             <p>RAM 비용과 빌드 태그를 비교하세요. 다음 화면에서 장착하거나 0 RAM 보관함에 저장할 수 있습니다.</p>
+            <div class="choice-ram-banner" aria-live="polite"><span id="choice-ram-level">LEVEL 2 FRAME EXPANSION</span><b id="choice-ram-capacity">10 → 12 RAM</b><em id="choice-ram-gain">+2 CAPACITY</em></div>
           </header>
           <div class="choice-cards" id="choice-cards"></div>
           <footer class="choice-confirm-bar">
@@ -99,7 +101,13 @@
         <div class="factory-shell">
           <header class="factory-header">
             <h2>증강 생산 라인</h2>
+            <div class="factory-header-meta"><span id="factory-level-meta">LV.1 · NEXT +2</span><strong id="factory-ram-meta">0 / 10 RAM</strong><i><u id="factory-ram-fill"></u></i></div>
           </header>
+          <nav class="factory-tabs" aria-label="공장 화면 전환">
+            <button type="button" data-factory-view="parts" aria-pressed="false"><span>부품</span><small>PARTS</small></button>
+            <button type="button" data-factory-view="board" aria-pressed="true"><span>회로</span><small>BOARD</small></button>
+            <button type="button" data-factory-view="output" aria-pressed="false"><span>출력</span><small id="factory-tab-ram">0 / 10 RAM</small></button>
+          </nav>
 
           <div class="factory-layout">
             <aside class="part-shelf">
@@ -181,6 +189,6 @@
       </div>
     </main>
 
-    <script type="module" src="game.js?v=prototype-20"></script>
+    <script type="module" src="game.js?v=prototype-21"></script>
   </body>
 </html>

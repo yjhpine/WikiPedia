@@ -10,6 +10,7 @@ const CHROME_CANDIDATES = [
 ].filter(Boolean);
 const chromePath = CHROME_CANDIDATES.find((candidate) => fs.existsSync(candidate));
 const baseUrl = process.argv[2] || "http://127.0.0.1:4173/";
+const captureDir = process.env.UI_CAPTURE_DIR || "";
 const viewports = [
   { name: "wide", width: 1920, height: 1080, layout: "wide", scale: 1.2 },
   { name: "compact", width: 1024, height: 1024, layout: "compact", scale: 1024 / 1100 },
@@ -72,6 +73,18 @@ async function evaluate(session, expression) {
     throw new Error(description.split("\n")[0]);
   }
   return result.result.value;
+}
+
+async function captureUi(session, viewport, stage) {
+  if (!captureDir) return;
+  fs.mkdirSync(captureDir, { recursive: true });
+  const testPanelWasHidden = await evaluate(session, `(() => { const panel = document.querySelector('#test-panel'); const hidden = panel?.hidden ?? true; if (panel) panel.hidden = true; return hidden; })()`);
+  try {
+    const result = await session.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    fs.writeFileSync(path.join(captureDir, `${viewport.name}-${stage}.png`), Buffer.from(result.data, "base64"));
+  } finally {
+    await evaluate(session, `(() => { const panel = document.querySelector('#test-panel'); if (panel) panel.hidden = ${JSON.stringify(testPanelWasHidden)}; })()`);
+  }
 }
 
 function assert(condition, message) {
@@ -171,6 +184,7 @@ async function auditViewport(session, viewport) {
   assert(start.strayUi.length === 0, `${viewport.name}: UI 스테이지 밖 요소 ${start.strayUi.join(', ')}`);
   assert(start.overlayOverflowX <= 1, `${viewport.name}: 시작 오버레이 가로 오버플로 ${start.overlayOverflowX}px`);
   assert(start.documentOverflowX <= 1, `${viewport.name}: 문서 가로 오버플로 ${start.documentOverflowX}px`);
+  await captureUi(session, viewport, "start");
 
   await clickElement(session, '[data-class="melee"]');
   await sleep(50);
@@ -210,14 +224,18 @@ async function auditViewport(session, viewport) {
       hud: rect('.hud-left'),
       objective: rect('#combat-objective'),
       abilities: rect('.ability-rack'),
-      factoryToggle: rect('#factory-toggle')
+      factoryToggle: rect('#factory-toggle'),
+      ramText: document.querySelector('#hud-ram-text')?.textContent || '',
+      ramCapacity: Number(document.querySelector('#game-canvas').dataset.ramCapacity || 0)
     };
   })()`);
   assert(pointerTarget.id === "game-canvas", `${viewport.name}: 전투 클릭이 ${pointerTarget.id || pointerTarget.className || pointerTarget.tag}에 차단됨`);
   assert(swingAfterClick >= 1, `${viewport.name}: 실제 마우스 클릭 공격 미발동`);
-  for (const [name, rect] of Object.entries(combat)) {
+  assert(combat.ramText === "0 / 10" && combat.ramCapacity === 10, `${viewport.name}: 전투 HUD 초기 RAM 표시 오류 ${JSON.stringify(combat)}`);
+  for (const [name, rect] of Object.entries(combat).filter(([, value]) => value && typeof value === "object" && "left" in value)) {
     assert(rectFits(rect, viewport.width, viewport.height), `${viewport.name}: ${name} HUD 잘림 ${JSON.stringify(rect)}`);
   }
+  await captureUi(session, viewport, "combat");
 
   await clickElement(session, "#factory-toggle");
   await sleep(360);
@@ -227,12 +245,29 @@ async function auditViewport(session, viewport) {
     return {
       open: !overlay.hidden,
       shell: { left: shell.left, top: shell.top, right: shell.right, bottom: shell.bottom, width: shell.width, height: shell.height },
-      boardScrollable: document.querySelector('.factory-layout').scrollWidth >= document.querySelector('.factory-layout').clientWidth
+      boardScrollable: document.querySelector('.factory-layout').scrollWidth >= document.querySelector('.factory-layout').clientWidth,
+      view: document.querySelector('.factory-shell').dataset.factoryView,
+      tabsVisible: getComputedStyle(document.querySelector('.factory-tabs')).display !== 'none',
+      headerRam: document.querySelector('#factory-ram-meta')?.textContent || ''
     };
   })()`);
   assert(factory.open, `${viewport.name}: 공장 오버레이 열기 실패`);
   assert(rectFits(factory.shell, viewport.width, viewport.height), `${viewport.name}: 공장 셸 잘림 ${JSON.stringify(factory.shell)}`);
   assert(factory.boardScrollable, `${viewport.name}: 공장 레이아웃 스크롤 보호 누락`);
+  assert(factory.headerRam === "0 / 10 RAM", `${viewport.name}: 공장 헤더 RAM 표시 오류 ${JSON.stringify(factory)}`);
+  if (viewport.name === "portrait") {
+    assert(factory.tabsVisible && factory.view === "board", "portrait: 공장 탭 또는 기본 회로 화면 누락 " + JSON.stringify(factory));
+    await evaluate(session, "document.querySelector('[data-factory-view=\"parts\"]').click()");
+    const partsView = await evaluate(session, "({ view: document.querySelector('.factory-shell').dataset.factoryView, shown: getComputedStyle(document.querySelector('.part-shelf')).display !== 'none', boardHidden: getComputedStyle(document.querySelector('.board-panel')).display === 'none' })");
+    assert(partsView.view === "parts" && partsView.shown && partsView.boardHidden, "portrait: 부품 탭 전환 실패 " + JSON.stringify(partsView));
+    await evaluate(session, "document.querySelector('[data-factory-view=\"output\"]').click()");
+    const outputView = await evaluate(session, "({ view: document.querySelector('.factory-shell').dataset.factoryView, shown: getComputedStyle(document.querySelector('.output-panel')).display !== 'none', commitVisible: Boolean(document.querySelector('#factory-commit').offsetParent) })");
+    assert(outputView.view === "output" && outputView.shown && outputView.commitVisible, "portrait: 출력 탭·적용 버튼 전환 실패 " + JSON.stringify(outputView));
+    await evaluate(session, "document.querySelector('[data-factory-view=\"board\"]').click()");
+  } else {
+    assert(!factory.tabsVisible, `${viewport.name}: 데스크톱에서 모바일 공장 탭이 노출됨`);
+  }
+  await captureUi(session, viewport, "factory");
 
   if (viewport.name === "wide") {
     await clickElement(session, "#factory-commit");
@@ -354,6 +389,21 @@ async function auditViewport(session, viewport) {
       return { status: canvas.dataset.auditStatus, reports: report.reports?.map((item) => ({ missingActivations: item.missingActivations, missingEffects: item.missingEffects })) || [] };
     })()`);
     assert(augmentAudit.status === "pass" && augmentAudit.reports.length === 3 && augmentAudit.reports.every((report) => !report.missingActivations.length && !report.missingEffects.length), "wide: 30개 증강 실제 활성·효과 감사 실패 " + JSON.stringify(augmentAudit));
+
+    await clickElement(session, '#test-level');
+    const levelRamUi = await waitUntil(async () => {
+      const state = await evaluate(session, `(() => ({
+        choiceOpen: !document.querySelector('#choice-overlay').hidden,
+        level: Number(document.querySelector('#level-text').textContent),
+        capacity: Number(document.querySelector('#game-canvas').dataset.ramCapacity),
+        hudRam: document.querySelector('#hud-ram-text').textContent,
+        expansion: document.querySelector('#choice-ram-capacity').textContent,
+        gain: document.querySelector('#choice-ram-gain').textContent
+      }))()`);
+      return state.choiceOpen ? state : null;
+    });
+    assert(levelRamUi.level === 2 && levelRamUi.capacity === 12 && levelRamUi.hudRam.endsWith('/ 12') && levelRamUi.expansion === '10 → 12 RAM' && levelRamUi.gain === '+2 CAPACITY', "wide: 레벨업 RAM 성장 UI 실패 " + JSON.stringify(levelRamUi));
+    await captureUi(session, viewport, "levelup");
   }
   return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}${viewport.name === "wide" && rightClickReset ? " · right-click reset" : ""}`;
 }

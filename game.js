@@ -190,6 +190,8 @@ const MODULE_RAM = {
   a_recursive: 4, a_dashbomb: 2, a_super: 4, a_cluster: 3, a_orbit: 3
 };
 const PROTOCOL_RAM = 1;
+const RAM_BASE_CAPACITY = 10;
+const RAM_PER_LEVEL = 2;
 
 const RARITIES = {
   common: { id: "common", label: "일반", code: "COMMON", width: 1, height: 1, color: "#a7b8ba" },
@@ -508,9 +510,12 @@ function disconnectWire(wireId) {
   return factory.wires.length !== before;
 }
 
+function ramCapacityAtLevel(level) {
+  return RAM_BASE_CAPACITY + Math.max(0, Math.floor(level || 1) - 1) * RAM_PER_LEVEL;
+}
+
 function ramCapacity() {
-  const level = game.player?.level || 1;
-  return Math.min(24, 8 + level * 2);
+  return ramCapacityAtLevel(game.player?.level || 1);
 }
 
 function ramUsage(output) {
@@ -598,7 +603,7 @@ function renderTestModuleButtons() {
 
 const factory = {
   pending: null, selectedIndex: null, dragged: null, pointerCandidate: null, ignoreBoardClickUntil: 0, manual: false,
-  choiceSelection: null, lastPlacedId: null, placementNotice: null, reserve: [],
+  choiceSelection: null, lastPlacedId: null, placementNotice: null, view: "board", reserve: [],
   wires: [], wireStart: null, toolInventory: Object.fromEntries(TOOL_TYPES.map((type) => [type, 0])),
   nextId: 1, nextWireId: 1
 };
@@ -1116,6 +1121,12 @@ function renderFactoryBoard() {
   const usedRam = ramUsage(output);
   const capacity = ramCapacity();
   const freeRam = capacity - usedRam;
+  const level = game.player?.level || 1;
+  const nextCapacity = ramCapacityAtLevel(level + 1);
+  $("#factory-level-meta").textContent = "LV." + level + " · NEXT +" + RAM_PER_LEVEL;
+  $("#factory-ram-meta").textContent = usedRam + " / " + capacity + " RAM";
+  $("#factory-ram-fill").style.width = Math.min(100, usedRam / capacity * 100) + "%";
+  $("#factory-tab-ram").textContent = usedRam + " / " + capacity + " RAM";
   const moduleCost = modulesOnBoard().reduce((sum, module) => sum + partRamCost(module), 0);
   const toolCost = toolsOnBoard().reduce((sum, tool) => sum + partRamCost(tool), 0);
   const tuning = output.tuning;
@@ -1124,7 +1135,7 @@ function renderFactoryBoard() {
     ? '<article class="lane-summary build-summary" style="--lane-color:' + build.color + '"><header><b>' + build.name + '</b><span>TIER ' + ["0", "I", "II", "III"][build.tier] + ' · ' + build.depth + ' MODULE</span></header><p>' + build.identity + '</p><strong>' + build.tiers[build.tier - 1] + '</strong></article>'
     : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>BUS IN에서 도달한 증강 라인 전체가 즉시 적용됩니다. 도구를 사이에 두면 성능과 반동이 달라집니다.</p></article>';
   $("#factory-summary").innerHTML =
-    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p></article>' +
+    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p><small>LV.' + level + ' 용량 ' + capacity + ' · 다음 레벨 ' + nextCapacity + ' RAM</small></article>' +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>LEGO 회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' LINK</span></header><p>신호는 중앙 BUS IN 한 줄에서만 시작하며, 가동 블록의 맞닿은 단자로 이어집니다.</p></article>' +
     tuningSummary + buildSummary +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' + (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
@@ -1270,6 +1281,7 @@ function selectToolBlueprint(type) {
     factory.placementNotice = TOOLS[type].name + " 드랍 도구를 배치할 위치를 선택하세요.";
   }
   renderFactoryBoard();
+  if (factory.pending) setFactoryView("board");
 }
 
 function rotateBoardTool(index) {
@@ -1291,6 +1303,7 @@ function activateReserve(moduleId) {
   factory.selectedIndex = null;
   factory.placementNotice = null;
   renderFactoryBoard();
+  setFactoryView("board");
 }
 
 function draggedPart() {
@@ -1392,6 +1405,18 @@ function finishPointerDrag(event) {
   else finishFactoryDrag();
 }
 
+function setFactoryView(view) {
+  const nextView = ["parts", "board", "output"].includes(view) ? view : "board";
+  factory.view = nextView;
+  const shell = $(".factory-shell");
+  if (shell) shell.dataset.factoryView = nextView;
+  document.querySelectorAll("[data-factory-view]").forEach((button) => {
+    const active = button.dataset.factoryView === nextView;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
 function openFactory(manual) {
   if (manual && !["playing", "paused", "factory"].includes(game.mode)) return;
   if (game.mode !== "factory") factory.returnMode = game.mode === "paused" ? "paused" : "playing";
@@ -1405,7 +1430,9 @@ function openFactory(manual) {
   $("#factory-overlay").hidden = false;
   const title = $(".factory-header h2");
   if (title) title.textContent = CLASS_PROFILES[game.selectedClass].name + " 회로 보드";
+  factory.view = "board";
   renderFactoryBoard();
+  setFactoryView("board");
 }
 
 function syncPlayerDerivedStats(previousMax) {
@@ -1460,7 +1487,12 @@ function showLevelChoices() {
   const choices = generateChoices();
   const classProfile = CLASS_PROFILES[game.selectedClass];
   factory.choiceSelection = null;
-  $(".choice-shell > header span").textContent = classProfile.code + " / FRAME RAM " + ramUsage(evaluateClassFactory()) + " / " + ramCapacity();
+  const currentCapacity = ramCapacity();
+  const previousCapacity = ramCapacityAtLevel(Math.max(1, game.player.level - 1));
+  $(".choice-shell > header > span").textContent = classProfile.code + " / FRAME RAM " + ramUsage(evaluateClassFactory()) + " / " + currentCapacity;
+  $("#choice-ram-level").textContent = "LEVEL " + game.player.level + " FRAME EXPANSION";
+  $("#choice-ram-capacity").textContent = previousCapacity + " → " + currentCapacity + " RAM";
+  $("#choice-ram-gain").textContent = "+" + (currentCapacity - previousCapacity) + " CAPACITY";
   $(".choice-shell h2").textContent = classProfile.name + " 전용 증강 선택";
   $(".choice-shell header p").textContent = "카드의 RAM 비용과 플레이스타일 태그를 비교하세요. 장착하지 않은 부품은 0 RAM 보관함에 둘 수 있습니다.";
   $("#choice-cards").innerHTML = choices.map((type, index) => {
@@ -1499,6 +1531,7 @@ function confirmAugmentChoice() {
   const type = factory.choiceSelection;
   if (game.mode !== "choice" || !MODULES[type]) return;
   factory.pending = createPart("module", type);
+  factory.view = "board";
   factory.choiceSelection = null;
   $("#choice-overlay").hidden = true;
   openFactory(false);
@@ -4137,6 +4170,11 @@ function updateHud() {
   $("#xp-fill").style.width = xpRatio * 100 + "%";
   $("#xp-text").textContent = game.xp + " / " + game.xpNext;
   $("#level-text").textContent = game.player.level;
+  const usedRam = ramUsage(game.output);
+  const capacity = ramCapacity();
+  $("#hud-ram-text").textContent = usedRam + " / " + capacity;
+  $("#hud-ram-fill").style.width = Math.min(100, usedRam / capacity * 100) + "%";
+  $("#factory-toggle").classList.toggle("ram-tight", capacity - usedRam <= 2);
   $("#time-text").textContent = formatRoom();
   $("#objective-text").textContent = game.roomCleared ? "북쪽 출구로 이동" : "적 전멸";
   $("#objective-count").textContent = game.roomCleared ? "GATE OPEN" : game.enemies.length + " TARGET" + (game.enemies.length === 1 ? "" : "S");
@@ -4174,8 +4212,8 @@ function updateHud() {
   canvas.dataset.factoryDamage = tuning.damageMult.toFixed(2);
   canvas.dataset.factoryEcho = String(tuning.echo);
   canvas.dataset.activeTools = String(game.output.activeToolCount);
-  canvas.dataset.ramUsage = String(ramUsage(game.output));
-  canvas.dataset.ramCapacity = String(ramCapacity());
+  canvas.dataset.ramUsage = String(usedRam);
+  canvas.dataset.ramCapacity = String(capacity);
   canvas.dataset.playerShots = String(game.playerShots.length);
   canvas.dataset.zones = String(game.zones.length);
   canvas.dataset.delayedAttacks = String(game.delayedAttacks.length);
@@ -4213,6 +4251,10 @@ $(".class-cards").addEventListener("click", (event) => {
 $("#restart-button").addEventListener("click", startGame);
 $("#change-class-button").addEventListener("click", returnToClassSelection);
 $("#factory-toggle").addEventListener("click", () => openFactory(true));
+$(".factory-tabs").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-factory-view]");
+  if (button) setFactoryView(button.dataset.factoryView);
+});
 $("#factory-commit").addEventListener("click", commitFactory);
 $("#resume-button").addEventListener("click", togglePause);
 $("#pause-factory-button").addEventListener("click", () => openFactory(true));
