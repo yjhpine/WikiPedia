@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-21" />
+    <link rel="stylesheet" href="styles.css?v=prototype-22" />
   </head>
   <body>
     <main class="game" id="game">
@@ -54,7 +54,7 @@
           <div class="start-layout">
             <section class="start-intro">
               <h1>증강<br /><em>라인</em></h1>
-              <p>전투 방식을 고르고 중앙 BUS에서 증강 공장을 배선하세요. 같은 핵심 증강도 어떤 공정 도구를 거치느냐에 따라 전혀 다른 공격으로 생산됩니다.</p>
+              <p>전투 방식을 고르고 증강을 반복 강화하세요. 두 증강을 RANK 2까지 성장시키면 완성형 진화가 열리고, 연속된 공정 도구는 A × B 조합 코어가 됩니다.</p>
             </section>
 
             <section class="class-picker" aria-label="전투 클래스 선택">
@@ -84,9 +84,9 @@
       <section class="overlay choice-overlay" id="choice-overlay" hidden>
         <div class="choice-shell">
           <header>
-            <span>LEVEL UP / PART DELIVERY</span>
-            <h2>신규 증강 1개를 선택하세요</h2>
-            <p>RAM 비용과 빌드 태그를 비교하세요. 다음 화면에서 장착하거나 0 RAM 보관함에 저장할 수 있습니다.</p>
+            <span>LEVEL UP / BUILD DRAFT</span>
+            <h2>증강 획득 / 강화를 선택하세요</h2>
+            <p>신규 행동, RANK 강화, 진화 파트너를 비교하세요. 완성형 진화는 두 파트너가 모두 RANK 2 이상일 때 가동됩니다.</p>
             <div class="choice-ram-banner" aria-live="polite"><span id="choice-ram-level">LEVEL 2 FRAME EXPANSION</span><b id="choice-ram-capacity">10 → 12 RAM</b><em id="choice-ram-gain">+2 CAPACITY</em></div>
           </header>
           <div class="choice-cards" id="choice-cards"></div>
@@ -124,17 +124,17 @@
               </section>
               <div class="factory-help">
                 <b>배치 규칙</b>
-                <p>도구는 상·우·하 잭을 모두 쓰고, 증강은 좌측 BUS 입력과 무작위 전방 잭 1~2개(총 2~3곳)로 자동 결합됩니다. 부품을 끌어 빈 셀에 놓으면 바로 배치됩니다.</p>
+                <p>증강은 반복 획득하면 RANK가 오릅니다. 서로 다른 도구를 연속 배선하면 도구 A × 도구 B 공정 코어가 되고, RANK 2 파트너 증강 둘을 함께 가동하면 완성형 진화가 열립니다.</p>
                 <ul>
                   <li>일반은 1×1, 희귀는 2×2, 전설은 4×4 공간을 차지합니다.</li>
-                  <li>도구는 상·우·하 세 방향 모두 출력하고, 증강은 매번 다른 2곳 이상 잭 조합으로 배치 퍼즐을 만듭니다.</li>
+                  <li>도구는 상·우·하 세 방향 모두 출력하며, 서로 다른 도구가 연속될 때 순서와 무관한 X 조합이 활성화됩니다.</li>
                   <li>보드·NEW PART·STORAGE·드랍 도구를 빈 셀로 끌어 놓으세요. 클릭으로 들어 올린 뒤 놓는 방식도 유지됩니다.</li>
                 </ul>
               </div>
             </aside>
 
             <section class="board-panel" aria-label="가로로 무한 확장되는 5행 증강 배치 보드">
-              <div class="board-column-labels"><span>SOURCE RAIL</span><span>DRAG TO BUILD · TOOL U/R/D · AUGMENT RANDOM 2+</span><button id="board-expand" type="button">+ EXTEND 8</button></div>
+              <div class="board-column-labels"><span>SOURCE RAIL</span><span>TOOL × TOOL · RANK 2 PAIR = EVOLUTION</span><button id="board-expand" type="button">+ EXTEND 8</button></div>
               <div class="factory-board" id="factory-board"></div>
               <p class="board-message" id="board-message" aria-live="polite">신규 부품을 빈 셀에 배치하세요.</p>
             </section>
@@ -142,11 +142,15 @@
             <aside class="output-panel">
               <div class="factory-summary" id="factory-summary"></div>
               <div class="factory-recipes">
-                <b>핵심 증강 가공표</b>
+                <b>가동 증강 랭크</b>
                 <div id="factory-recipe-list">없음</div>
               </div>
+              <div class="factory-tool-combos">
+                <b>도구 X 조합</b>
+                <div id="factory-tool-combo-list">없음</div>
+              </div>
               <div class="factory-synergies">
-                <b>활성 신호 프로토콜</b>
+                <b>완성형 진화</b>
                 <div id="factory-synergy-list">없음</div>
               </div>
               <footer class="factory-action-bar">
@@ -189,6 +193,6 @@
       </div>
     </main>
 
-    <script type="module" src="game.js?v=prototype-21"></script>
+    <script type="module" src="game.js?v=prototype-22"></script>
   </body>
 </html>

@@ -78,40 +78,25 @@ const MODULES = {
 
 const SYNERGY_DEFINITIONS = {
   melee: [
-    { types: ["m_step", "m_mark"], kind: "first_mark", name: "선제 각인", description: "점멸로 접근한 첫 베기가 대상에게 반대 방향 표식을 미리 새겨 즉시 교차 절단합니다." },
-    { types: ["m_mark", "m_blood"], kind: "blood_loop", name: "혈인 순환", description: "표식 소비가 회복과 함께 같은 궤도의 지연 잔상을 한 번 더 남깁니다." },
-    { types: ["m_blood", "m_execute"], kind: "harvester", name: "회수 집행", description: "처형 시 내구도를 회수하고 대시를 즉시 다시 사용할 수 있습니다." },
-    { types: ["m_execute", "m_spin"], kind: "execution_wheel", name: "처형 회전", description: "마무리 회전 중 처형한 위치에서 작은 회전 참격이 다시 발생합니다." },
-    { types: ["m_spin", "m_hook"], kind: "vortex", name: "자력 회오리", description: "회전 참격이 주변 적을 끌어모은 뒤 두 번째 회전을 일으킵니다." },
-    { types: ["m_hook", "m_shock"], kind: "compression_break", name: "압축 파쇄", description: "세 번째 충격파가 적을 중심선으로 압축한 뒤 더 넓게 파열합니다." },
-    { types: ["m_shock", "m_echo"], kind: "aftershock", name: "잔상 파쇄", description: "대시 잔상도 충격파를 방출해 이동 경로 전체를 공격합니다." },
-    { types: ["m_echo", "m_guard"], kind: "phantom_guard", name: "잔상 방벽", description: "대시 잔상이 발동할 때 출발 지점 주변의 적 탄환을 소거합니다." },
-    { types: ["m_guard", "m_riposte"], kind: "perfect_counter", name: "완전 반격", description: "탄환 반사 성공 시 복수 회로가 즉시 충전되고 반사탄이 사수를 추적합니다." },
-    { types: ["m_riposte", "m_step"], kind: "vengeance_step", name: "복수 추격", description: "반격이 준비되면 점멸 보폭이 마지막 공격자를 우선 추적합니다." }
+    { types: ["m_step", "m_mark"], kind: "first_mark", name: "붉은 추격선", tag: "CHASE", description: "점멸 접근과 교차 표식을 융합합니다. 첫 베기가 양방향 표식을 완성하고 즉시 교차 절단합니다." },
+    { types: ["m_spin", "m_hook"], kind: "vortex", name: "자력 절단 폭풍", tag: "VORTEX", description: "회전 칼날이 적을 중심으로 압축하고 한 번 더 폭발적인 회전을 일으킵니다." },
+    { types: ["m_guard", "m_riposte"], kind: "perfect_counter", name: "완전 반격장", tag: "GUARD", description: "반사 성공이 복수 회로를 즉시 충전하고 추적 반격 파편을 준비합니다." },
+    { types: ["m_execute", "m_blood"], kind: "harvester", name: "혈액 영구기관", tag: "SUSTAIN", description: "처형이 회복·보호막·대시 초기화를 동시에 연결해 전진을 멈추지 않게 합니다." },
+    { types: ["m_shock", "m_echo"], kind: "aftershock", name: "잔향 파쇄검", tag: "ECHO", description: "대시 잔상과 충격파를 융합해 이동 궤도 전체를 두 번 파쇄합니다." }
   ],
   sniper: [
-    { types: ["s_ghost", "s_mark"], kind: "dead_center", name: "데드 센터", description: "충전 광선이 적중할 때 전장의 모든 파열 표식을 동시에 폭발시킵니다." },
-    { types: ["s_mark", "s_pierce"], kind: "rupture_line", name: "파열 관통선", description: "표식을 파열한 레일탄이 추가 관통력을 얻어 뒤의 적까지 계속 나아갑니다." },
-    { types: ["s_pierce", "s_ricochet"], kind: "prism_rail", name: "프리즘 레일", description: "관통을 모두 마친 탄환이 마지막 표적에서 다시 도탄합니다." },
-    { types: ["s_ricochet", "s_homing"], kind: "smart_rebound", name: "지능 도탄", description: "첫 도탄이 다음 표적을 추적하고 한 번 더 꺾일 기회를 얻습니다." },
-    { types: ["s_homing", "s_twin"], kind: "hound_pair", name: "하운드 페어", description: "쌍열 탄환이 서로 다른 표적을 나누어 지정 추적합니다." },
-    { types: ["s_twin", "s_mine"], kind: "crossfire_mine", name: "교차 탄피진", description: "쌍열 사격이 남긴 지뢰가 기폭될 때 사방으로 레일 파편을 발사합니다." },
-    { types: ["s_mine", "s_dashload"], kind: "escape_route", name: "탈출 사선", description: "대시 장전 시 출발점에 탄피 지뢰를 추가로 남깁니다." },
-    { types: ["s_dashload", "s_freeze"], kind: "cold_escape", name: "빙결 탈출선", description: "대시 장전이 출발 지점에 냉각 지대를 만들고 보조탄도 냉기를 운반합니다." },
-    { types: ["s_freeze", "s_drone"], kind: "cold_observer", name: "빙결 관측망", description: "관측 드론이 냉각 지대의 적을 우선 사격하고 적중 지대를 연장합니다." },
-    { types: ["s_drone", "s_ghost"], kind: "spectral_observer", name: "유령 관측기", description: "관측 드론의 보조 사격이 충전 광선으로 변해 적을 관통합니다." }
+    { types: ["s_pierce", "s_ricochet"], kind: "prism_rail", name: "프리즘 관통선", tag: "PRISM", description: "관통이 끝난 레일탄이 마지막 표적에서 굴절해 새로운 사선을 이어갑니다." },
+    { types: ["s_mark", "s_ghost"], kind: "dead_center", name: "데드 센터", tag: "BURST", description: "충전 광선이 전장의 모든 파열 표식을 동시에 폭발시키는 결전 사격이 됩니다." },
+    { types: ["s_homing", "s_twin"], kind: "hound_pair", name: "하운드 페어", tag: "HUNT", description: "쌍열 탄환이 서로 다른 표적을 지정 추적하고 남은 적을 다시 탐색합니다." },
+    { types: ["s_mine", "s_dashload"], kind: "escape_route", name: "탈출 탄피진", tag: "MOBILE", description: "대시 장전이 출발점에 지뢰를 남기고 이동 방향으로 보조 사격을 전개합니다." },
+    { types: ["s_freeze", "s_drone"], kind: "cold_observer", name: "빙결 관측망", tag: "CONTROL", description: "드론이 냉각된 적을 우선 관측하고 관통 냉각 광선으로 지대를 연장합니다." }
   ],
   artillery: [
-    { types: ["a_vacuum", "a_fire"], kind: "inferno_vortex", name: "화염 소용돌이", description: "진공 코어 뒤의 소이 지대가 지속적으로 적을 중심으로 끌어당깁니다." },
-    { types: ["a_fire", "a_chain"], kind: "wildfire_chain", name: "들불 기폭", description: "소이 지대에서 죽은 적이 주변으로 작은 연쇄 폭발을 전달합니다." },
-    { types: ["a_chain", "a_sticky"], kind: "living_fuse", name: "생체 신관", description: "점착 대상이 죽는 즉시 신관이 커진 범위로 폭발해 연쇄를 이어갑니다." },
-    { types: ["a_sticky", "a_cluster"], kind: "parasite_cluster", name: "기생 분열탄", description: "점착 폭발의 소형 유탄이 살아 있는 적을 각각 추적합니다." },
-    { types: ["a_cluster", "a_recursive"], kind: "cascade", name: "폭발 캐스케이드", description: "분열 유탄도 한 번씩 잔향 폭발을 남깁니다." },
-    { types: ["a_recursive", "a_shrapnel"], kind: "echo_shrapnel", name: "잔향 파편", description: "재귀 폭발도 파편을 방출해 같은 구역을 두 번 절단합니다." },
-    { types: ["a_shrapnel", "a_dashbomb"], kind: "breach_field", name: "돌파 지뢰밭", description: "대시 폭탄이 이동 방향으로 집중 파편을 발사합니다." },
-    { types: ["a_dashbomb", "a_super"], kind: "nova_mine", name: "초신성 지뢰", description: "세 번째 대시 폭탄이 적 탄환을 지우는 대형 초신성으로 변합니다." },
-    { types: ["a_super", "a_orbit"], kind: "planetary", name: "행성 폭격", description: "초신성이 세 개의 궤도탄을 생성해 남은 적을 차례로 추적합니다." },
-    { types: ["a_orbit", "a_vacuum"], kind: "gravity_satellite", name: "중력 위성", description: "궤도탄 폭발에도 진공 코어가 전달되어 표적 무리를 끌어당깁니다." }
+    { types: ["a_vacuum", "a_fire"], kind: "inferno_vortex", name: "중력 화염로", tag: "INFERNO", description: "소이 지대가 적을 계속 중심으로 당겨 화염 안에 가두는 지속 화로가 됩니다." },
+    { types: ["a_chain", "a_sticky"], kind: "living_fuse", name: "생체 들불", tag: "CHAIN", description: "점착 대상이 죽는 순간 확대 기폭하고 주변 적을 다음 살아 있는 신관으로 만듭니다." },
+    { types: ["a_cluster", "a_recursive"], kind: "cascade", name: "무한 캐스케이드", tag: "CASCADE", description: "분열탄도 잔향 폭발을 남기며 한 번의 착탄을 다단 폭격으로 재생산합니다." },
+    { types: ["a_shrapnel", "a_dashbomb"], kind: "breach_field", name: "돌파 파편진", tag: "BREACH", description: "대시 폭탄이 이동 방향으로 집중 파편을 발사해 퇴로를 공격 통로로 바꿉니다." },
+    { types: ["a_super", "a_orbit"], kind: "planetary", name: "행성 초신성", tag: "ORBIT", description: "초신성이 궤도탄 세 개를 낳고 남은 표적을 차례로 자동 추적합니다." }
   ]
 };
 
@@ -119,19 +104,19 @@ const PLAYSTYLES = {
   melee: [
     {
       id: "pursuit", name: "추적 처형", color: "#ff7c6b", attackName: "추적 횡베기",
-      protocols: ["first_mark", "blood_loop", "harvester", "execution_wheel"],
+      protocols: ["first_mark", "harvester", "aftershock"],
       identity: "표적 사이를 점멸하며 교차 절단과 처형으로 끊임없이 전진합니다.",
       tiers: ["공격마다 먼 표적에게 돌진", "교차 절단이 추격 잔상을 생성", "처치 시 다음 표적으로 자동 사냥 베기"]
     },
     {
       id: "maelstrom", name: "자력 회오리", color: "#b88cff", attackName: "광역 회오리",
-      protocols: ["vortex", "compression_break", "aftershock"],
+      protocols: ["vortex", "aftershock", "harvester"],
       identity: "넓은 칼날과 자력으로 적 무리를 한 점에 모아 연속 회전으로 분쇄합니다.",
       tiers: ["모든 베기가 넓은 부채꼴로 확장", "두 번째 공격마다 전방위 회전", "회전 뒤 거대한 잔류 칼날 폭풍"]
     },
     {
       id: "counter", name: "반격 방벽", color: "#71efad", attackName: "방벽 반격",
-      protocols: ["phantom_guard", "perfect_counter", "vengeance_step"],
+      protocols: ["perfect_counter", "harvester", "aftershock"],
       identity: "베기와 대시를 방어 타이밍으로 바꾸고 막아낸 탄환을 즉시 반격으로 전환합니다.",
       tiers: ["모든 베기가 주변 탄환을 소거", "대시가 방벽 잔상과 반격 충전을 생성", "반격 베기가 추적 파편 세 발을 방출"]
     }
@@ -139,19 +124,19 @@ const PLAYSTYLES = {
   sniper: [
     {
       id: "deadeye", name: "관통 데드아이", color: "#f6dc66", attackName: "중관통 광선",
-      protocols: ["dead_center", "rupture_line", "prism_rail"],
+      protocols: ["dead_center", "prism_rail", "cold_observer"],
       identity: "연사 대신 매 발을 굵은 관통 광선으로 바꾸고 정렬된 적과 표식을 한꺼번에 파열합니다.",
       tiers: ["모든 사격이 굵은 관통 광선", "광선 적중이 파열 폭발을 연쇄", "광선이 전장의 모든 표식을 동시 기폭"]
     },
     {
       id: "hunter", name: "하운드 탄막", color: "#69a9ff", attackName: "추적 쌍열",
-      protocols: ["smart_rebound", "hound_pair", "crossfire_mine"],
+      protocols: ["hound_pair", "prism_rail", "cold_observer"],
       identity: "한 발을 여러 추적탄으로 분할해 흩어진 표적을 자동으로 물고 늘어집니다.",
       tiers: ["모든 공격이 서로 다른 표적을 노리는 쌍열", "세 번째 추적탄과 추가 도탄", "처치마다 하운드 드론이 후속 광선 발사"]
     },
     {
       id: "ranger", name: "빙결 유격대", color: "#57d8ee", attackName: "기동 냉각탄",
-      protocols: ["escape_route", "cold_escape", "cold_observer", "spectral_observer"],
+      protocols: ["escape_route", "cold_observer", "hound_pair"],
       identity: "대시와 사격 자리에 지뢰·냉각 지대를 남기며 계속 이동하는 구역 통제형 저격수입니다.",
       tiers: ["모든 탄착점에 냉각 지대", "대시가 지뢰와 보조탄을 동시 전개", "대시 후 다음 공격이 세 갈래 유령 사격"]
     }
@@ -159,19 +144,19 @@ const PLAYSTYLES = {
   artillery: [
     {
       id: "inferno", name: "중력 화염로", color: "#ff714f", attackName: "중력 소이탄",
-      protocols: ["inferno_vortex", "wildfire_chain", "living_fuse"],
+      protocols: ["inferno_vortex", "living_fuse", "breach_field"],
       identity: "모든 폭발이 적을 끌어당기는 화염 지대를 만들고 불붙은 적을 연쇄 기폭합니다.",
       tiers: ["모든 폭발이 흡인 화염 지대 생성", "화염 처치가 연쇄 폭발", "화염 지대가 커지고 오래 지속"]
     },
     {
       id: "cascade", name: "파편 캐스케이드", color: "#d9ef59", attackName: "분열 파편탄",
-      protocols: ["parasite_cluster", "cascade", "echo_shrapnel"],
+      protocols: ["cascade", "breach_field", "living_fuse"],
       identity: "한 번의 착탄을 분열탄·잔향·방사 파편으로 여러 차례 재생산합니다.",
       tiers: ["모든 폭발이 세 개의 분열탄 생성", "분열탄도 잔향 폭발", "모든 잔향이 방사 파편을 재생산"]
     },
     {
       id: "orbital", name: "기동 궤도포", color: "#71efad", attackName: "궤도 유도탄",
-      protocols: ["breach_field", "nova_mine", "planetary", "gravity_satellite"],
+      protocols: ["planetary", "breach_field", "inferno_vortex"],
       identity: "대시 폭탄과 자동 궤도탄을 쌓아 직접 조준보다 이동 경로로 전장을 포격합니다.",
       tiers: ["모든 폭발이 궤도탄 한 발 충전", "대시마다 초신성 지뢰 투하", "폭발마다 궤도탄 세 발 자동 추적"]
     }
@@ -192,6 +177,41 @@ const MODULE_RAM = {
 const PROTOCOL_RAM = 1;
 const RAM_BASE_CAPACITY = 10;
 const RAM_PER_LEVEL = 2;
+const AUGMENT_MAX_RANK = 3;
+const AUGMENT_EVOLUTION_RANK = 2;
+
+const AUGMENT_GROWTH = {
+  m_mark: ["교차 절단 피해와 표식 유지시간 증가", "표식 소비 시 짧은 잔상 베기"],
+  m_spin: ["회전 참격 주기 3회 → 2회", "회전 반경과 경직 증가"],
+  m_hook: ["끌어당김 강도와 범위 증가", "끌어당김 강도와 범위 추가 증가"],
+  m_echo: ["잔상 피해와 도달거리 증가", "대시 잔상이 충격파를 동반"],
+  m_guard: ["반사 판정 범위 증가", "반사 성공 시 다음 공격 재사용 단축"],
+  m_execute: ["처형 기준 체력 22% → 27%", "처형이 주변 적에게 공포 경직"],
+  m_shock: ["충격파 폭과 관통력 증가", "두 번째 공격마다 소형 충격파"],
+  m_blood: ["회복 파편 회복량 증가", "표식 소비·처형 회복량 추가 증가"],
+  m_step: ["점멸 탐색 거리 증가", "점멸 직후 짧은 무적"],
+  m_riposte: ["반격 피해와 무적시간 증가", "반격이 추적 파편을 방출"],
+  s_pierce: ["추가 관통 +1", "추가 관통 +1 · 관통 피해 강화"],
+  s_ricochet: ["추가 도탄 +1", "추가 도탄 +1 · 도탄 피해 강화"],
+  s_mark: ["파열 피해와 표식 지속 증가", "파열이 가까운 표식으로 전염"],
+  s_homing: ["유도 회전 속도 증가", "빗나간 탄환이 한 번 재탐색"],
+  s_mine: ["지뢰 생성 주기 3발 → 2발", "지뢰가 사방 레일 파편 방출"],
+  s_dashload: ["대시 보조탄 피해 증가", "보조탄을 부채꼴 3발 발사"],
+  s_twin: ["쌍열 탄환 간격과 피해 개선", "모든 사격을 쌍열로 전환"],
+  s_freeze: ["냉각 지대 지속과 감속 증가", "냉각 지대 지속시간 추가 증가"],
+  s_ghost: ["충전 대기시간 감소", "충전 광선 폭과 치명타 증가"],
+  s_drone: ["드론 후속탄 피해 증가", "드론이 관통 광선으로 진화"],
+  a_sticky: ["점착 신관 지연 감소", "대상 사망 시 즉시 확대 기폭"],
+  a_fire: ["소이 지대 크기와 지속 증가", "불붙은 적 처치 시 불꽃 전이"],
+  a_chain: ["연쇄 기폭 범위 증가", "연쇄 횟수와 피해 유지율 증가"],
+  a_vacuum: ["흡인 범위와 강도 증가", "폭발 뒤에도 짧게 흡인 유지"],
+  a_shrapnel: ["파편 수 6개 → 8개", "파편이 적을 한 번 유도"],
+  a_recursive: ["잔향 폭발 피해 증가", "잔향이 한 번 더 축소 재귀"],
+  a_dashbomb: ["대시 폭탄 반경 증가", "대시 경로 끝에도 추가 폭탄"],
+  a_super: ["초신성 주기 3발 → 2발", "초신성이 적 탄환을 흡수해 강화"],
+  a_cluster: ["분열탄 3개 → 4개", "분열탄이 서로 다른 적을 추적"],
+  a_orbit: ["궤도탄 충전 수 +1", "궤도탄 충전 수 +1"]
+};
 
 const RARITIES = {
   common: { id: "common", label: "일반", code: "COMMON", width: 1, height: 1, color: "#a7b8ba" },
@@ -225,6 +245,20 @@ const TOOLS = {
     description: "다음 증강을 제어·방어 회로로 반전해 범위와 생존력을 강화합니다.", tradeoff: "복합 보정 · 직접 피해 감소"
   }
 };
+
+const TOOL_COMBINATIONS = [
+  { types: ["router", "amplifier"], name: "터보 버스", code: "TURBO", color: "#ff8b63", power: .5, heat: -.18, description: "라우팅 손실 없이 과급하고 열을 일부 회수합니다." },
+  { types: ["amplifier", "focuser"], name: "레일 오버드라이브", code: "RAIL", color: "#ffd76a", power: .35, focus: .65, heat: .16, description: "출력을 좁고 먼 고위력 신호로 압축합니다." },
+  { types: ["amplifier", "repeater"], name: "버스트 루프", code: "BURST", color: "#ff7f9d", power: .25, echo: 1, heat: .3, description: "증폭한 신호를 한 번 더 복제하지만 과열이 커집니다." },
+  { types: ["focuser", "splitter"], name: "프리즘 포크", code: "FORK", color: "#d9ef59", focus: .35, throughput: .12, description: "정밀 신호를 나눠 분기 처리량 손실을 줄입니다." },
+  { types: ["splitter", "inverter"], name: "미러 브랜치", code: "MIRROR", color: "#71efad", utility: 1, throughput: .1, description: "갈라진 한쪽 성향을 방어·제어 신호로 반전합니다." },
+  { types: ["repeater", "inverter"], name: "세이프 리턴", code: "RETURN", color: "#a48cff", echo: 1, utility: 1, heat: -.24, description: "복제 신호를 안전 회로로 되돌려 열을 줄이고 제어를 강화합니다." }
+];
+
+function findToolCombination(typeA, typeB) {
+  if (!typeA || !typeB || typeA === typeB) return null;
+  return TOOL_COMBINATIONS.find((combo) => combo.types.includes(typeA) && combo.types.includes(typeB)) || null;
+}
 
 const TOOL_TYPES = Object.keys(TOOLS);
 const TOOL_TIER_LABELS = { 1: "초기", 2: "중급", 3: "고급" };
@@ -412,6 +446,7 @@ function portGridPoint(part, edge, offset) {
 function createPart(kind, type) {
   const part = { id: factory.nextId++, kind, type };
   if (kind === "tool") part.dir = 0;
+  else part.rank = 1;
   return ensurePartPorts(part);
 }
 
@@ -692,7 +727,7 @@ function playstylesForModule(type, classId) {
 }
 
 function findClassSynergy(typeA, typeB, classId) {
-  return (SYNERGY_DEFINITIONS[classId] || []).find((item) => item.types[0] === typeA && item.types[1] === typeB) || null;
+  return (SYNERGY_DEFINITIONS[classId] || []).find((item) => item.types.includes(typeA) && item.types.includes(typeB)) || null;
 }
 
 function evaluateLineReactors(protocolRoutes) {
@@ -814,14 +849,16 @@ function evaluateClassFactory() {
   const activeIds = new Set();
   const activeToolIds = new Set();
   const activeTypes = new Set();
+  const augmentRanks = new Map();
+  const augmentLimits = new Map();
   const recipes = new Map();
   const flowDirections = new Map();
   const protocolRoutes = [];
-  const protocolKeys = new Set();
+  const toolCombinationMap = new Map();
   const circuit = operationalCircuit(parts);
   const queue = (circuit.outgoing.get(BUS_SOURCE_ID) || [])
     .filter((wire) => circuit.operationalIds.has(wire.toId))
-    .map((wire) => ({ wire, lastModule: null, mods: emptyProcessState(), throughput: 1, toolIds: [], path: [] }));
+    .map((wire) => ({ wire, lastModule: null, lastToolType: null, lastToolId: null, mods: emptyProcessState(), throughput: 1, toolIds: [], path: [] }));
   const visited = new Set();
   let processed = 0;
 
@@ -829,8 +866,8 @@ function evaluateClassFactory() {
     const signal = queue.shift();
     const part = partById.get(signal.wire.toId);
     if (!part || !circuit.operationalIds.has(part.id) || signal.throughput < .16) continue;
-    const visitKey = [signal.wire.id, signal.lastModule?.id || 0, signal.mods.power, signal.mods.echo, signal.mods.focus,
-      Number(signal.mods.inverted), signal.throughput.toFixed(2)].join(":");
+    const visitKey = [signal.wire.id, signal.lastModule?.id || 0, signal.lastToolType || "-", signal.mods.power, signal.mods.echo,
+      signal.mods.focus, Number(signal.mods.inverted), signal.throughput.toFixed(2)].join(":");
     if (visited.has(visitKey)) continue;
     visited.add(visitKey);
     processed += 1;
@@ -838,37 +875,29 @@ function evaluateClassFactory() {
 
     if (part.kind === "module") {
       if (MODULES[part.type]?.classId !== classId) continue;
+      const rank = clamp(Math.floor(part.rank || 1), 1, AUGMENT_MAX_RANK);
       activeIds.add(part.id);
       activeTypes.add(part.type);
+      augmentRanks.set(part.type, Math.max(augmentRanks.get(part.type) || 0, rank));
+      augmentLimits.set(part.type, Math.max(augmentLimits.get(part.type) || 0, Math.floor(part.limit || 0)));
       const previous = recipes.get(part.id) || {
-        id: part.id, type: part.type, feeds: 0, throughput: 0, power: 0, echo: 0, focus: 0,
+        id: part.id, type: part.type, rank, feeds: 0, throughput: 0, power: 0, echo: 0, focus: 0,
         inverted: false, heat: 0, toolIds: new Set()
       };
+      previous.rank = Math.max(previous.rank, rank);
       previous.feeds += 1;
       previous.throughput = Math.min(1.5, previous.throughput + signal.throughput);
       previous.power = Math.max(previous.power, signal.mods.power);
       previous.echo = Math.max(previous.echo, signal.mods.echo);
       previous.focus = Math.max(previous.focus, signal.mods.focus);
       previous.inverted ||= signal.mods.inverted;
-      previous.heat = Math.max(previous.heat, signal.mods.heat);
+      previous.heat = Math.max(0, Math.max(previous.heat, signal.mods.heat));
       signal.toolIds.forEach((id) => previous.toolIds.add(id));
       previous.mode = recipeMode(previous);
       recipes.set(part.id, previous);
       statuses.set(part.id, previous.mode.toLowerCase());
 
-      if (signal.lastModule) {
-        const synergy = findClassSynergy(signal.lastModule.type, part.type, classId);
-        const routeKey = signal.lastModule.id + ">" + part.id;
-        if (synergy && !protocolKeys.has(routeKey)) {
-          protocolKeys.add(routeKey);
-          protocolRoutes.push({
-            kind: synergy.kind, fromId: signal.lastModule.id, toId: part.id,
-            fromRow: signal.lastModule.row, fromCol: signal.lastModule.col, toRow: part.row, toCol: part.col,
-            row: signal.lastModule.row, col: signal.lastModule.col, path: [...signal.path, part.id], toolIds: [...signal.toolIds]
-          });
-        }
-      }
-      const next = { lastModule: part, mods: emptyProcessState(), toolIds: [], path: [] };
+      const next = { lastModule: part, lastToolType: null, lastToolId: null, mods: emptyProcessState(), toolIds: [], path: [] };
       for (const wire of circuit.outgoing.get(part.id) || []) {
         if (circuit.operationalIds.has(wire.toId)) queue.push({ ...next, wire, throughput: signal.throughput });
       }
@@ -884,28 +913,72 @@ function evaluateClassFactory() {
     if (part.type === "repeater") { nextMods.echo += tool.echo || 1; nextMods.heat += tool.heat || 0; }
     if (part.type === "focuser") nextMods.focus += tool.focus || 1;
     if (part.type === "inverter") nextMods.inverted = !nextMods.inverted;
+
+    const combination = findToolCombination(signal.lastToolType, part.type);
+    if (combination) {
+      nextMods.power += combination.power || 0;
+      nextMods.echo += combination.echo || 0;
+      nextMods.focus += combination.focus || 0;
+      nextMods.heat = Math.max(0, nextMods.heat + (combination.heat || 0));
+      if (combination.utility) nextMods.inverted = true;
+      const key = combination.types.slice().sort().join("×");
+      if (!toolCombinationMap.has(key)) {
+        toolCombinationMap.set(key, { ...combination, key, fromId: signal.lastToolId, toId: part.id });
+      }
+      statuses.set(part.id, "tool-combo");
+      if (signal.lastToolId) statuses.set(signal.lastToolId, "tool-combo");
+    }
+
     const nextWires = (circuit.outgoing.get(part.id) || []).filter((wire) => circuit.operationalIds.has(wire.toId));
-    const throughput = part.type === "splitter" && nextWires.length > 1 ? signal.throughput * (tool.splitThroughput || .72) : signal.throughput;
+    let throughput = part.type === "splitter" && nextWires.length > 1 ? signal.throughput * (tool.splitThroughput || .72) : signal.throughput;
+    if (combination?.throughput) throughput = Math.min(1.5, throughput + combination.throughput);
     for (const wire of nextWires) {
-      queue.push({ wire, lastModule: signal.lastModule, mods: { ...nextMods }, throughput, toolIds: [...signal.toolIds, part.id], path: [...signal.path, part.id] });
+      queue.push({
+        wire, lastModule: signal.lastModule, lastToolType: part.type, lastToolId: part.id,
+        mods: { ...nextMods }, throughput, toolIds: [...signal.toolIds, part.id], path: [...signal.path, part.id]
+      });
     }
   }
 
+  const synergies = [];
+  const synergyKinds = new Set();
+  const synergyModuleIds = new Set();
+  const outgoingModuleIds = new Set();
+  for (const evolution of SYNERGY_DEFINITIONS[classId] || []) {
+    const pair = evolution.types.map((type) => placedModules.find((part) => activeIds.has(part.id) && part.type === type));
+    if (!pair[0] || !pair[1] || evolution.types.some((type) => (augmentRanks.get(type) || 0) < AUGMENT_EVOLUTION_RANK)) continue;
+    synergyKinds.add(evolution.kind);
+    pair.forEach((part) => {
+      synergyModuleIds.add(part.id);
+      statuses.set(part.id, "evolved");
+    });
+    outgoingModuleIds.add(pair[0].id);
+    synergies.push({ ...evolution, ranks: evolution.types.map((type) => augmentRanks.get(type) || 0) });
+    protocolRoutes.push({
+      kind: evolution.kind, fromId: pair[0].id, toId: pair[1].id,
+      fromRow: pair[0].row, fromCol: pair[0].col, toRow: pair[1].row, toCol: pair[1].col,
+      row: pair[0].row, col: pair[0].col, path: pair.map((part) => part.id), toolIds: []
+    });
+  }
+
   const activeTools = placedTools.filter((tool) => activeToolIds.has(tool.id));
+  const toolCombinations = [...toolCombinationMap.values()];
   const tuning = buildFactoryTuning(recipes, activeTools);
+  const rankUps = [...augmentRanks.values()].reduce((sum, rank) => sum + Math.max(0, rank - 1), 0);
+  const limitBreaks = [...augmentLimits.values()].reduce((sum, limit) => sum + limit, 0);
   const primary = createAttackProfile(classProfile.attackName, classProfile.damage, classProfile.range, classProfile.arc);
-  primary.damage = Math.round(primary.damage * tuning.damageMult * 10) / 10;
-  primary.cooldown = classProfile.cooldown * tuning.cooldownMult / COMBAT_TEMPO.attackRate;
+  primary.damage = Math.round(primary.damage * tuning.damageMult * (1 + rankUps * .035 + limitBreaks * .05) * 10) / 10;
+  primary.cooldown = classProfile.cooldown * tuning.cooldownMult / COMBAT_TEMPO.attackRate / (1 + Math.min(.24, rankUps * .012));
   primary.range *= tuning.rangeMult;
   primary.arc *= tuning.areaMult;
   primary.stun *= tuning.controlMult;
   const classCritBonus = classId === "sniper" ? .06 : classId === "artillery" ? .04 : .025;
-  primary.crit = clamp(.12 + classCritBonus + tuning.focus * .045 + tuning.power * .025, .12, .42);
+  primary.crit = clamp(.12 + classCritBonus + tuning.focus * .045 + tuning.power * .025 + rankUps * .004, .12, .48);
   primary.critMultiplier = 2 + tuning.power * .13 + tuning.focus * .08;
   primary.classId = classId;
   primary.modules = new Set(activeIds);
   primary.blastRadius = classId === "artillery" ? 86 * tuning.areaMult : 0;
-  const echo = createAttackProfile("조합 프로토콜", Math.round(classProfile.damage * .55), classProfile.range, classProfile.arc);
+  const echo = createAttackProfile("진화 후속 공격", Math.round(classProfile.damage * .55), classProfile.range, classProfile.arc);
   echo.cooldown = 0;
   echo.crit = Math.max(.04, primary.crit * .65);
   echo.critMultiplier = primary.critMultiplier;
@@ -915,33 +988,38 @@ function evaluateClassFactory() {
   guard.maxHpBonus += Math.round(tuning.utility * 24);
   guard.armor += tuning.utility * .12;
   guard.dashCooldown *= 1 - tuning.utility * .16;
-  const synergies = [];
-  const synergyKinds = new Set();
-  const synergyModuleIds = new Set();
-  const outgoingModuleIds = new Set();
-  for (const route of protocolRoutes) {
-    const synergy = (SYNERGY_DEFINITIONS[classId] || []).find((item) => item.kind === route.kind);
-    if (!synergy) continue;
-    synergyModuleIds.add(route.fromId);
-    synergyModuleIds.add(route.toId);
-    outgoingModuleIds.add(route.fromId);
-    if (!synergyKinds.has(synergy.kind)) {
-      synergyKinds.add(synergy.kind);
-      synergies.push({ kind: synergy.kind, name: synergy.name, description: synergy.description });
+
+  const buildCandidates = (PLAYSTYLES[classId] || []).map((style) => {
+    const matched = style.protocols.filter((kind) => synergyKinds.has(kind));
+    const affinityTypes = new Set((SYNERGY_DEFINITIONS[classId] || [])
+      .filter((evolution) => style.protocols.includes(evolution.kind)).flatMap((evolution) => evolution.types));
+    const partial = [...activeTypes].filter((type) => affinityTypes.has(type)).length;
+    return { style, matched, partial, tier: Math.min(3, matched.length), score: matched.length * 100 + partial };
+  }).sort((a, b) => b.score - a.score);
+  const dominant = buildCandidates.find((candidate) => candidate.tier > 0) || null;
+  const buildModuleIds = new Set();
+  if (dominant) {
+    for (const evolution of SYNERGY_DEFINITIONS[classId] || []) {
+      if (!dominant.matched.includes(evolution.kind)) continue;
+      placedModules.filter((part) => evolution.types.includes(part.type) && activeIds.has(part.id)).forEach((part) => buildModuleIds.add(part.id));
     }
   }
-  const lineReactors = evaluateLineReactors(protocolRoutes);
-  const sequenceDepth = lineReactors.reactors.reduce((maximum, reactor) => Math.max(maximum, reactor.depth), 0);
-  const build = lineReactors.dominant ? {
-    id: lineReactors.dominant.style.id, name: lineReactors.dominant.style.name, color: lineReactors.dominant.style.color,
-    attackName: lineReactors.dominant.style.attackName, identity: lineReactors.dominant.style.identity,
-    tiers: lineReactors.dominant.style.tiers, tier: lineReactors.dominant.tier, depth: lineReactors.dominant.depth,
-    row: lineReactors.dominant.row, moduleIds: lineReactors.dominant.moduleIds
+  const build = dominant ? {
+    id: dominant.style.id, name: dominant.style.name, color: dominant.style.color,
+    attackName: dominant.style.attackName, identity: dominant.style.identity,
+    tiers: dominant.style.tiers, tier: dominant.tier, depth: dominant.matched.length,
+    row: 0, moduleIds: buildModuleIds
   } : null;
+  const reactors = buildCandidates.filter((candidate) => candidate.tier > 0).map((candidate) => ({
+    style: candidate.style, tier: candidate.tier, links: candidate.matched.length, depth: candidate.matched.length,
+    moduleIds: candidate.style.id === build?.id ? buildModuleIds : new Set()
+  }));
+  const sequenceDepth = synergies.length;
+
   return {
-    primary, echo, guard, classId, classProfile, traits: activeTypes, synergyKinds, synergyModuleIds, outgoingModuleIds,
-    statuses, synergies, protocolRoutes, sequenceDepth, reactors: lineReactors.reactors, build,
-    recipes, tuning, flowDirections, activeToolIds, activeCount: activeIds.size,
+    primary, echo, guard, classId, classProfile, traits: activeTypes, augmentRanks, augmentLimits, rankUps, limitBreaks,
+    synergyKinds, synergyModuleIds, outgoingModuleIds, statuses, synergies, protocolRoutes, sequenceDepth,
+    reactors, build, recipes, tuning, toolCombinations, flowDirections, activeToolIds, activeCount: activeIds.size,
     inactiveCount: placedModules.length - activeIds.size, placedToolCount: placedTools.length, activeToolCount: activeTools.length,
     wires: circuit.validWires, operationalIds: circuit.operationalIds, connectedCount: circuit.operationalIds.size
   };
@@ -982,6 +1060,7 @@ function partToken(part, status, index) {
   return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' size-' + footprint.width + ' ' + status + isNew + '" draggable="false" data-part-id="' +
     part.id + '" data-label="' + def.name + (rarity ? " · " + rarity.label + " " + sizeLabel : " · 공정 도구") + '" style="--module-color:' + def.color + ';--footprint-w:' + footprint.width + ';--footprint-h:' + footprint.height + ';--footprint-width:' + footprintCssSize(footprint.width) + ';--footprint-height:' + footprintCssSize(footprint.height) + '">' +
     '<span class="part-type">' + (kind === "tool" ? "PROCESS TOOL" : "AUGMENT NODE") + '</span><span class="part-code">' + def.code + '</span><span class="part-name">' + def.name + '</span>' +
+    (kind === "module" ? '<span class="part-rank">R' + (part.rank || 1) + ((part.limit || 0) ? " · L+" + part.limit : "") + '</span>' : "") +
     (rarity ? '<span class="rarity-badge" style="--rarity-color:' + rarity.color + '">' + rarity.label + ' ' + sizeLabel + '</span>' : '<span class="rarity-badge tool-badge">DROP</span>') +
     '<span class="module-ram">' + partRamCost(part) + 'R</span>' + portPads(part) +
     '<button class="module-store" type="button" data-store-index="' + index + '" aria-label="' + def.name + ' ' + actionLabel + '" title="' + actionLabel + '">PICK</button></div>';
@@ -1000,7 +1079,7 @@ function renderPendingPart() {
   const rarity = footprint.rarity;
   const toolTier = isTool ? TOOLS[factory.pending.type].tier : 0;
   target.innerHTML = '<div class="pending-module ' + (isTool ? "pending-tool" : "module-" + factory.pending.type) +
-    '" draggable="false" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + (isTool ? "T" + toolTier + " " : "") + def.name + ' · ' + partRamCost(factory.pending) + ' RAM' +
+    '" draggable="false" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + (isTool ? "T" + toolTier + " " : "") + def.name + (isTool ? "" : " · R" + (factory.pending.rank || 1)) + ' · ' + partRamCost(factory.pending) + ' RAM' +
     '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 희소 단자 2–3개 · 면당 1개' : '드랍 공정 도구 · 빈 셀로 끌어 놓기') + '</span><span>' + def.description + '</span></div>';
   $("#pending-archive").textContent = isTool ? "드랍 도구 선택 취소" : "장착하지 않고 보관";
   $("#pending-archive").hidden = false;
@@ -1034,7 +1113,7 @@ function renderReserveParts() {
       const def = MODULES[module.type];
       const footprint = partFootprint(module);
       const rarity = footprint.rarity;
-      return '<button type="button" draggable="false" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '" title="' + def.description + '"><b>' + def.code + '</b><span>' + def.name + ' · ' + rarity.label + ' ' + footprint.width + '×' + footprint.height + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
+      return '<button type="button" draggable="false" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '" title="' + def.description + '"><b>' + def.code + '</b><span>' + def.name + ' · R' + (module.rank || 1) + ((module.limit || 0) ? ' · L+' + module.limit : '') + ' · ' + rarity.label + ' ' + footprint.width + '×' + footprint.height + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
     }).join("")
     : '<span class="reserve-empty">비어 있음</span>';
 }
@@ -1049,7 +1128,7 @@ function outputChangeSummary(previous, next) {
   }
   const mechanics = [...next.traits].filter((type) => !previous.traits?.has(type)).map((type) => MODULES[type].name);
   const combos = next.synergies.filter((item) => !previous.synergyKinds?.has(item.kind)).map((item) => item.name);
-  if (combos.length) return "순서 프로토콜 · " + combos.join(" + ");
+  if (combos.length) return "완성형 진화 · " + combos.join(" + ");
   if (mechanics.length) return "새 행동 해금 · " + mechanics.join(" + ");
   return "행동 조합 배치가 변경되었습니다.";
 }
@@ -1116,7 +1195,7 @@ function renderFactoryBoard() {
   renderPendingPart();
   renderReserveParts();
   renderToolPalette();
-  const mechanicNames = [...output.traits].map((type) => MODULES[type].name);
+  const mechanicNames = [...output.traits].map((type) => MODULES[type].name + " R" + (output.augmentRanks.get(type) || 1));
   const build = output.build;
   const usedRam = ramUsage(output);
   const capacity = ramCapacity();
@@ -1132,19 +1211,20 @@ function renderFactoryBoard() {
   const tuning = output.tuning;
   const tuningSummary = '<article class="lane-summary tuning-summary" style="--lane-color:#58d7d3"><header><b>' + tuning.mode + ' 공정</b><span>' + Math.round(tuning.throughput * 100) + '% FLOW</span></header><p>피해 ×' + tuning.damageMult.toFixed(2) + ' · 주기 ×' + tuning.cooldownMult.toFixed(2) + ' · 거리 ×' + tuning.rangeMult.toFixed(2) + ' · 범위 ×' + tuning.areaMult.toFixed(2) + (tuning.echo ? ' · 지연 복제 ' + tuning.echo + '회' : '') + '</p></article>';
   const buildSummary = build
-    ? '<article class="lane-summary build-summary" style="--lane-color:' + build.color + '"><header><b>' + build.name + '</b><span>TIER ' + ["0", "I", "II", "III"][build.tier] + ' · ' + build.depth + ' MODULE</span></header><p>' + build.identity + '</p><strong>' + build.tiers[build.tier - 1] + '</strong></article>'
+    ? '<article class="lane-summary build-summary" style="--lane-color:' + build.color + '"><header><b>' + build.name + '</b><span>TIER ' + ["0", "I", "II", "III"][build.tier] + ' · ' + build.depth + ' EVOLUTION</span></header><p>' + build.identity + '</p><strong>' + build.tiers[build.tier - 1] + '</strong></article>'
     : '<article class="lane-summary build-summary muted"><header><b>주력 플레이스타일</b><span>OFFLINE</span></header><p>BUS IN에서 도달한 증강 라인 전체가 즉시 적용됩니다. 도구를 사이에 두면 성능과 반동이 달라집니다.</p></article>';
   $("#factory-summary").innerHTML =
-    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 프로토콜 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p><small>LV.' + level + ' 용량 ' + capacity + ' · 다음 레벨 ' + nextCapacity + ' RAM</small></article>' +
+    '<article class="ram-summary"><header><b>FRAME RAM</b><span>' + usedRam + ' / ' + capacity + '</span></header><div><i style="width:' + Math.min(100, usedRam / capacity * 100) + '%"></i></div><p>핵심 ' + moduleCost + ' · 드랍 도구 ' + toolCost + ' · 진화 ' + output.protocolRoutes.length + '×' + PROTOCOL_RAM + ' RAM</p><small>LV.' + level + ' 용량 ' + capacity + ' · 다음 레벨 ' + nextCapacity + ' RAM</small></article>' +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>LEGO 회로 상태</b><span>' + output.connectedCount + ' ONLINE · ' + output.wires.length + ' LINK</span></header><p>신호는 중앙 BUS IN 한 줄에서만 시작하며, 가동 블록의 맞닿은 단자로 이어집니다.</p></article>' +
     tuningSummary + buildSummary +
     '<article class="lane-summary" style="--lane-color:#a48cff"><header><b>해금 행동</b><span>' + mechanicNames.length + ' / 10</span></header><p>' + (mechanicNames.length ? mechanicNames.join(" · ") : "아직 해금된 전용 행동이 없습니다.") + '</p></article>' +
-    '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>순서 프로토콜</b><span>' + output.protocolRoutes.length + ' LINK</span></header><p>' + (output.sequenceDepth ? '최장 ' + output.sequenceDepth + ' MODULE 체인' : '입력·출력이 모두 이어진 핵심 증강의 순서가 프로토콜을 만듭니다.') + '</p></article>';
+    '<article class="lane-summary" style="--lane-color:#ffbd57"><header><b>완성형 진화</b><span>' + output.synergies.length + ' / 5</span></header><p>' + (output.synergies.length ? output.synergies.map((item) => item.name).join(" · ") : '지정 파트너 증강 둘을 RANK 2 이상으로 성장시키고 회로에서 함께 가동하세요.') + '</p></article>';
   const recipeItems = [...output.recipes.values()];
   $("#factory-recipe-list").innerHTML = recipeItems.length
-    ? recipeItems.map((recipe) => { const def = MODULES[recipe.type]; const tags = [recipe.mode, Math.round(recipe.throughput * 100) + "%"]; if (recipe.power) tags.push("AMP×" + recipe.power); if (recipe.echo) tags.push("ECHO×" + recipe.echo); if (recipe.focus) tags.push("FOCUS×" + recipe.focus); return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>'; }).join("")
+    ? recipeItems.map((recipe) => { const def = MODULES[recipe.type]; const tags = ["R" + recipe.rank, recipe.mode, Math.round(recipe.throughput * 100) + "%"]; if (recipe.power) tags.push("AMP×" + recipe.power); if (recipe.echo) tags.push("ECHO×" + recipe.echo); if (recipe.focus) tags.push("FOCUS×" + recipe.focus); return '<div class="recipe-chip" style="--recipe-color:' + def.color + '"><b>' + def.name + '</b><span>' + tags.join(" · ") + '</span></div>'; }).join("")
     : '<span class="no-synergy">중앙 BUS IN 바로 오른쪽의 밝은 셀에서 회로를 시작하고, 이후 표시되는 결합 셀로 확장하세요.</span>';
-  $("#factory-synergy-list").innerHTML = output.synergies.length ? output.synergies.map((item) => '<div class="synergy-chip"><b>→ ' + item.name + '</b>' + item.description + '</div>').join("") : '<span class="no-synergy">유효 회로의 순서 프로토콜 없음</span>';
+  $("#factory-tool-combo-list").innerHTML = output.toolCombinations.length ? output.toolCombinations.map((item) => '<div class="tool-combo-chip" style="--combo-color:' + item.color + '"><b>' + TOOLS[item.types[0]].name + ' × ' + TOOLS[item.types[1]].name + '</b><span>' + item.name + ' · ' + item.description + '</span></div>').join("") : '<span class="no-synergy">서로 다른 도구 둘을 연속 배선하면 X 조합이 활성화됩니다.</span>';
+  $("#factory-synergy-list").innerHTML = output.synergies.length ? output.synergies.map((item) => '<div class="synergy-chip evolved"><b>EVOLVED · ' + item.name + '</b><span>' + MODULES[item.types[0]].name + ' R' + item.ranks[0] + ' × ' + MODULES[item.types[1]].name + ' R' + item.ranks[1] + '</span>' + item.description + '</div>').join("") : '<span class="no-synergy">RANK 2 파트너 증강을 함께 가동하면 완성형 진화가 표시됩니다.</span>';
   const commit = $("#factory-commit");
   commit.disabled = Boolean(factory.pending);
   commit.textContent = factory.pending ? "신규 부품을 먼저 배치하세요" : "회로 적용 · 전투 복귀";
@@ -1378,6 +1458,19 @@ function completeFactoryDrop(target) {
 function queuePointerDrag(event, drag, source) {
   if (event.button !== 0) return;
   factory.pointerCandidate = { ...drag, startX: event.clientX, startY: event.clientY, source, active: false };
+  try {
+    if (source.setPointerCapture && Number.isFinite(event.pointerId)) source.setPointerCapture(event.pointerId);
+  } catch {}
+  if (TEST_MODE) canvas.dataset.factoryPointer = "queued:" + drag.kind;
+}
+
+function factoryCellFromPoint(x, y, target) {
+  const direct = target?.closest?.("[data-cell-index]");
+  if (direct) return direct;
+  return [...document.querySelectorAll("#factory-board [data-cell-index]")].find((cell) => {
+    const rect = cell.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }) || null;
 }
 
 function updatePointerDrag(event) {
@@ -1388,8 +1481,9 @@ function updatePointerDrag(event) {
     candidate.active = true;
     factory.dragged = { kind: candidate.kind, from: candidate.from, id: candidate.id, type: candidate.type };
     candidate.source.classList.add("is-dragging");
+    if (TEST_MODE) canvas.dataset.factoryPointer = "active:" + candidate.kind;
   }
-  const cell = event.target.closest?.("[data-cell-index]");
+  const cell = factoryCellFromPoint(event.clientX, event.clientY, event.target);
   if (cell && isPlaceable(Number(cell.dataset.cellIndex))) showDragFeedback(cell, dragTargetIsValid(Number(cell.dataset.cellIndex)));
   else clearDragFeedback();
 }
@@ -1397,12 +1491,20 @@ function updatePointerDrag(event) {
 function finishPointerDrag(event) {
   const candidate = factory.pointerCandidate;
   factory.pointerCandidate = null;
-  if (!candidate?.active) return;
+  if (!candidate?.active) {
+    if (TEST_MODE) canvas.dataset.factoryPointer = candidate ? "released-before-drag:" + candidate.kind : "released:none";
+    return;
+  }
   factory.ignoreBoardClickUntil = performance.now() + 90;
   const element = document.elementFromPoint?.(event.clientX, event.clientY) || event.target;
-  const cell = element?.closest?.("[data-cell-index]");
-  if (cell && isPlaceable(Number(cell.dataset.cellIndex))) completeFactoryDrop(Number(cell.dataset.cellIndex));
-  else finishFactoryDrag();
+  const cell = factoryCellFromPoint(event.clientX, event.clientY, element);
+  if (cell && isPlaceable(Number(cell.dataset.cellIndex))) {
+    const dropped = completeFactoryDrop(Number(cell.dataset.cellIndex));
+    if (TEST_MODE) canvas.dataset.factoryPointer = (dropped ? "dropped:" : "rejected:") + candidate.kind;
+  } else {
+    finishFactoryDrag();
+    if (TEST_MODE) canvas.dataset.factoryPointer = "missed:" + candidate.kind;
+  }
 }
 
 function setFactoryView(view) {
@@ -1466,21 +1568,59 @@ function commitFactory() {
   updateHud();
   showSystemToast("CIRCUIT UPDATED", outputChangeSummary(previousOutput, nextOutput), "success", 2600);
 }
+function ownedModulePart(type) {
+  const boardPart = board.find((part) => part && partKind(part) === "module" && part.type === type);
+  if (boardPart) return boardPart;
+  const reservePart = factory.reserve.find((part) => part.type === type);
+  if (reservePart) return reservePart;
+  return factory.pending?.kind === "module" && factory.pending.type === type ? factory.pending : null;
+}
+
 function ownedCount(type) {
-  return board.filter((module) => module && module.type === type).length +
-    factory.reserve.filter((module) => module.type === type).length +
-    (factory.pending && factory.pending.type === type ? 1 : 0);
+  return ownedModulePart(type) ? 1 : 0;
+}
+
+function ownedRank(type) {
+  const part = ownedModulePart(type);
+  return part ? clamp(Math.floor(part.rank || 1), 1, AUGMENT_MAX_RANK) : 0;
+}
+
+function ownedLimit(type) {
+  return Math.max(0, Math.floor(ownedModulePart(type)?.limit || 0));
+}
+
+function evolutionForType(type, classId = game.selectedClass) {
+  return (SYNERGY_DEFINITIONS[classId] || []).find((evolution) => evolution.types.includes(type)) || null;
+}
+
+function choicePriority(type) {
+  const rank = ownedRank(type);
+  const evolution = evolutionForType(type);
+  const partner = evolution?.types.find((candidate) => candidate !== type);
+  const partnerRank = partner ? ownedRank(partner) : 0;
+  if (rank === 1 && partnerRank >= AUGMENT_EVOLUTION_RANK) return 0;
+  if (rank >= 1 && rank < AUGMENT_EVOLUTION_RANK && partnerRank >= AUGMENT_EVOLUTION_RANK) return 1;
+  if (rank === 0 && partnerRank >= AUGMENT_EVOLUTION_RANK) return 2;
+  if (rank > 0 && rank < AUGMENT_MAX_RANK) return 3;
+  if (rank === 0) return 4;
+  return 5;
 }
 
 function generateChoices() {
   const classTypes = classModuleTypes(game.selectedClass);
-  const owned = new Set([...modulesOnBoard().map((module) => module.type), ...factory.reserve.map((module) => module.type)]);
-  const unowned = classTypes.filter((type) => !owned.has(type)).sort(() => Math.random() - .5);
-  const pool = [...unowned, ...classTypes.filter((type) => owned.has(type)).sort(() => Math.random() - .5)];
-  const choices = pool.slice(0, 3);
   const signature = CLASS_PROFILES[game.selectedClass].signature;
-  if (game.player.level === 2 && !owned.has(signature) && !choices.includes(signature)) choices[2] = signature;
+  const eligible = classTypes.filter((type) => ownedRank(type) < AUGMENT_MAX_RANK);
+  const source = eligible.length >= 3 ? eligible : classTypes;
+  const grouped = source.map((type) => ({ type, priority: choicePriority(type), roll: Math.random() }))
+    .sort((a, b) => a.priority - b.priority || a.roll - b.roll);
+  const choices = grouped.slice(0, 3).map((entry) => entry.type);
+  if (game.player.level === 2 && ownedRank(signature) === 0 && !choices.includes(signature)) choices[choices.length - 1] = signature;
   return [...new Set(choices)].slice(0, 3);
+}
+
+function rankPips(rank) {
+  return Array.from({ length: AUGMENT_MAX_RANK }, (_, index) =>
+    '<i class="' + (index < rank ? "filled" : "") + '"></i>').join("");
 }
 
 function showLevelChoices() {
@@ -1490,23 +1630,39 @@ function showLevelChoices() {
   const currentCapacity = ramCapacity();
   const previousCapacity = ramCapacityAtLevel(Math.max(1, game.player.level - 1));
   $(".choice-shell > header > span").textContent = classProfile.code + " / FRAME RAM " + ramUsage(evaluateClassFactory()) + " / " + currentCapacity;
-  $("#choice-ram-level").textContent = "LEVEL " + game.player.level + " FRAME EXPANSION";
+  $("#choice-ram-level").textContent = "LEVEL " + game.player.level + " · BUILD DRAFT";
   $("#choice-ram-capacity").textContent = previousCapacity + " → " + currentCapacity + " RAM";
   $("#choice-ram-gain").textContent = "+" + (currentCapacity - previousCapacity) + " CAPACITY";
-  $(".choice-shell h2").textContent = classProfile.name + " 전용 증강 선택";
-  $(".choice-shell header p").textContent = "카드의 RAM 비용과 플레이스타일 태그를 비교하세요. 장착하지 않은 부품은 0 RAM 보관함에 둘 수 있습니다.";
+  $(".choice-shell h2").textContent = classProfile.name + " 증강 획득 / 강화";
+  $(".choice-shell header p").textContent = "같은 증강은 RANK 3까지 성장합니다. 지정된 두 증강이 모두 RANK 2가 되면 순서와 무관하게 완성형 진화가 가동됩니다.";
   $("#choice-cards").innerHTML = choices.map((type, index) => {
     const def = MODULES[type];
-    const affinities = playstylesForModule(type, game.selectedClass);
-    return '<button class="augment-card" type="button" data-choice="' + type +
+    const rank = ownedRank(type);
+    const limit = ownedLimit(type);
+    const nextRank = Math.min(AUGMENT_MAX_RANK, Math.max(1, rank + 1));
+    const evolution = evolutionForType(type);
+    const partnerType = evolution?.types.find((candidate) => candidate !== type);
+    const partner = partnerType ? MODULES[partnerType] : null;
+    const partnerRank = partnerType ? ownedRank(partnerType) : 0;
+    const willEvolve = Boolean(evolution && nextRank >= AUGMENT_EVOLUTION_RANK && partnerRank >= AUGMENT_EVOLUTION_RANK);
+    const state = rank === 0 ? "NEW" : rank < AUGMENT_MAX_RANK ? "RANK " + rank + " → " + (rank + 1) : "LIMIT +" + (limit + 1);
+    const nextEffect = rank === 0 ? "R1 · " + def.hint : rank < AUGMENT_MAX_RANK
+      ? "R" + (rank + 1) + " · " + AUGMENT_GROWTH[type][rank - 1]
+      : "LIMIT BREAK · 해당 증강 효과 +5%";
+    const evolutionCopy = evolution
+      ? '<div class="evolution-preview ' + (willEvolve ? "ready" : "") + '"><span>' + (willEvolve ? "EVOLUTION READY" : "EVOLUTION PAIR") +
+        '</span><b>' + def.name + ' × ' + partner.name + '</b><small>' + evolution.name + ' · 파트너 R' + partnerRank + '/' + AUGMENT_EVOLUTION_RANK + '</small></div>'
+      : "";
+    return '<button class="augment-card rank-' + rank + (willEvolve ? " evolution-ready" : "") + '" type="button" data-choice="' + type +
       '" data-choice-index="' + index + '" aria-pressed="false" style="--module-color:' + def.color +
       '"><span class="card-shortcut">' + (index + 1) + '</span><div class="card-top"><span>MODULE / ' +
-      def.code + '</span><span>' + MODULE_RAM[type] + ' RAM · 보유 ' + ownedCount(type) + '</span></div><div class="card-icon">' +
-      def.code + '</div><h3>' + def.name + '</h3><p>' + def.description +
-      '</p><div class="build-affinity">' + affinities.map((style) => '<span style="--affinity-color:' + style.color + '">' + style.name + '</span>').join("") +
-      '</div><div class="placement-hint">' + def.hint + '</div></button>';
+      def.code + '</span><strong>' + state + '</strong></div><div class="card-icon">' +
+      def.code + '</div><div class="rank-track" aria-label="현재 랭크 ' + rank + '"><span>' + rankPips(rank) + '</span><b>' + (rank ? "R" + rank : "NEW") +
+      '</b></div><h3>' + def.name + '</h3><p>' + def.description +
+      '</p><div class="next-rank-effect">' + nextEffect + '</div>' + evolutionCopy +
+      '<div class="placement-hint">' + MODULE_RAM[type] + ' RAM · ' + def.hint + '</div></button>';
   }).join("");
-  $("#choice-status").innerHTML = '증강 카드를 선택하세요. <kbd>1–3</kbd> 선택 · <kbd>ENTER</kbd> 확정';
+  $("#choice-status").innerHTML = '카드를 선택하세요. <kbd>1–3</kbd> 선택 · <kbd>ENTER</kbd> 확정';
   $("#choice-confirm").innerHTML = '선택 확정 <kbd>ENTER</kbd>';
   $("#choice-confirm").disabled = true;
   $("#choice-overlay").hidden = false;
@@ -1520,23 +1676,44 @@ function previewAugmentChoice(type) {
     card.classList.toggle("selected", selected);
     card.setAttribute("aria-pressed", String(selected));
   }
-  const def = MODULES[type];
-  const styles = playstylesForModule(type, game.selectedClass).map((style) => style.name).join(" / ");
-  $("#choice-status").innerHTML = def.name + ' · ' + MODULE_RAM[type] + ' RAM · ' + styles + ' · <kbd>ENTER</kbd> 확정';
-  $("#choice-confirm").innerHTML = def.name + ' 선택 확정 <kbd>ENTER</kbd>';
+  const rank = ownedRank(type);
+  const evolution = evolutionForType(type);
+  const partnerType = evolution?.types.find((candidate) => candidate !== type);
+  const partnerRank = partnerType ? ownedRank(partnerType) : 0;
+  const action = rank === 0 ? "신규 획득" : rank < AUGMENT_MAX_RANK ? "RANK " + rank + " → " + (rank + 1) : "LIMIT BREAK";
+  const evolutionReady = evolution && Math.min(AUGMENT_MAX_RANK, Math.max(1, rank + 1)) >= AUGMENT_EVOLUTION_RANK && partnerRank >= AUGMENT_EVOLUTION_RANK;
+  $("#choice-status").innerHTML = MODULES[type].name + ' · ' + action + (evolutionReady ? ' · <b>진화 ' + evolution.name + ' 준비</b>' : '') + ' · <kbd>ENTER</kbd> 확정';
+  $("#choice-confirm").innerHTML = MODULES[type].name + ' ' + action + ' <kbd>ENTER</kbd>';
   $("#choice-confirm").disabled = false;
 }
 
 function confirmAugmentChoice() {
   const type = factory.choiceSelection;
   if (game.mode !== "choice" || !MODULES[type]) return;
-  factory.pending = createPart("module", type);
+  const owned = ownedModulePart(type);
   factory.view = "board";
   factory.choiceSelection = null;
   $("#choice-overlay").hidden = true;
+  if (owned) {
+    const previousRank = ownedRank(type);
+    if (previousRank < AUGMENT_MAX_RANK) {
+      owned.rank = previousRank + 1;
+      factory.placementNotice = MODULES[type].name + " RANK " + owned.rank + " 강화 완료";
+    } else {
+      owned.limit = ownedLimit(type) + 1;
+      factory.placementNotice = MODULES[type].name + " LIMIT +" + owned.limit + " · 효과 +5%";
+    }
+    game.output = evaluateClassFactory();
+    openFactory(false);
+    const evolution = evolutionForType(type);
+    if (evolution && evolution.types.every((candidate) => ownedRank(candidate) >= AUGMENT_EVOLUTION_RANK)) {
+      showSystemToast("EVOLUTION READY", evolution.name + " · 두 증강을 회로에서 함께 가동하세요.", "success", 3200);
+    }
+    return;
+  }
+  factory.pending = createPart("module", type);
   openFactory(false);
 }
-
 function interfaceReference(aspect) {
   const first = UI_REFERENCE_ANCHORS[0];
   const last = UI_REFERENCE_ANCHORS.at(-1);
@@ -1977,14 +2154,24 @@ function hasTrait(type) {
   return Boolean(game.output?.traits?.has(type));
 }
 
+function augmentRank(type) {
+  return game.output?.augmentRanks?.get(type) || 0;
+}
+
+function augmentLimit(type) {
+  return game.output?.augmentLimits?.get(type) || 0;
+}
+
 function augmentRecipesForType(type) {
   return [...(game.output?.recipes?.values() || [])].filter((recipe) => recipe.type === type);
 }
 
 function augmentStrength(type) {
   const recipes = augmentRecipesForType(type);
-  if (!recipes.length) return 1;
-  return Math.max(...recipes.map((recipe) => recipe.throughput * (1 + recipe.power * .32 + recipe.focus * .18 - Number(recipe.inverted) * .18)));
+  const processStrength = recipes.length
+    ? Math.max(...recipes.map((recipe) => recipe.throughput * (1 + recipe.power * .32 + recipe.focus * .18 - Number(recipe.inverted) * .18)))
+    : 1;
+  return processStrength * (1 + Math.max(0, augmentRank(type) - 1) * .24 + augmentLimit(type) * .05);
 }
 
 function augmentUtility(type) {
@@ -2092,7 +2279,7 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
     const aliveBeforeStrike = !enemy.dead;
     damageEnemy(enemy, profile.damage * strikeScale, profile, Math.atan2(dy, dx), true);
     if (aliveBeforeStrike && enemy.dead && hasTrait("m_blood")) {
-      player.hp = Math.min(player.maxHp, player.hp + 3);
+      player.hp = Math.min(player.maxHp, player.hp + 2 + augmentRank("m_blood"));
       noteAugment("m_blood");
     }
     if (aliveBeforeStrike && enemy.dead && hasPlaystyle("pursuit", 3) && !context.synthetic && !huntQueued) {
@@ -2100,12 +2287,17 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
       huntQueued = true;
       addFloater(enemy.x, enemy.y - enemy.radius - 16, "HUNT CONTINUES", game.output.build.color);
     }
-    if (game.selectedClass === "melee" && hasTrait("m_execute") && !enemy.dead && enemy.hp / enemy.maxHp <= .22) {
+    if (game.selectedClass === "melee" && hasTrait("m_execute") && !enemy.dead && enemy.hp / enemy.maxHp <= .17 + augmentRank("m_execute") * .05) {
       addFloater(enemy.x, enemy.y - enemy.radius - 10, "EXECUTE", "#f08080");
       noteAugment("m_execute");
       killEnemy(enemy);
+      if (augmentRank("m_execute") >= 3) {
+        for (const nearby of game.enemies) {
+          if (!nearby.dead && distanceSquared(nearby, enemy) <= 110 ** 2) nearby.stun = Math.max(nearby.stun, .75);
+        }
+      }
       if (hasTrait("m_blood")) {
-        player.hp = Math.min(player.maxHp, player.hp + 8);
+        player.hp = Math.min(player.maxHp, player.hp + 5 + augmentRank("m_blood") * 3);
         noteAugment("m_blood");
       }
       if (hasSynergy("harvester")) {
@@ -2118,12 +2310,12 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
       }
     }
     if (hasTrait("m_blood") && consumedMark) {
-      player.hp = Math.min(player.maxHp, player.hp + 4);
+      player.hp = Math.min(player.maxHp, player.hp + 2 + augmentRank("m_blood") * 2);
       noteAugment("m_blood");
     }
-    if (consumedMark && (hasSynergy("blood_loop") || hasPlaystyle("pursuit", 2))) {
+    if (consumedMark && (augmentRank("m_mark") >= 3 || hasPlaystyle("pursuit", 2))) {
       game.delayedAttacks.push({ delay: .11, kind: "slash", angle, damageScale: .65, synthetic: true });
-      if (hasSynergy("blood_loop")) noteProtocol("blood_loop");
+      if (augmentRank("m_mark") >= 3) canvas.dataset.lastSpecial = "rank-3-mark-echo";
     }
     hitEnemies.push(enemy);
     applyAreaExplosion(enemy.x, enemy.y, profile.explosion, profile.damage, enemy.id);
@@ -2138,10 +2330,10 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
     originY + Math.sin(angle) * profile.range * .58,
     echo ? "#a48cff" : "#58d7d3", echo ? 5 : 8, 75
   );
-  if (context.finisher && hasTrait("m_shock")) {
+  if ((context.finisher || augmentRank("m_shock") >= 3 && player.swingCount % 2 === 0) && hasTrait("m_shock")) {
     const shockX = originX + Math.cos(angle) * 82;
     const shockY = originY + Math.sin(angle) * 82;
-    let shockRadius = 72;
+    let shockRadius = 58 + augmentRank("m_shock") * 14;
     if (hasSynergy("compression_break")) {
       shockRadius = 102;
       for (const enemy of game.enemies) {
@@ -2168,8 +2360,8 @@ function executeSlash(profile, angle, damageScale, echo, meta) {
 function spawnRailShot(angle, options) {
   const settings = options || {};
   const speed = (settings.speed || 920) * COMBAT_TEMPO.projectile;
-  const pierce = settings.pierce ?? (hasTrait("s_pierce") ? Math.max(1, Math.round(2 * augmentStrength("s_pierce"))) : 0);
-  const ricochet = settings.ricochet ?? (hasTrait("s_ricochet") ? Math.max(1, Math.round(augmentStrength("s_ricochet"))) : 0);
+  const pierce = settings.pierce ?? (hasTrait("s_pierce") ? 1 + augmentRank("s_pierce") : 0);
+  const ricochet = settings.ricochet ?? (hasTrait("s_ricochet") ? augmentRank("s_ricochet") : 0);
   const homing = settings.homing ?? hasTrait("s_homing");
   game.playerShots.push({
     kind: settings.kind || "rail", x: settings.x ?? game.player.x, y: settings.y ?? game.player.y,
@@ -2189,8 +2381,8 @@ function fireSniperAttack(angle) {
   const deadeyeTier = playstyleTier("deadeye");
   const hunterTier = playstyleTier("hunter");
   const rangerTier = playstyleTier("ranger");
-  const charged = Boolean(deadeyeTier) || (hasTrait("s_ghost") && player.stillTime >= 1.05);
-  const twin = Boolean(hunterTier) || (hasTrait("s_twin") && player.shotCount % 2 === 0);
+  const charged = Boolean(deadeyeTier) || (hasTrait("s_ghost") && player.stillTime >= 1.05 - Math.max(0, augmentRank("s_ghost") - 1) * .18);
+  const twin = Boolean(hunterTier) || (hasTrait("s_twin") && (augmentRank("s_twin") >= 3 || player.shotCount % 2 === 0));
   if (charged) {
     canvas.dataset.lastSpecial = "charged-rail";
     if (hasTrait("s_ghost")) noteAugment("s_ghost");
@@ -2233,8 +2425,8 @@ function fireSniperAttack(angle) {
       addFloater(player.x, player.y - 38, "GHOST VOLLEY", game.output.build.color);
     }
   }
-  if ((hasTrait("s_mine") && player.shotCount % 3 === 0) || (rangerTier >= 2 && player.shotCount % 2 === 0)) {
-    game.zones.push({ kind: "mine", x: player.x, y: player.y, radius: 48, life: 12, tick: 0, color: "#ff9b4a", crossfire: hasSynergy("crossfire_mine") });
+  if ((hasTrait("s_mine") && player.shotCount % Math.max(2, 4 - augmentRank("s_mine")) === 0) || (rangerTier >= 2 && player.shotCount % 2 === 0)) {
+    game.zones.push({ kind: "mine", x: player.x, y: player.y, radius: 48, life: 12, tick: 0, color: "#ff9b4a", crossfire: augmentRank("s_mine") >= 3 });
     if (hasTrait("s_mine")) noteAugment("s_mine");
   }
   player.stillTime = 0;
@@ -2265,15 +2457,15 @@ function fireArtilleryAttack(angle) {
   player.shotCount += 1;
   const orbitalTier = playstyleTier("orbital");
   const orbitalNova = orbitalTier >= 2 && player.shotCount % (orbitalTier >= 3 ? 2 : 3) === 0;
-  const supernova = orbitalNova || (hasTrait("a_super") && player.shotCount % 3 === 0);
+  const supernova = orbitalNova || (hasTrait("a_super") && player.shotCount % Math.max(2, 4 - augmentRank("a_super")) === 0);
   if (supernova) {
     canvas.dataset.lastSpecial = hasSynergy("planetary") ? "planetary-supernova" : "supernova";
     if (hasTrait("a_super")) noteAugment("a_super");
   }
   launchGrenade(angle, {
     supernova,
-    blastRadius: supernova ? 148 : game.output.primary.blastRadius,
-    damage: supernova ? 34 : game.output.primary.damage,
+    blastRadius: supernova ? 126 + augmentRank("a_super") * 18 : game.output.primary.blastRadius,
+    damage: supernova ? 28 + augmentRank("a_super") * 6 : game.output.primary.damage,
     color: game.output.build?.color || (supernova ? "#f6dc66" : "#ff9b4a")
   });
   player.attackFlash = .14;
@@ -2303,7 +2495,7 @@ function startSlash(attackAngle) {
     return true;
   }
   const maelstromTier = playstyleTier("maelstrom");
-  const comboLength = maelstromTier >= 2 ? 2 : 3;
+  const comboLength = maelstromTier >= 2 || augmentRank("m_spin") >= 2 ? 2 : 3;
   player.combo = (player.combo + 1) % comboLength;
   const finisher = player.combo === 0;
   const direction = player.nextSwingDirection;
@@ -2312,7 +2504,7 @@ function startSlash(attackAngle) {
     const revengeTarget = player.riposteReady && hasSynergy("vengeance_step")
       ? game.enemies.find((enemy) => enemy.id === player.riposteTargetId && !enemy.dead)
       : null;
-    const target = revengeTarget || nearestEnemyInDirection(player.aim, pursuitTier ? 250 + pursuitTier * 45 : 230, pursuitTier ? .72 : .5);
+    const target = revengeTarget || nearestEnemyInDirection(player.aim, pursuitTier ? 250 + pursuitTier * 45 : 230 + Math.max(0, augmentRank("m_step") - 1) * 55, pursuitTier ? .72 : .5);
     if (target) {
       const targetAngle = Math.atan2(target.y - player.y, target.x - player.x);
       const advance = Math.max(0, Math.hypot(target.x - player.x, target.y - player.y) - 62);
@@ -2320,6 +2512,7 @@ function startSlash(attackAngle) {
       player.y += Math.sin(targetAngle) * advance;
       addPulse(player.x, player.y, "#69a9ff", 38, .22);
       noteAugment("m_step");
+      if (augmentRank("m_step") >= 3) player.invulnerable = Math.max(player.invulnerable, .18);
       if (hasSynergy("first_mark")) {
         target.duelMark = 4;
         target.markDirection = -direction;
@@ -2329,11 +2522,11 @@ function startSlash(attackAngle) {
     }
   }
   const counterTier = playstyleTier("counter");
-  if (counterTier) {
-    const cleared = clearEnemyBulletsNear(player.x, player.y, 110 + counterTier * 18);
+  if (counterTier || augmentRank("m_guard") >= 2) {
+    const cleared = clearEnemyBulletsNear(player.x, player.y, 86 + counterTier * 18 + augmentRank("m_guard") * 12);
     if (cleared) {
       player.riposteReady = true;
-      addFloater(player.x, player.y - 38, "GUARD ×" + cleared, game.output.build.color);
+      addFloater(player.x, player.y - 38, "GUARD ×" + cleared, game.output.build?.color || "#e8f2f1");
     }
   }
   player.nextSwingDirection *= -1;
@@ -2352,16 +2545,16 @@ function startSlash(attackAngle) {
     direction,
     arc: slashArc, range: output.primary.range, echo: false
   };
-  const meleeProfile = { ...output.primary, arc: slashArc, phase: player.riposteReady };
+  const meleeProfile = { ...output.primary, arc: slashArc, range: output.primary.range * (finisher && hasTrait("m_spin") ? 1 + Math.max(0, augmentRank("m_spin") - 1) * .12 : 1), phase: player.riposteReady };
   const riposteActive = player.riposteReady;
-  const riposteScale = riposteActive ? 1.8 : 1;
-  if (riposteActive) player.invulnerable = Math.max(player.invulnerable, .24);
+  const riposteScale = riposteActive ? 1.55 + augmentRank("m_riposte") * .25 : 1;
+  if (riposteActive) player.invulnerable = Math.max(player.invulnerable, .18 + augmentRank("m_riposte") * .06);
   if (riposteActive && hasTrait("m_riposte")) noteAugment("m_riposte");
   player.riposteReady = false;
   player.riposteTargetId = null;
   executeSlash(meleeProfile, player.aim, (finisher ? 1.28 : 1) * riposteScale, false, { direction, finisher });
   queueFactoryEcho(player.aim);
-  if (riposteActive && counterTier >= 3) {
+  if (riposteActive && (counterTier >= 3 || augmentRank("m_riposte") >= 3)) {
     for (const offset of [-.22, 0, .22]) {
       spawnRailShot(player.aim + offset, { damage: 16, homing: true, pierce: 1, ricochet: 0, color: game.output.build.color });
     }
@@ -2445,7 +2638,7 @@ function updatePlayer(dt) {
   if (game.dashRequested && player.dashCooldown <= 0) {
     const dashAngle = Math.atan2(player.lastMoveY, player.lastMoveX);
     if (game.selectedClass === "melee" && hasTrait("m_echo")) {
-      game.delayedAttacks.push({ delay: .18, kind: "slash", angle: dashAngle, damageScale: .72, x: player.x, y: player.y, synthetic: true, aftershock: hasSynergy("aftershock"), guardPulse: hasSynergy("phantom_guard") });
+      game.delayedAttacks.push({ delay: Math.max(.1, .22 - augmentRank("m_echo") * .04), kind: "slash", angle: dashAngle, damageScale: .54 + augmentRank("m_echo") * .18, x: player.x, y: player.y, synthetic: true, aftershock: hasSynergy("aftershock") || augmentRank("m_echo") >= 3, guardPulse: false });
       noteAugment("m_echo");
     }
     if (game.selectedClass === "melee" && hasPlaystyle("counter", 2)) {
@@ -2459,10 +2652,14 @@ function updatePlayer(dt) {
       player.aim = cursorAim;
       player.weaponFacing = cursorAim;
       player.aimHold = .22;
-      spawnRailShot(cursorAim, { damage: 22, color: rangerTier ? game.output.build.color : "#d9ef59", pierce: 0, ricochet: 0, homing: Boolean(rangerTier) });
+      const dashShotCount = augmentRank("s_dashload") >= 3 ? 3 : 1;
+      for (let index = 0; index < dashShotCount; index += 1) {
+        const spread = (index - (dashShotCount - 1) / 2) * .14;
+        spawnRailShot(cursorAim + spread, { damage: 18 + augmentRank("s_dashload") * 4, color: rangerTier ? game.output.build.color : "#d9ef59", pierce: 0, ricochet: 0, homing: Boolean(rangerTier) });
+      }
       if (hasTrait("s_dashload")) noteAugment("s_dashload");
       if (hasSynergy("escape_route") || rangerTier >= 2) {
-        game.zones.push({ kind: "mine", x: player.x, y: player.y, radius: 52, life: 12, tick: 0, color: "#ff9b4a", crossfire: hasSynergy("crossfire_mine") });
+        game.zones.push({ kind: "mine", x: player.x, y: player.y, radius: 52, life: 12, tick: 0, color: "#ff9b4a", crossfire: augmentRank("s_mine") >= 3 });
         if (hasSynergy("escape_route")) noteProtocol("escape_route");
       }
       if (hasSynergy("cold_escape") || rangerTier >= 2) {
@@ -2475,7 +2672,12 @@ function updatePlayer(dt) {
     if (game.selectedClass === "artillery" && (hasTrait("a_dashbomb") || orbitalTier >= 2)) {
       player.dashBombCount += 1;
       const novaMine = orbitalTier >= 2 || (hasSynergy("nova_mine") && player.dashBombCount % 3 === 0);
-      launchGrenade(dashAngle + Math.PI, { x: player.x, y: player.y, targetX: player.x, targetY: player.y, speed: 1, damage: novaMine ? 30 : 17, blastRadius: novaMine ? 132 : 74, dashBomb: true, dashAngle, supernova: novaMine, color: novaMine ? "#f6dc66" : "#69a9ff" });
+      launchGrenade(dashAngle + Math.PI, { x: player.x, y: player.y, targetX: player.x, targetY: player.y, speed: 1, damage: novaMine ? 30 : 17, blastRadius: novaMine ? 132 : 62 + augmentRank("a_dashbomb") * 12, dashBomb: true, dashAngle, supernova: novaMine, color: novaMine ? "#f6dc66" : "#69a9ff" });
+      if (augmentRank("a_dashbomb") >= 3) {
+        const endX = player.x + Math.cos(dashAngle) * 118;
+        const endY = player.y + Math.sin(dashAngle) * 118;
+        launchGrenade(dashAngle, { x: endX, y: endY, targetX: endX, targetY: endY, speed: 1, damage: 14, blastRadius: 70, dashBomb: true, dashAngle, color: "#69a9ff" });
+      }
       if (hasTrait("a_dashbomb")) noteAugment("a_dashbomb");
       if (novaMine) {
         if (hasTrait("a_super")) noteAugment("a_super");
@@ -2656,6 +2858,7 @@ function updateEnemyBullets(dt) {
             });
             addFloater(bullet.x, bullet.y - 18, perfectCounter ? "PERFECT RETURN" : "BULLET RETURN", perfectCounter ? "#8b7fff" : "#e8f2f1");
           }
+          if (augmentRank("m_guard") >= 3) player.attackCooldown = Math.min(player.attackCooldown, .08);
           if (perfectCounter) {
             player.riposteReady = true;
             noteProtocol("perfect_counter");
@@ -2701,7 +2904,7 @@ function createPlayerExplosion(x, y, damage, radius, options) {
     if (enemy.dead) continue;
     const distance = Math.hypot(enemy.x - x, enemy.y - y);
     if (augmented && (hasTrait("a_vacuum") || infernoTier) && vacuumAllowed && distance <= radius * (infernoTier ? 1.85 : 1.55)) {
-      const pull = infernoTier ? .38 + infernoTier * .06 : .34;
+      const pull = infernoTier ? .38 + infernoTier * .06 : .25 + augmentRank("a_vacuum") * .09;
       enemy.x += (x - enemy.x) * pull;
       enemy.y += (y - enemy.y) * pull;
       vacuumed = true;
@@ -2713,6 +2916,9 @@ function createPlayerExplosion(x, y, damage, radius, options) {
     if (wasAlive && enemy.dead) killed.push(enemy);
   }
   if (vacuumed) {
+    if (augmentRank("a_vacuum") >= 3 && primaryExplosion) {
+      game.zones.push({ kind: "vacuum", x, y, radius: radius * 1.15, life: 1.1, tick: 0, color: "#ef70c4", vortex: true });
+    }
     noteAugment("a_vacuum");
     if (settings.orbital && hasSynergy("gravity_satellite")) noteProtocol("gravity_satellite");
   }
@@ -2724,20 +2930,20 @@ function createPlayerExplosion(x, y, damage, radius, options) {
       life: (infernoTier >= 3 ? 5.4 : infernoTier ? 4.1 : 3.2) * fireStrength,
       tick: 0, color: infernoTier ? game.output.build.color : "#ff714f",
       vortex: Boolean(infernoTier) || hasSynergy("inferno_vortex"),
-      wildfire: infernoTier >= 2 || hasSynergy("wildfire_chain")
+      wildfire: infernoTier >= 2 || augmentRank("a_fire") >= 3
     });
     if (hasTrait("a_fire")) noteAugment("a_fire");
     if (hasSynergy("inferno_vortex")) noteProtocol("inferno_vortex");
   }
   const shrapnelAllowed = primaryExplosion || (settings.recursive && (hasSynergy("echo_shrapnel") || cascadeTier >= 3)) || (settings.dashBomb && hasSynergy("breach_field"));
   if (augmented && (hasTrait("a_shrapnel") || cascadeTier >= 3) && !settings.shrapnel && shrapnelAllowed) {
-    const amount = settings.dashBomb && hasSynergy("breach_field") ? 6 : 10;
+    const amount = settings.dashBomb && hasSynergy("breach_field") ? 6 : 4 + augmentRank("a_shrapnel") * 2;
     const baseAngle = settings.dashAngle || 0;
     for (let index = 0; index < amount; index += 1) {
       const angle = settings.dashBomb && hasSynergy("breach_field")
         ? baseAngle + (index - (amount - 1) / 2) * .16
         : index / amount * Math.PI * 2;
-      spawnRailShot(angle, { kind: "shrapnel", x, y, speed: 520, damage: 8, life: .65, pierce: 1, ricochet: 0, homing: false, color: "#ffd6a0" });
+      spawnRailShot(angle, { kind: "shrapnel", x, y, speed: 520, damage: 8, life: .65, pierce: 1, ricochet: 0, homing: augmentRank("a_shrapnel") >= 3, color: "#ffd6a0" });
     }
     if (hasTrait("a_shrapnel")) noteAugment("a_shrapnel");
     if (settings.recursive && hasSynergy("echo_shrapnel")) noteProtocol("echo_shrapnel");
@@ -2747,30 +2953,34 @@ function createPlayerExplosion(x, y, damage, radius, options) {
     primaryExplosion || (settings.fragment && !settings.orbital && (hasSynergy("cascade") || cascadeTier >= 2))
   );
   if (recursiveAllowed) {
-    game.delayedAttacks.push({ delay: .42, kind: "explosion", x, y, damage: damage * .62, radius: radius * .72, options: { recursive: true, color: "#a48cff" } });
+    game.delayedAttacks.push({ delay: .42, kind: "explosion", x, y, damage: damage * (.5 + augmentRank("a_recursive") * .12), radius: radius * .72, options: { recursive: true, color: "#a48cff" } });
+    if (augmentRank("a_recursive") >= 3 && primaryExplosion) {
+      game.delayedAttacks.push({ delay: .72, kind: "explosion", x, y, damage: damage * .42, radius: radius * .48, options: { noAugments: true, color: "#7655d8" } });
+    }
     if (hasTrait("a_recursive")) noteAugment("a_recursive");
     if (settings.fragment && hasSynergy("cascade")) noteProtocol("cascade");
   }
   if (augmented && primaryExplosion && (hasTrait("a_cluster") || cascadeTier)) {
-    const parasiteTargets = settings.fromSticky && hasSynergy("parasite_cluster")
-      ? game.enemies.filter((enemy) => !enemy.dead).sort((a, b) => distanceSquared(a, { x, y }) - distanceSquared(b, { x, y })).slice(0, 3)
+    const parasiteTargets = augmentRank("a_cluster") >= 3
+      ? game.enemies.filter((enemy) => !enemy.dead).sort((a, b) => distanceSquared(a, { x, y }) - distanceSquared(b, { x, y })).slice(0, 2 + augmentRank("a_cluster"))
       : [];
-    for (let index = 0; index < 3; index += 1) {
+    const clusterCount = hasTrait("a_cluster") ? 2 + augmentRank("a_cluster") : 3;
+    for (let index = 0; index < clusterCount; index += 1) {
       const target = parasiteTargets[index];
-      const angle = target ? Math.atan2(target.y - y, target.x - x) : index / 3 * Math.PI * 2 + .35;
+      const angle = target ? Math.atan2(target.y - y, target.x - x) : index / clusterCount * Math.PI * 2 + .35;
       launchGrenade(angle, { x, y, targetX: target?.x ?? x + Math.cos(angle) * 105, targetY: target?.y ?? y + Math.sin(angle) * 105, speed: 360, damage: damage * .52, blastRadius: radius * .55, fragment: true, color: "#d9ef59" });
     }
     if (hasTrait("a_cluster")) noteAugment("a_cluster");
     if (parasiteTargets.length) noteProtocol("parasite_cluster");
   }
   if (augmented && (hasTrait("a_chain") || infernoTier >= 2) && !settings.chain) {
-    for (const enemy of killed.slice(0, 3)) {
-      game.delayedAttacks.push({ delay: .12, kind: "explosion", x: enemy.x, y: enemy.y, damage: damage * .5, radius: radius * .58, options: { chain: true, noAugments: true, color: "#f08080" } });
+    for (const enemy of killed.slice(0, 2 + augmentRank("a_chain"))) {
+      game.delayedAttacks.push({ delay: .12, kind: "explosion", x: enemy.x, y: enemy.y, damage: damage * (.42 + augmentRank("a_chain") * .08), radius: radius * (.48 + augmentRank("a_chain") * .07), options: { chain: true, noAugments: true, color: "#f08080" } });
     }
     if (killed.length && hasTrait("a_chain")) noteAugment("a_chain");
   }
   if (augmented && primaryExplosion && (hasTrait("a_orbit") || orbitalTier) && game.orbitals.length < 12) {
-    const count = orbitalTier >= 3 || (settings.supernova && hasSynergy("planetary")) ? 3 : orbitalTier >= 2 ? 2 : 1;
+    const count = orbitalTier >= 3 || (settings.supernova && hasSynergy("planetary")) ? 3 : Math.max(orbitalTier >= 2 ? 2 : 1, augmentRank("a_orbit"));
     for (let index = 0; index < count; index += 1) game.orbitals.push({ x, y, angle: index / count * Math.PI * 2, delay: .35 + index * .14, color: "#71efad" });
     if (hasTrait("a_orbit")) noteAugment("a_orbit");
     if (count === 3) noteProtocol("planetary");
@@ -2823,7 +3033,7 @@ function updatePlayerShots(dt) {
         .sort((a, b) => distanceSquared(a, shot) - distanceSquared(b, shot))[0];
       if (target && distanceSquared(target, shot) < 260 ** 2) {
         const targetAngle = Math.atan2(target.y - shot.y, target.x - shot.x);
-        shot.angle += angleDelta(targetAngle, shot.angle) * Math.min(1, dt * 4.8);
+        shot.angle += angleDelta(targetAngle, shot.angle) * Math.min(1, dt * (4.8 + augmentRank("s_homing") * 1.2));
         const speed = Math.hypot(shot.vx, shot.vy);
         shot.vx = Math.cos(shot.angle) * speed;
         shot.vy = Math.sin(shot.angle) * speed;
@@ -2840,7 +3050,7 @@ function updatePlayerShots(dt) {
         const target = game.enemies.find((enemy) => !enemy.dead && distanceSquared(enemy, shot) <= (enemy.radius + shot.radius) ** 2);
         if (target) {
           shot.attachedId = target.id;
-          shot.fuse = .34;
+          shot.fuse = Math.max(.16, .42 - augmentRank("a_sticky") * .08);
           shot.vx = 0; shot.vy = 0;
           noteAugment("a_sticky");
           addFloater(target.x, target.y - target.radius, "STICK", "#ffbd57");
@@ -2860,7 +3070,12 @@ function updatePlayerShots(dt) {
       if (game.selectedClass === "sniper" && hasTrait("s_mark") && shot.kind === "rail") {
         if (enemy.sniperMark > 0) {
           enemy.sniperMark = 0;
-          createPlayerExplosion(enemy.x, enemy.y, 15, 58, { source: "mark", noAugments: true, color: "#ef70c4" });
+          createPlayerExplosion(enemy.x, enemy.y, 12 + augmentRank("s_mark") * 5, 52 + augmentRank("s_mark") * 6, { source: "mark", noAugments: true, color: "#ef70c4" });
+          if (augmentRank("s_mark") >= 3) {
+            const relay = game.enemies.filter((target) => !target.dead && target.id !== enemy.id && target.sniperMark <= 0)
+              .sort((a, b) => distanceSquared(a, enemy) - distanceSquared(b, enemy))[0];
+            if (relay && distanceSquared(relay, enemy) <= 180 ** 2) relay.sniperMark = 5;
+          }
           addFloater(enemy.x, enemy.y - enemy.radius - 10, "MARK BREAK", "#ef70c4");
           if (hasSynergy("rupture_line")) {
             shot.pierce += 2;
@@ -3018,8 +3233,8 @@ function updateDelayedAttacks(dt) {
         (attack.cold ? Number(b.slowed) - Number(a.slowed) : 0) || distanceSquared(a, attack) - distanceSquared(b, attack)
       )[0];
       if (target) {
-        const spectral = hasSynergy("spectral_observer") || hasPlaystyle("hunter", 3);
-        spawnRailShot(Math.atan2(target.y - attack.y, target.x - attack.x), { x: attack.x, y: attack.y, damage: spectral ? 24 : 16, drone: true, homing: true, charged: spectral, pierce: spectral ? 99 : 0, color: spectral ? "#a48cff" : "#71efad" });
+        const spectral = augmentRank("s_drone") >= 3 || hasPlaystyle("hunter", 3);
+        spawnRailShot(Math.atan2(target.y - attack.y, target.x - attack.x), { x: attack.x, y: attack.y, damage: spectral ? 20 + augmentRank("s_drone") * 4 : 12 + augmentRank("s_drone") * 4, drone: true, homing: true, charged: spectral, pierce: spectral ? 99 : 0, color: spectral ? "#a48cff" : "#71efad" });
         if (hasTrait("s_drone")) noteAugment("s_drone");
         if (attack.cold) noteProtocol("cold_observer");
         if (spectral) noteProtocol("spectral_observer");
@@ -3108,35 +3323,33 @@ function auditIsolatedModuleActivation(classId) {
 
 function installAuditSequence(classId, reverse) {
   const definitions = SYNERGY_DEFINITIONS[classId];
-  const sequence = [definitions[0].types[0], ...definitions.map((item) => item.types[1])];
+  const sequence = [...new Set(definitions.flatMap((item) => item.types))];
   if (reverse) sequence.reverse();
   boardCols = Math.max(INITIAL_COLS, sequence.length + 2);
   board.length = boardCols * ROWS;
   board.fill(null);
   const parts = sequence.map((type, index) => {
-    const part = { id: 9000 + index, kind: "module", type };
+    const part = { id: 9000 + index, kind: "module", type, rank: AUGMENT_EVOLUTION_RANK };
     board[indexOf(index + 1, MAIN_ROW)] = part;
     return part;
   });
   wireInstalledParts(parts);
 }
-
 function installPlaystyleSequence(classId, styleId, linkCount) {
   const style = PLAYSTYLES[classId].find((item) => item.id === styleId);
   const definitions = style.protocols.slice(0, linkCount || 3)
     .map((kind) => SYNERGY_DEFINITIONS[classId].find((item) => item.kind === kind));
-  const sequence = [definitions[0].types[0], ...definitions.map((item) => item.types[1])];
-  boardCols = INITIAL_COLS;
+  const sequence = [...new Set(definitions.flatMap((item) => item.types))];
+  boardCols = Math.max(INITIAL_COLS, sequence.length + 2);
   board.length = boardCols * ROWS;
   board.fill(null);
   const parts = sequence.map((type, index) => {
-    const part = { id: 9500 + index, kind: "module", type };
+    const part = { id: 9500 + index, kind: "module", type, rank: AUGMENT_EVOLUTION_RANK };
     board[indexOf(index + 1, MAIN_ROW)] = part;
     return part;
   });
   wireInstalledParts(parts);
 }
-
 function runFactoryToolAudits() {
   const savedBoard = board.slice();
   const savedCols = boardCols;
@@ -3180,6 +3393,15 @@ function runFactoryToolAudits() {
     const terminalFreeActive = sourceCircuit.traits.has("m_mark") && sourceCircuit.connectedCount === 1;
     const toolProcessed = ampCircuit.recipes.get(9702)?.mode === "OVERDRIVE" && ampCircuit.primary.damage > sourceCircuit.primary.damage;
     const advancedToolProcessed = repeaterCircuit.tuning.echo === 1 && inverterCircuit.tuning.utility === 1 && inverterCircuit.guard.armor > 0;
+    const toolXCombinations = TOOL_COMBINATIONS.every((combination, index) => {
+      const comboCircuit = install([
+        { id: 9800 + index * 3, kind: "tool", type: combination.types[0] },
+        { id: 9801 + index * 3, kind: "tool", type: combination.types[1] },
+        { id: 9802 + index * 3, kind: "module", type: "m_mark", rank: 1 }
+      ]).output;
+      return comboCircuit.toolCombinations.some((active) => active.name === combination.name) &&
+        comboCircuit.recipes.get(9802 + index * 3)?.toolIds.size === 2;
+    });
     const root = ensurePartPorts({ id: 9705, kind: "tool", type: "router" });
     const branchA = ensurePartPorts({ id: 9703, kind: "module", type: "m_guard", ports: { layout: "lego-augment-random", edges: ["left", "bottom"], offsets: { left: 1, bottom: 0 } } });
     const branchB = ensurePartPorts({ id: 9704, kind: "module", type: "m_spin", ports: { layout: "lego-augment-random", edges: ["left", "top"], offsets: { left: 0, top: 0 } } });
@@ -3250,7 +3472,7 @@ function runFactoryToolAudits() {
     rebuildPhysicalWires();
     const restored = evaluateClassFactory().traits.has("m_mark") && factory.wires.length === 1;
     const rewireable = removed && disconnected && restored;
-    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, advancedToolProcessed, noInfiniteTool, droppedToWorld, stagedToolUnlocks, advancedToolLockedEarly, advancedToolUnlockedLater, droppedToolCollected, rarityFootprints, toolThreeWayJackLayout, randomAugmentJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
+    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, advancedToolProcessed, toolXCombinations, noInfiniteTool, droppedToWorld, stagedToolUnlocks, advancedToolLockedEarly, advancedToolUnlockedLater, droppedToolCollected, rarityFootprints, toolThreeWayJackLayout, randomAugmentJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
     report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
   } finally {
     boardCols = savedCols;
@@ -3287,7 +3509,7 @@ function runPlaystyleAudits() {
         const tiers = [1, 2, 3].map((tier) => {
           installPlaystyleSequence(classId, style.id, tier);
           const output = evaluateClassFactory();
-          return output.build?.id === style.id && output.build?.tier === tier && output.build?.depth === tier + 1;
+          return output.build?.id === style.id && output.build?.tier === tier && output.build?.depth === tier;
         });
         installPlaystyleSequence(classId, style.id, 3);
         game.output = evaluateClassFactory();
@@ -3344,7 +3566,7 @@ function runPlaystyleAudits() {
         if (style.id === "cascade") {
           game.enemies = [createAuditEnemy(141, 410, 500, 200, 200)];
           createPlayerExplosion(400, 500, 12, 90);
-          mechanic = game.playerShots.length >= 13 && game.delayedAttacks.some((attack) => attack.kind === "explosion");
+          mechanic = game.playerShots.length >= 8 && game.delayedAttacks.some((attack) => attack.kind === "explosion");
         }
         if (style.id === "orbital") {
           game.enemies = [createAuditEnemy(151, 510, 500, 200, 200)];
@@ -3380,7 +3602,7 @@ function auditMeleeRuntime() {
   executeSlash({ ...game.output.primary, crit: 0 }, 0, 1, false, { direction: 1, finisher: true });
   updateDelayedAttacks(.2);
 
-  const attacker = createAuditEnemy(4, game.player.x + 75, game.player.y, 200, 200);
+  const attacker = createAuditEnemy(4, game.player.x + 75, game.player.y, 1000, 1000);
   game.enemies = [attacker];
   game.player.invulnerable = 0;
   damagePlayer(1, attacker.x, attacker.y);
@@ -3466,7 +3688,7 @@ function auditArtilleryRuntime() {
   advanceAuditProjectiles(100, .012);
 
   game.enemies.push(createAuditEnemy(36, 520, 500, 300, 300));
-  game.player.shotCount = 2;
+  game.player.shotCount = 1;
   fireArtilleryAttack(0);
   advanceAuditProjectiles(90, .012);
 
@@ -3540,8 +3762,8 @@ function runAugmentAuditForClass(classId) {
       forwardProtocols: forwardKinds.length,
       isolatedActivation, events: { ...game.augmentEvents }, protocolEvents: { ...game.protocolEvents }
     };
-    report.pass = report.modules === 10 && report.protocols === 10 && report.forwardProtocols === 10 &&
-      report.forwardDepth === 11 && report.reverseProtocols === 0 && !report.missingActivations.length &&
+    report.pass = report.modules === 10 && report.protocols === 5 && report.forwardProtocols === 5 &&
+      report.forwardDepth === 5 && report.reverseProtocols === 5 && !report.missingActivations.length &&
       !report.missingModules.length && !report.missingEffects.length && !report.missingProtocols.length;
   } finally {
     boardCols = savedCols;
@@ -3563,7 +3785,7 @@ function runAllAugmentAudits() {
   canvas.dataset.auditReport = JSON.stringify({ pass, reports, playstyles, factoryTools });
   canvas.dataset.auditStatus = pass ? "pass" : "fail";
   const result = $("#test-audit-result");
-  result.textContent = pass ? "30 증강 · 드랍 도구 6종 · 단자 회로 · 9 빌드 PASS" : "FAIL · 콘솔 진단 확인";
+  result.textContent = pass ? "30 증강 RANK · 15 진화 · 도구 X 6종 · 9 빌드 PASS" : "FAIL · 콘솔 진단 확인";
   result.classList.toggle("failed", !pass);
   return { pass, reports, playstyles, factoryTools };
 }
@@ -4290,6 +4512,7 @@ $("#factory-board").addEventListener("click", (event) => {
   if (anchorIndexAt(index) >= 0) liftBoardPart(index);
 });
 $("#factory-board").addEventListener("pointerdown", (event) => {
+  if (event.target.closest("button, [data-port-owner]")) return;
   const token = event.target.closest("[data-part-id]");
   if (!token) return;
   const from = board.findIndex((part) => part?.id === Number(token.dataset.partId));

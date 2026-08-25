@@ -9,6 +9,9 @@ const modules = [...source.matchAll(/^\s{2}([msa]_[a-z]+): \{ classId: "(melee|s
   .map((match) => ({ id: match[1], classId: match[2] }));
 const protocols = [...source.matchAll(/\{ types: \["([msa]_[a-z]+)", "([msa]_[a-z]+)"\], kind: "([a-z_]+)"/g)]
   .map((match) => ({ from: match[1], to: match[2], kind: match[3] }));
+const toolCombinations = [...source.matchAll(/\{ types: \["(router|splitter|amplifier|repeater|focuser|inverter)", "(router|splitter|amplifier|repeater|focuser|inverter)"\], name: "([^"]+)"/g)]
+  .map((match) => ({ a: match[1], b: match[2], name: match[3] }));
+const growthEntries = [...source.matchAll(/^\s{2}([msa]_[a-z]+): \["/gm)].map((match) => match[1]);
 const augmentEvents = new Set([...source.matchAll(/noteAugment\("([msa]_[a-z]+)"\)/g)].map((match) => match[1]));
 const protocolEvents = new Set([...source.matchAll(/noteProtocol\("([a-z_]+)"\)/g)].map((match) => match[1]));
 const playstyleIds = [...source.matchAll(/id: "(pursuit|maelstrom|counter|deadeye|hunter|ranger|inferno|cascade|orbital)"/g)].map((match) => match[1]);
@@ -21,15 +24,17 @@ function check(condition, message) {
 }
 
 check(modules.length === 30, `증강 정의 ${modules.length}/30`);
-check(protocols.length === 30, `프로토콜 정의 ${protocols.length}/30`);
+check(protocols.length === 15, `완성형 진화 정의 ${protocols.length}/15`);
+check(toolCombinations.length === 6, `도구 X 조합 정의 ${toolCombinations.length}/6`);
+check(new Set(growthEntries).size === 30, `증강 랭크 성장표 ${new Set(growthEntries).size}/30`);
 check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new Set(playstyleIds).size}/9`);
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-21") && html.includes("game.js?v=prototype-21") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-21 누락");
-check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list", "hud-ram-text", "hud-ram-fill", "choice-ram-capacity", "factory-ram-meta", "factory-tab-ram"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM 성장/공정 도구 UI 항목 누락");
+check(html.includes("styles.css?v=prototype-22") && html.includes("game.js?v=prototype-22") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-22 누락");
+check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list", "factory-tool-combo-list", "factory-synergy-list", "hud-ram-text", "hud-ram-fill", "choice-ram-capacity", "factory-ram-meta", "factory-tab-ram"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM 성장/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("RAM_PER_LEVEL = 2") && source.includes("ramCapacityAtLevel") && source.includes("setFactoryView") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("minimum + offsetSeed %") && source.includes("previewPartPlacement") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("AUGMENT_MAX_RANK = 3") && source.includes("AUGMENT_EVOLUTION_RANK = 2") && source.includes("TOOL_COMBINATIONS") && source.includes("findToolCombination") && source.includes("RAM_PER_LEVEL = 2") && source.includes("ramCapacityAtLevel") && source.includes("setFactoryView") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("minimum + offsetSeed %") && source.includes("previewPartPlacement") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -308,7 +313,36 @@ try {
     const capacityProgression = JSON.stringify(capacities) === JSON.stringify([10, 12, 16, 24, 32]);
     return { factoryOpened, offCenterBusBlocked, centerOnlyStart, disconnectedPlacementBlocked, placedRare, autoLegoActive, storedForRedeploy, pickupAndRedeploy, redeployedActive, proximityOnly, boardExtends, noDropNoTool, unlimitedToolBlocked, droppedToolSelected, toolConsumed, toolRecovered, toolPaletteDrag, raritySizes, portLayouts, committed, capacityProgression };
   })()`, runtime, { timeout: 1800 });
-  check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);  const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
+  check(Object.values(circuitAudit).every(Boolean), `드랍·단자 회로 흐름 검증 실패: ${JSON.stringify(circuitAudit)}`);
+  const rankProgressionAudit = vm.runInContext(`(() => {
+    game.selectedClass = "melee";
+    resetGame();
+    wireInstalledParts([{ id: 8100, kind: "module", type: "m_mark", rank: 1 }]);
+    game.output = evaluateClassFactory();
+    const startingRam = ramUsage(game.output);
+    const upgrade = () => {
+      game.mode = "choice";
+      factory.choiceSelection = "m_mark";
+      confirmAugmentChoice();
+      return ownedRank("m_mark");
+    };
+    const rank2 = upgrade() === 2;
+    const partnerSuggested = generateChoices().includes("m_step");
+    const rank3 = upgrade() === 3;
+    const limitRank = upgrade() === 3 && ownedLimit("m_mark") === 1;
+    wireInstalledParts([
+      { id: 8100, kind: "module", type: "m_mark", rank: 3, limit: 1 },
+      { id: 8101, kind: "module", type: "m_step", rank: 2 }
+    ]);
+    const evolved = evaluateClassFactory();
+    const rankDoesNotDuplicate = modulesOnBoard().filter((part) => part.type === "m_mark").length === 1;
+    const fixedModuleRam = startingRam === MODULE_RAM.m_mark && ramUsage(evolved) === MODULE_RAM.m_mark + MODULE_RAM.m_step + PROTOCOL_RAM;
+    const evolutionActive = evolved.synergyKinds.has("first_mark") && evolved.synergies[0]?.name === "붉은 추격선";
+    const rankPipsVisible = (rankPips(2).match(/class="filled"/g) || []).length === 2;
+    return { rank2, partnerSuggested, rank3, limitRank, rankDoesNotDuplicate, fixedModuleRam, evolutionActive, rankPipsVisible };
+  })()`, runtime, { timeout: 1800 });
+  check(Object.values(rankProgressionAudit).every(Boolean), `증강 랭크·리미트·진화 선택 흐름 실패: ${JSON.stringify(rankProgressionAudit)}`);
+  const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });
   check(fullAudit.pass && fullAudit.playstyles.length === 9 && fullAudit.playstyles.every((report) => report.pass) && fullAudit.factoryTools.pass, `전체 런타임 검증 실패: ${JSON.stringify(fullAudit)}`);
 } catch (error) {
   failures.push(`초기 화면 런타임 오류: ${error.message}`);
@@ -316,17 +350,15 @@ try {
 
 for (const [classId, prefix] of Object.entries(classPrefixes)) {
   const classModules = modules.filter((module) => module.classId === classId);
-  const classProtocols = protocols.filter((protocol) => protocol.from.startsWith(prefix));
-  const exactPairs = new Set(classProtocols.map((protocol) => `${protocol.from}>${protocol.to}`));
+  const classEvolutions = protocols.filter((protocol) => protocol.from.startsWith(prefix));
+  const unorderedPairs = new Set(classEvolutions.map((protocol) => [protocol.from, protocol.to].sort().join("×")));
   check(classModules.length === 10, `${classId}: 증강 ${classModules.length}/10`);
-  check(classProtocols.length === 10, `${classId}: 프로토콜 ${classProtocols.length}/10`);
-  check(classProtocols.every((protocol) => protocol.to.startsWith(prefix)), `${classId}: 다른 클래스 연결 존재`);
+  check(classEvolutions.length === 5, `${classId}: 완성형 진화 ${classEvolutions.length}/5`);
+  check(classEvolutions.every((protocol) => protocol.to.startsWith(prefix)), `${classId}: 다른 클래스 진화 연결 존재`);
   check(classModules.every((module) => augmentEvents.has(module.id)), `${classId}: 런타임 증강 기록 누락`);
-  check(classProtocols.every((protocol) => protocolEvents.has(protocol.kind)), `${classId}: 런타임 프로토콜 기록 누락`);
-  check(classModules.every((module) => classProtocols.filter((protocol) => protocol.from === module.id).length === 1), `${classId}: 출발 링크가 1개가 아닌 증강 존재`);
-  check(classModules.every((module) => classProtocols.filter((protocol) => protocol.to === module.id).length === 1), `${classId}: 도착 링크가 1개가 아닌 증강 존재`);
-  check(classProtocols.every((protocol, index) => protocol.to === classProtocols[(index + 1) % classProtocols.length].from), `${classId}: 레시피 순환이 끊김`);
-  check(classProtocols.every((protocol) => !exactPairs.has(`${protocol.to}>${protocol.from}`)), `${classId}: 역방향도 활성화되는 링크 존재`);
+  check(classEvolutions.every((protocol) => protocolEvents.has(protocol.kind)), `${classId}: 런타임 진화 기록 누락`);
+  check(classModules.every((module) => classEvolutions.filter((evolution) => evolution.from === module.id || evolution.to === module.id).length === 1), `${classId}: 진화 파트너가 정확히 1개가 아닌 증강 존재`);
+  check(unorderedPairs.size === classEvolutions.length, `${classId}: 중복 진화 쌍 존재`);
 }
 
 if (failures.length) {
@@ -335,5 +367,5 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log("GAME AUDIT PASS");
-  console.log("30/30 augments · T1→T3 staged tools · tool 4-way / sparse 2+ augment jacks · drag/PICK/redeploy · 9/9 playstyles · high-tempo combat + crit impact rendering");
+  console.log("30 augments × 3 ranks · 15 unordered evolutions · 6 tool X combinations · 9/9 builds · responsive circuit UX");
 }

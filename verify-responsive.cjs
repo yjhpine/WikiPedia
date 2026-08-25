@@ -120,13 +120,16 @@ async function clickElement(session, selector) {
 
 async function dragElementToElement(session, sourceSelector, targetSelector) {
   const points = await evaluate(session, `(() => {
-    const point = (selector) => {
-      const element = document.querySelector(selector);
-      if (!element) return null;
+    const source = document.querySelector(${JSON.stringify(sourceSelector)});
+    const target = document.querySelector(${JSON.stringify(targetSelector)});
+    if (!source || !target) return { source: null, target: null };
+    source.scrollIntoView({ block: "center", inline: "center" });
+    target.scrollIntoView({ block: "center", inline: "center" });
+    const point = (element) => {
       const rect = element.getBoundingClientRect();
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     };
-    return { source: point(${JSON.stringify(sourceSelector)}), target: point(${JSON.stringify(targetSelector)}) };
+    return { source: point(source), target: point(target) };
   })()`);
   assert(points.source && points.target, `드래그 대상 누락: ${sourceSelector} → ${targetSelector}`);
   await session.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: points.source.x, y: points.source.y });
@@ -248,13 +251,16 @@ async function auditViewport(session, viewport) {
       boardScrollable: document.querySelector('.factory-layout').scrollWidth >= document.querySelector('.factory-layout').clientWidth,
       view: document.querySelector('.factory-shell').dataset.factoryView,
       tabsVisible: getComputedStyle(document.querySelector('.factory-tabs')).display !== 'none',
-      headerRam: document.querySelector('#factory-ram-meta')?.textContent || ''
+      headerRam: document.querySelector('#factory-ram-meta')?.textContent || '',
+      toolComboPrompt: document.querySelector('#factory-tool-combo-list')?.textContent || '',
+      evolutionPrompt: document.querySelector('#factory-synergy-list')?.textContent || ''
     };
   })()`);
   assert(factory.open, `${viewport.name}: 공장 오버레이 열기 실패`);
   assert(rectFits(factory.shell, viewport.width, viewport.height), `${viewport.name}: 공장 셸 잘림 ${JSON.stringify(factory.shell)}`);
   assert(factory.boardScrollable, `${viewport.name}: 공장 레이아웃 스크롤 보호 누락`);
   assert(factory.headerRam === "0 / 10 RAM", `${viewport.name}: 공장 헤더 RAM 표시 오류 ${JSON.stringify(factory)}`);
+  assert(factory.toolComboPrompt.includes("X 조합") && factory.evolutionPrompt.includes("RANK 2"), `${viewport.name}: 도구 X·진화 안내 누락 ${JSON.stringify(factory)}`);
   if (viewport.name === "portrait") {
     assert(factory.tabsVisible && factory.view === "board", "portrait: 공장 탭 또는 기본 회로 화면 누락 " + JSON.stringify(factory));
     await evaluate(session, "document.querySelector('[data-factory-view=\"parts\"]').click()");
@@ -268,6 +274,35 @@ async function auditViewport(session, viewport) {
     assert(!factory.tabsVisible, `${viewport.name}: 데스크톱에서 모바일 공장 탭이 노출됨`);
   }
   await captureUi(session, viewport, "factory");
+
+  if (viewport.name === "portrait") {
+    await evaluate(session, "document.querySelector('[data-factory-view=\"output\"]').click()");
+    await sleep(40);
+    await clickElement(session, "#factory-commit");
+    await sleep(80);
+    await evaluate(session, "document.querySelector('#test-level').click()");
+    const portraitChoice = await waitUntil(async () => {
+      const state = await evaluate(session, `(() => {
+        const overlay = document.querySelector('#choice-overlay');
+        const cards = [...document.querySelectorAll('.augment-card')].map((card) => {
+          const rect = card.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, state: card.querySelector('.card-top strong')?.textContent || '' };
+        });
+        return {
+          open: !overlay.hidden,
+          cards,
+          ranks: document.querySelectorAll('.augment-card .rank-track').length,
+          effects: document.querySelectorAll('.augment-card .next-rank-effect').length,
+          evolutions: document.querySelectorAll('.augment-card .evolution-preview').length,
+          overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth
+        };
+      })()`);
+      return state.open ? state : null;
+    });
+    assert(portraitChoice.cards.length === 3 && portraitChoice.ranks === 3 && portraitChoice.effects === 3 && portraitChoice.evolutions === 3, "portrait: 랭크·진화 3택 UI 누락 " + JSON.stringify(portraitChoice));
+    assert(portraitChoice.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1) && portraitChoice.overflowX <= 1, "portrait: 레벨업 카드 가로 잘림 " + JSON.stringify(portraitChoice));
+    await captureUi(session, viewport, "levelup");
+  }
 
   if (viewport.name === "wide") {
     await clickElement(session, "#factory-commit");
@@ -315,7 +350,7 @@ async function auditViewport(session, viewport) {
     assert(stored.stored === 1 && !stored.token && stored.wires === 0, "wide: 설치 블록을 STORAGE로 회수하지 못함 " + JSON.stringify(stored));
     await dragElementToElement(session, '#reserve-parts [data-reserve-id]', '#factory-board [data-cell-index="7"]');
     await sleep(100);
-    const redeployed = await evaluate(session, "({ token: document.querySelector('.module-token')?.className || '', wires: document.querySelectorAll('.circuit-wire').length })");
+    const redeployed = await evaluate(session, "({ token: document.querySelector('.module-token')?.className || '', wires: document.querySelectorAll('.circuit-wire').length, reserve: document.querySelectorAll('#reserve-parts [data-reserve-id]').length, pending: Boolean(document.querySelector('#pending-part .pending-module')), dragged: document.querySelector('#board-message')?.textContent || '', pointer: document.querySelector('#game-canvas')?.dataset.factoryPointer || '', source: document.querySelector('#reserve-parts [data-reserve-id]')?.getBoundingClientRect().toJSON?.() || null, target: document.querySelector('#factory-board [data-cell-index=\\\"7\\\"]')?.getBoundingClientRect().toJSON?.() || null, sourceHit: (() => { const r = document.querySelector('#reserve-parts [data-reserve-id]')?.getBoundingClientRect(); const e = r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return e?.outerHTML?.slice(0, 180) || ''; })() })");
     assert(redeployed.token.includes('raw') && redeployed.wires === 1, "wide: STORAGE 블록을 재설치해 자동 결합하지 못함 " + JSON.stringify(redeployed));
     await clickElement(session, "#factory-commit");
     await sleep(80);
@@ -398,11 +433,20 @@ async function auditViewport(session, viewport) {
         capacity: Number(document.querySelector('#game-canvas').dataset.ramCapacity),
         hudRam: document.querySelector('#hud-ram-text').textContent,
         expansion: document.querySelector('#choice-ram-capacity').textContent,
-        gain: document.querySelector('#choice-ram-gain').textContent
+        gain: document.querySelector('#choice-ram-gain').textContent,
+        cards: [...document.querySelectorAll('.augment-card')].map((card) => {
+          const rect = card.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, state: card.querySelector('.card-top strong')?.textContent || '' };
+        }),
+        ranks: document.querySelectorAll('.augment-card .rank-track').length,
+        effects: document.querySelectorAll('.augment-card .next-rank-effect').length,
+        evolutions: document.querySelectorAll('.augment-card .evolution-preview').length
       }))()`);
       return state.choiceOpen ? state : null;
     });
     assert(levelRamUi.level === 2 && levelRamUi.capacity === 12 && levelRamUi.hudRam.endsWith('/ 12') && levelRamUi.expansion === '10 → 12 RAM' && levelRamUi.gain === '+2 CAPACITY', "wide: 레벨업 RAM 성장 UI 실패 " + JSON.stringify(levelRamUi));
+    assert(levelRamUi.cards.length === 3 && levelRamUi.ranks === 3 && levelRamUi.effects === 3 && levelRamUi.evolutions === 3, "wide: 랭크·진화 3택 UI 누락 " + JSON.stringify(levelRamUi));
+    assert(levelRamUi.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1 && card.top >= -1 && card.bottom <= viewport.height + 1), "wide: 레벨업 카드 잘림 " + JSON.stringify(levelRamUi));
     await captureUi(session, viewport, "levelup");
   }
   return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}${viewport.name === "wide" && rightClickReset ? " · right-click reset" : ""}`;
