@@ -24,22 +24,88 @@ const CLASS_PROFILES = {
   melee: {
     name: "근접 클래스", title: "절단 집행자", code: "BLADE", color: "#58d7d3", icon: "刃",
     attackName: "교대 횡베기", damage: 18, range: 104 * MELEE_WEAPON_SCALE, arc: 118, cooldown: .5,
-    description: "2배 길이의 칼날로 넓어진 사거리에서 좌우 횡베기를 교대로 잇고, 표식·반격·돌진으로 적진 안에서 싸웁니다.",
-    identity: "근접 압박 · 방향 콤보 · 반격", signature: "m_mark"
+    maxHp: 150, moveSpeed: 225, dashSpeed: 610, dashDuration: .17, dashName: "전투 대시", lifeSteal: .08,
+    techniqueName: "칼날 방벽", techniqueKey: "SHIFT", techniqueCooldown: 4, techniqueDuration: .7,
+    description: "높은 체력과 근접 피흡으로 버티며 Shift 칼날 방벽으로 결정적인 공격을 막습니다.",
+    identity: "HP 150 · 피흡 8% · SHIFT 방어", statLine: "HP 150 · 근접 피해 8% 회복 · Shift 칼날 방벽", signature: "m_mark"
   },
   sniper: {
     name: "원거리 저격 클래스", title: "레일 관측자", code: "SNIPER", color: "#f6dc66", icon: "◎",
     attackName: "레일 저격", damage: 38, range: 760, arc: 0, cooldown: .82,
-    description: "긴 사거리의 단발 레일탄으로 표식과 관통 경로를 설계하며 싸웁니다.",
-    identity: "장거리 단발 · 표식 · 도탄", signature: "s_pierce"
+    maxHp: 50, moveSpeed: 270, dashSpeed: 825, dashDuration: .17, dashName: "장거리 회피",
+    description: "낮은 체력을 빠른 이동과 약 35% 긴 회피 거리로 보완하며 사선을 유지합니다.",
+    identity: "HP 50 · 이동 +20% · 회피 +35%", statLine: "HP 50 · 이동 속도 +20% · 회피 거리 +35%", signature: "s_pierce"
   },
   artillery: {
     name: "광역 공격 클래스", title: "폭발 설계자", code: "BLAST", color: "#ff714f", icon: "✹",
     attackName: "중력 유탄", damage: 19, range: 540, arc: 0, cooldown: .88,
-    description: "조준 지점에 유탄을 투사해 흡입·분열·지속 지대를 연쇄 설계합니다.",
-    identity: "범위 제어 · 지연 폭발 · 연쇄 기폭", signature: "a_fire"
+    maxHp: 100, moveSpeed: 190, dashSpeed: 610, dashDuration: .17, dashName: "중량 대시", blastRadiusMult: 1.25,
+    description: "느린 이동 대신 모든 주요 폭발 반경이 25% 넓어 전장을 크게 봉쇄합니다.",
+    identity: "HP 100 · 이동 -16% · 폭발 +25%", statLine: "HP 100 · 이동 속도 -16% · 폭발 반경 +25%", signature: "a_fire"
   }
 };
+
+const COMBAT_ROOMS_PER_SECTOR = 5;
+const ROOMS_PER_SECTOR = COMBAT_ROOMS_PER_SECTOR + 1;
+const BOSS_TYPES = ["forge_titan", "prism_warden", "void_leviathan"];
+const BOSS_PROFILES = {
+  forge_titan: {
+    name: "용광로 거신", title: "FORGE TITAN", color: "#ff714f", accent: "#ffbd57",
+    hp: 980, speed: 43, radius: 50, damage: 28, xp: 150,
+    description: "중장갑 돌진과 용융 지뢰로 공간을 압착하는 근접 공성 보스",
+    patterns: [
+      { id: "hammer_slam", name: "단조 충격", windup: .82, cooldown: 1.45 },
+      { id: "furnace_fan", name: "용광로 산탄", windup: .62, cooldown: 1.35 },
+      { id: "rail_charge", name: "압연 돌진", windup: .72, cooldown: 1.5 },
+      { id: "slag_mines", name: "슬래그 지뢰", windup: .7, cooldown: 1.4 },
+      { id: "drone_forge", name: "전투체 주조", windup: .95, cooldown: 2.2 }
+    ]
+  },
+  prism_warden: {
+    name: "프리즘 감시자", title: "PRISM WARDEN", color: "#a48cff", accent: "#69a9ff",
+    hp: 820, speed: 58, radius: 42, damage: 23, xp: 155,
+    description: "순간이동과 굴절 광선으로 안전 지대를 재단하는 원거리 보스",
+    patterns: [
+      { id: "prism_lance", name: "칠색 관통광", windup: .9, cooldown: 1.45 },
+      { id: "kaleidoscope", name: "만화경 탄막", windup: .62, cooldown: 1.35 },
+      { id: "mirror_gate", name: "거울문 포화", windup: .8, cooldown: 1.65 },
+      { id: "blink_shot", name: "굴절 점멸", windup: .52, cooldown: 1.25 },
+      { id: "prism_cage", name: "프리즘 감옥", windup: .9, cooldown: 1.8 }
+    ]
+  },
+  void_leviathan: {
+    name: "공허 레비아탄", title: "VOID LEVIATHAN", color: "#ef70c4", accent: "#58d7d3",
+    hp: 900, speed: 52, radius: 46, damage: 25, xp: 160,
+    description: "중력장과 나선 탄막으로 이동 리듬을 무너뜨리는 심연 보스",
+    patterns: [
+      { id: "spiral_tide", name: "공허 나선", windup: .68, cooldown: 1.4 },
+      { id: "gravity_well", name: "중력 우물", windup: .88, cooldown: 1.8 },
+      { id: "void_dive", name: "차원 잠행", windup: .76, cooldown: 1.55 },
+      { id: "tail_sweep", name: "사건지평선 휩쓸기", windup: .58, cooldown: 1.3 },
+      { id: "abyss_spawn", name: "심연 증식", windup: .98, cooldown: 2.15 }
+    ]
+  }
+};
+
+function sectorNumber(room = game.room) {
+  return Math.floor((room - 1) / ROOMS_PER_SECTOR) + 1;
+}
+
+function sectorRoom(room = game.room) {
+  return (room - 1) % ROOMS_PER_SECTOR + 1;
+}
+
+function isBossRoom(room = game.room) {
+  return sectorRoom(room) === ROOMS_PER_SECTOR;
+}
+
+function isBossType(type) {
+  return Boolean(BOSS_PROFILES[type]);
+}
+
+function bossTypeForRoom(room = game.room) {
+  return BOSS_TYPES[(sectorNumber(room) - 1) % BOSS_TYPES.length];
+}
 
 const MODULES = {
   m_mark: { classId: "melee", name: "결투 표식기", code: "D", color: "#58d7d3", description: "한 방향 베기로 표식을 새기고 반대 방향 베기로 표식을 소비해 교차 절단합니다.", hint: "방향을 번갈아 맞히는 결투 콤보 생성" },
@@ -296,6 +362,10 @@ const MODULE_RARITIES = Object.fromEntries(moduleTypes.map((type, index) => {
   const slot = index % 10;
   return [type, slot < 4 ? "common" : slot < 8 ? "rare" : "legendary"];
 }));
+const MODULE_FOOTPRINTS = {
+  m_hook: { width: 1, height: 2 }, s_homing: { width: 2, height: 1 }, a_chain: { width: 1, height: 2 },
+  m_execute: { width: 2, height: 4 }, s_dashload: { width: 4, height: 2 }, a_recursive: { width: 2, height: 4 }
+};
 const BUS_SOURCE_ID = "bus-source";
 const BUS_SOURCE_LABEL = "BUS IN";
 const board = Array(boardCols * ROWS).fill(null);
@@ -318,7 +388,8 @@ function moduleRarity(type) {
 function partFootprint(part) {
   if (partKind(part) === "tool") return { width: 1, height: 1, rarity: null };
   const rarity = moduleRarity(part?.type);
-  return { width: rarity.width, height: rarity.height, rarity };
+  const shape = MODULE_FOOTPRINTS[part?.type] || rarity;
+  return { width: shape.width, height: shape.height, rarity };
 }
 
 function footprintIndices(part, anchorIndex) {
@@ -623,7 +694,7 @@ function selectClass(classId) {
   $("#selected-class-copy").textContent = profile.name + " · " + profile.identity;
   $("#game").dataset.combatClass = classId;
   $("#game").style.setProperty("--class-color", profile.color);
-  $("#attack-name").textContent = profile.attackName;
+
   game.output = evaluateClassFactory();
   renderTestModuleButtons();
 }
@@ -646,10 +717,10 @@ const game = {
   mode: "start", selectedClass: null, width: innerWidth, height: innerHeight, time: 0, room: 1,
   kills: 0, xp: 0, xpNext: 28, levelUpQueued: false, roomCleared: false,
   doorOpen: false, doorPulse: 0, roomBanner: 0, player: null, enemies: [],
-  enemyBullets: [], playerShots: [], zones: [], delayedAttacks: [], orbitals: [], toolDrops: [],
+  enemyBullets: [], playerShots: [], zones: [], bossHazards: [], delayedAttacks: [], orbitals: [], toolDrops: [],
   particles: [], floaters: [], echoes: [], keys: new Set(),
   mouse: { x: innerWidth * .7, y: innerHeight * .5 }, dashRequested: false,
-  attackRequested: false, output: null, nextEnemyId: 1, shake: 0, hitStop: 0, criticalHits: 0,
+  guardRequested: false, attackRequested: false, output: null, nextEnemyId: 1, shake: 0, hitStop: 0, criticalHits: 0,
   pulses: [], hitConfirm: 0, missPulse: 0, augmentEvents: {}, protocolEvents: {},
   cameraOffsetX: 0, cameraOffsetY: 0, cursorX: innerWidth * .7, cursorY: innerHeight * .5,
   nextDropId: 1
@@ -977,7 +1048,7 @@ function evaluateClassFactory() {
   primary.critMultiplier = 2 + tuning.power * .13 + tuning.focus * .08;
   primary.classId = classId;
   primary.modules = new Set(activeIds);
-  primary.blastRadius = classId === "artillery" ? 86 * tuning.areaMult : 0;
+  primary.blastRadius = classId === "artillery" ? 86 * classProfile.blastRadiusMult * tuning.areaMult : 0;
   const echo = createAttackProfile("진화 후속 공격", Math.round(classProfile.damage * .55), classProfile.range, classProfile.arc);
   echo.cooldown = 0;
   echo.crit = Math.max(.04, primary.crit * .65);
@@ -1541,8 +1612,9 @@ function openFactory(manual) {
 
 function syncPlayerDerivedStats(previousMax) {
   if (!game.player) return;
-  const oldMax = previousMax || game.player.maxHp || 100;
-  const nextMax = Math.round(100 + game.output.guard.maxHpBonus);
+  const baseMaxHp = CLASS_PROFILES[game.selectedClass]?.maxHp || 100;
+  const oldMax = previousMax || game.player.maxHp || baseMaxHp;
+  const nextMax = Math.round(baseMaxHp + game.output.guard.maxHpBonus);
   const gained = Math.max(0, nextMax - oldMax);
   game.player.maxHp = nextMax;
   game.player.hp = clamp(game.player.hp + gained, 0, nextMax);
@@ -1643,7 +1715,7 @@ function augmentHardwarePreview(part, stateLabel = "ASSIGNED LAYOUT") {
   const sizeLabel = footprint.width + "×" + footprint.height;
   const occupiedCells = footprint.width * footprint.height;
   return '<div class="augment-hardware rarity-' + rarity.id + '" data-rarity="' + rarity.id + '" data-footprint="' + sizeLabel + '" data-input-count="1" data-output-count="' + outputEdges.length + '" aria-label="' + rarity.label + ' ' + sizeLabel + ', ' + occupiedCells + '칸 점유, 입력 좌측 1개, 출력 ' + outputEdges.map((edge) => HARDWARE_EDGE_LABELS[edge]).join(', ') + '">' +
-    '<div class="hardware-diagram"><div class="hardware-grid size-' + footprint.width + '" style="--hardware-cols:' + footprint.width + ';--hardware-rows:' + footprint.height + '">' + cells + '<b>' + def.code + '</b>' + ports + '</div></div>' +
+    '<div class="hardware-diagram"><div class="hardware-grid size-' + footprint.width + '" style="--hardware-cols:' + footprint.width + ';--hardware-rows:' + footprint.height + ';--hardware-width:' + Math.max(24, Math.min(64, 16 * footprint.width)) + 'px;--hardware-height:' + Math.max(24, Math.min(64, 16 * footprint.height)) + 'px">' + cells + '<b>' + def.code + '</b>' + ports + '</div></div>' +
     '<div class="hardware-copy"><span style="--rarity-color:' + rarity.color + '">' + rarity.code + ' · ' + rarity.label + '</span><b>' + sizeLabel + ' · ' + occupiedCells + ' CELLS</b><small>' + augmentPortSummary(part) + '</small><em>' + stateLabel + '</em></div></div>';
 }
 
@@ -1844,6 +1916,7 @@ function resetGame() {
   game.doorOpen = false;
   game.attackRequested = false;
   game.dashRequested = false;
+  game.guardRequested = false;
   game.keys.clear();
   canvas.dataset.swingCount = "0";
   canvas.dataset.swingDirection = "ready-left-to-right";
@@ -1852,13 +1925,14 @@ function resetGame() {
   canvas.dataset.protocolEvents = "";
   game.augmentEvents = {};
   game.protocolEvents = {};
+  const classProfile = CLASS_PROFILES[game.selectedClass] || CLASS_PROFILES.melee;
   game.player = {
     x: game.width * .5, y: game.height - 145, radius: 17,
-    hp: 100, maxHp: 100, level: 1, speed: 225 * COMBAT_TEMPO.unitMove,
+    hp: classProfile.maxHp, maxHp: classProfile.maxHp, level: 1, speed: classProfile.moveSpeed * COMBAT_TEMPO.unitMove,
     aim: -Math.PI / 2, facing: -Math.PI / 2, weaponFacing: -Math.PI / 2,
     renderX: game.width * .5, renderY: game.height - 145, aimHold: 0, bufferedAim: null,
-    attackCooldown: 0, dashCooldown: 0, dashTime: 0,
-    invulnerable: 0, combo: 0, slash: null, nextSwingDirection: 1, swingCount: 0,
+    attackCooldown: 0, dashCooldown: 0, dashTime: 0, guardCooldown: 0, guardTime: 0, guardBlocks: 0,
+    invulnerable: 0, lifeStealFlash: 0, lifeStolen: 0, combo: 0, slash: null, nextSwingDirection: 1, swingCount: 0,
     attackBuffer: 0, shotCount: 0, dashBombCount: 0, rangerVolley: 0, stillTime: 0, attackFlash: 0, riposteReady: false,
     riposteTargetId: null,
     lastMoveX: 0, lastMoveY: -1
@@ -1867,6 +1941,7 @@ function resetGame() {
   game.enemyBullets = [];
   game.playerShots = [];
   game.zones = [];
+  game.bossHazards = [];
   game.delayedAttacks = [];
   game.orbitals = [];
   game.toolDrops = [];
@@ -1889,6 +1964,8 @@ function resetGame() {
   $("#damage-flash").classList.remove("hit");
   $("#critical-flash").classList.remove("critical");
   canvas.dataset.criticalHits = "0";
+  canvas.dataset.guardBlocks = "0";
+  canvas.dataset.lifeStolen = "0";
   $("#system-toast").classList.remove("show");
   game.output = evaluateClassFactory();
   enterRoom(1);
@@ -1909,8 +1986,9 @@ function startGame() {
 }
 
 function roomType(room) {
-  if (room % 5 === 0) return "엘리트";
-  if (room % 3 === 0) return "기계실";
+  if (isBossRoom(room)) return "보스룸";
+  if (sectorRoom(room) === COMBAT_ROOMS_PER_SECTOR) return "엘리트 전초전";
+  if (sectorRoom(room) % 3 === 0) return "기계실";
   return "전투실";
 }
 
@@ -1923,6 +2001,7 @@ function enterRoom(room) {
   game.enemyBullets = [];
   game.playerShots = [];
   game.zones = [];
+  game.bossHazards = [];
   game.delayedAttacks = [];
   game.orbitals = [];
   game.echoes = [];
@@ -1931,41 +2010,57 @@ function enterRoom(room) {
   game.player.y = bounds.bottom - 45;
   game.player.renderX = game.player.x;
   game.player.renderY = game.player.y;
-  const count = Math.min(8, 3 + Math.ceil(room * .72));
-  for (let index = 0; index < count; index += 1) {
-    let type = "drone";
-    if (room >= 2 && index % 3 === 1) type = "turret";
-    if (room >= 3 && index % 4 === 3) type = "brute";
-    if (room % 5 === 0 && index === count - 1) type = "guardian";
-    const angle = (index / count) * Math.PI * 2 + .35;
-    const radius = Math.min(game.width, game.height) * (.23 + (index % 2) * .07);
-    spawnEnemy(type, game.width * .5 + Math.cos(angle) * radius, game.height * .48 + Math.sin(angle) * radius * .55);
+  if (isBossRoom(room)) {
+    const bossType = bossTypeForRoom(room);
+    const boss = spawnEnemy(bossType, game.width * .5, bounds.top + Math.min(210, (bounds.bottom - bounds.top) * .28));
+    showSystemToast("BOSS CORE DETECTED", BOSS_PROFILES[bossType].name + " · 패턴 신호를 읽고 안전 지대를 확보하세요.", "danger", 3600);
+    if (boss) addPulse(boss.x, boss.y, boss.color, 130, .85);
+  } else {
+    const count = Math.min(8, 3 + Math.ceil(room * .72));
+    for (let index = 0; index < count; index += 1) {
+      let type = "drone";
+      if (room >= 2 && index % 3 === 1) type = "turret";
+      if (room >= 3 && index % 4 === 3) type = "brute";
+      if (sectorRoom(room) === COMBAT_ROOMS_PER_SECTOR && index === count - 1) type = "guardian";
+      const angle = (index / count) * Math.PI * 2 + .35;
+      const radius = Math.min(game.width, game.height) * (.23 + (index % 2) * .07);
+      spawnEnemy(type, game.width * .5 + Math.cos(angle) * radius, game.height * .48 + Math.sin(angle) * radius * .55);
+    }
   }
+  $("#game").dataset.roomKind = isBossRoom(room) ? "boss" : "combat";
+  canvas.dataset.bossRoom = String(isBossRoom(room));
   $("#door-prompt").hidden = true;
 }
 
 function spawnEnemy(type, x, y) {
-  const scale = 1 + (game.room - 1) * .11;
-  const data = {
+  const bossProfile = BOSS_PROFILES[type] || null;
+  const scale = bossProfile ? 1 + (sectorNumber() - 1) * .3 : 1 + (game.room - 1) * .11;
+  const data = bossProfile || {
     drone: { hp: 32, speed: 88, radius: 14, damage: 12, xp: 8, color: "#e95757" },
     turret: { hp: 42, speed: 45, radius: 16, damage: 10, xp: 10, color: "#e7a050" },
     brute: { hp: 82, speed: 54, radius: 22, damage: 19, xp: 15, color: "#bb596d" },
     guardian: { hp: 210, speed: 58, radius: 29, damage: 24, xp: 34, color: "#ff873f" }
   }[type];
+  if (!data) return null;
   const bounds = roomBounds();
-  const spawnX = clamp(x, bounds.left + 35, bounds.right - 35);
-  const spawnY = clamp(y, bounds.top + 45, bounds.bottom - 55);
-  game.enemies.push({
+  const spawnX = clamp(x, bounds.left + data.radius + 12, bounds.right - data.radius - 12);
+  const spawnY = clamp(y, bounds.top + data.radius + 12, bounds.bottom - data.radius - 12);
+  const enemy = {
     id: game.nextEnemyId++, type,
     x: spawnX, y: spawnY, renderX: spawnX, renderY: spawnY,
     radius: data.radius, hp: data.hp * scale, maxHp: data.hp * scale,
-    speed: (data.speed + game.room * 1.4) * COMBAT_TEMPO.unitMove, damage: data.damage, xp: data.xp,
-    color: data.color, attackCooldown: (.5 + Math.random() * .5) / COMBAT_TEMPO.attackRate,
+    speed: (data.speed + (bossProfile ? sectorNumber() * 2 : game.room * 1.4)) * COMBAT_TEMPO.unitMove, damage: data.damage, xp: data.xp,
+    color: data.color, accent: data.accent || data.color, name: data.name || type, boss: Boolean(bossProfile),
+    attackCooldown: (.5 + Math.random() * .5) / COMBAT_TEMPO.attackRate,
     shootCooldown: (1 + Math.random()) / COMBAT_TEMPO.attackRate, chargeCooldown: 1.8 / COMBAT_TEMPO.attackRate,
     shootWindup: 0, chargeWindup: 0, chargeTime: 0, chargeAngle: 0,
+    patternIndex: 0, patternId: null, patternName: "패턴 분석 중", patternWindup: 0, patternWindupMax: 0,
+    patternCooldown: bossProfile ? 1.25 : 0, bossDashTime: 0, bossDashAngle: 0, summonCount: 0,
     burnTime: 0, burnDps: 0, bleedTime: 0, bleedDps: 0,
     stun: 0, flash: 0, critical: 0, dead: false
-  });
+  };
+  game.enemies.push(enemy);
+  return enemy;
 }
 
 function addParticles(x, y, color, count, speed) {
@@ -2011,7 +2106,7 @@ function addFloater(x, y, text, color, options) {
 }
 
 function spawnToolDrop(enemy) {
-  const guaranteed = enemy.type === "guardian";
+  const guaranteed = enemy.type === "guardian" || isBossType(enemy.type);
   const chance = Math.min(.72, .38 + game.room * .035);
   if (!guaranteed && Math.random() > chance) return null;
   const available = availableToolTypes();
@@ -2077,11 +2172,17 @@ function killEnemy(enemy) {
   enemy.dead = true;
   game.kills += 1;
   game.xp += enemy.xp;
-  addParticles(enemy.x, enemy.y, enemy.color, enemy.type === "guardian" ? 28 : 13, 190);
-  addPulse(enemy.x, enemy.y, enemy.color, enemy.type === "guardian" ? 82 : 48, .38);
-  addFloater(enemy.x, enemy.y - enemy.radius, "XP +" + enemy.xp);
+  const bossKill = isBossType(enemy.type);
+  addParticles(enemy.x, enemy.y, enemy.color, bossKill ? 72 : enemy.type === "guardian" ? 28 : 13, bossKill ? 280 : 190);
+  addPulse(enemy.x, enemy.y, enemy.color, bossKill ? 170 : enemy.type === "guardian" ? 82 : 48, bossKill ? .82 : .38);
+  addFloater(enemy.x, enemy.y - enemy.radius, bossKill ? "BOSS CORE BREAK · XP +" + enemy.xp : "XP +" + enemy.xp, bossKill ? enemy.accent : undefined, { life: bossKill ? 1.5 : .85 });
   spawnToolDrop(enemy);
-  game.shake = Math.max(game.shake, enemy.type === "guardian" ? 10 : 4);
+  if (bossKill) {
+    game.bossHazards = [];
+    game.enemyBullets = [];
+    showSystemToast("BOSS CORE SHATTERED", enemy.name + " 격파 · 다음 생산 구역이 개방됩니다.", "success", 3600);
+  }
+  game.shake = Math.max(game.shake, bossKill ? 22 : enemy.type === "guardian" ? 10 : 4);
   if (game.xp >= game.xpNext) game.levelUpQueued = true;
 }
 
@@ -2107,9 +2208,10 @@ function finishRoom() {
     addFloater(game.player.x, game.player.y - 30, "REPAIR +" + repair, "#71efad");
   }
   $("#door-prompt").hidden = false;
-  addFloater(game.width * .5, 145, "NORTH GATE OPEN", "#58d7d3");
-  addPulse(game.width * .5, roomBounds().top, "#58d7d3", 110, .55);
-  showSystemToast("SECTOR CLEAR", "북쪽 출구가 열렸습니다. 문 근처에서 E를 누르세요.", "success", 3000);
+  const bossClear = isBossRoom();
+  addFloater(game.width * .5, 145, bossClear ? "BOSS GATE OPEN" : "NORTH GATE OPEN", "#58d7d3");
+  addPulse(game.width * .5, roomBounds().top, "#58d7d3", bossClear ? 150 : 110, .55);
+  if (!bossClear) showSystemToast("SECTOR CLEAR", "북쪽 출구가 열렸습니다. 문 근처에서 E를 누르세요.", "success", 3000);
 }
 
 function tryNextRoom(force) {
@@ -2138,7 +2240,16 @@ function damageEnemy(enemy, damage, profile, angle, canCrit) {
   if (enemy.dead) return;
   const crit = Boolean(canCrit) && Math.random() < clamp(profile.crit || 0, 0, .95);
   const dealt = damage * (crit ? (profile.critMultiplier || 2) : 1);
+  const effectiveDamage = Math.max(0, Math.min(enemy.hp, dealt));
   enemy.hp -= dealt;
+  const classProfile = CLASS_PROFILES[game.selectedClass];
+  if (game.selectedClass === "melee" && classProfile.lifeSteal > 0 && game.player?.hp > 0 && game.player.hp < game.player.maxHp) {
+    const recovered = Math.min(game.player.maxHp - game.player.hp, effectiveDamage * classProfile.lifeSteal);
+    game.player.hp += recovered;
+    game.player.lifeStolen += recovered;
+    game.player.lifeStealFlash = .22;
+    canvas.dataset.lifeStolen = game.player.lifeStolen.toFixed(1);
+  }
   enemy.flash = crit ? .24 : .12;
   enemy.stun = Math.max(enemy.stun, profile.stun);
   enemy.x += Math.cos(angle) * profile.knockback;
@@ -2475,6 +2586,10 @@ function fireSniperAttack(angle) {
   addParticles(player.x + Math.cos(angle) * 34, player.y + Math.sin(angle) * 34, charged ? "#f6dc66" : "#d9f4ff", charged ? 15 : 7, 145);
 }
 
+function artilleryBlastRadius(radius) {
+  return radius * (CLASS_PROFILES.artillery.blastRadiusMult || 1);
+}
+
 function launchGrenade(angle, options) {
   const player = game.player;
   const settings = options || {};
@@ -2505,7 +2620,7 @@ function fireArtilleryAttack(angle) {
   }
   launchGrenade(angle, {
     supernova,
-    blastRadius: supernova ? 126 + augmentRank("a_super") * 18 : game.output.primary.blastRadius,
+    blastRadius: supernova ? artilleryBlastRadius(126 + augmentRank("a_super") * 18) : game.output.primary.blastRadius,
     damage: supernova ? 28 + augmentRank("a_super") * 6 : game.output.primary.damage,
     color: game.output.build?.color || (supernova ? "#f6dc66" : "#ff9b4a")
   });
@@ -2514,7 +2629,7 @@ function fireArtilleryAttack(angle) {
 
 function startSlash(attackAngle) {
   const player = game.player;
-  if (game.mode !== "playing" || player.attackCooldown > 0 || player.dashTime > 0) return false;
+  if (game.mode !== "playing" || player.attackCooldown > 0 || player.dashTime > 0 || player.guardTime > 0) return false;
   const output = game.output;
   const fallbackAim = Math.atan2(game.mouse.y - player.y, game.mouse.x - player.x);
   player.aim = Number.isFinite(attackAngle) ? attackAngle : fallbackAim;
@@ -2606,7 +2721,23 @@ function startSlash(attackAngle) {
 
 function damagePlayer(amount, sourceX, sourceY) {
   const player = game.player;
-  if (player.invulnerable > 0 || game.mode !== "playing") return;
+  if (game.mode !== "playing") return;
+  if (game.selectedClass === "melee" && player.guardTime > 0) {
+    player.guardTime = 0;
+    player.guardBlocks += 1;
+    player.invulnerable = Math.max(player.invulnerable, .28);
+    canvas.dataset.guardBlocks = String(player.guardBlocks);
+    clearEnemyBulletsNear(player.x, player.y, 126);
+    for (const enemy of game.enemies) {
+      if (!enemy.dead && distanceSquared(enemy, player) <= 126 ** 2) enemy.stun = Math.max(enemy.stun || 0, .55);
+    }
+    game.shake = Math.max(game.shake, 6);
+    addParticles(player.x, player.y, "#c9f05a", 16, 165);
+    addPulse(player.x, player.y, "#c9f05a", 92, .34);
+    addFloater(player.x, player.y - 36, "BLOCK", "#c9f05a");
+    return;
+  }
+  if (player.invulnerable > 0) return;
   const dealt = Math.max(1, amount * (1 - game.output.guard.armor));
   player.hp -= dealt;
   player.invulnerable = .62;
@@ -2647,16 +2778,33 @@ function returnToClassSelection() {
   $("#choice-overlay").hidden = true;
   $("#factory-overlay").hidden = true;
   $("#start-overlay").hidden = false;
-  $("#selected-class-copy").textContent = CLASS_PROFILES[game.selectedClass].name + " 선택됨 · 다른 클래스로 변경할 수 있습니다.";
+  const profile = CLASS_PROFILES[game.selectedClass];
+  $("#selected-class-copy").textContent = profile.name + " · " + profile.statLine;
 }
 
 function updatePlayer(dt) {
   const player = game.player;
+  const classProfile = CLASS_PROFILES[game.selectedClass];
   const bounds = roomBounds();
   const cursorAim = Math.atan2(game.mouse.y - player.y, game.mouse.x - player.x);
   player.attackCooldown -= dt;
   player.dashCooldown -= dt;
+  player.guardCooldown = Math.max(0, player.guardCooldown - dt);
+  player.guardTime = Math.max(0, player.guardTime - dt);
+  player.lifeStealFlash = Math.max(0, player.lifeStealFlash - dt);
   player.invulnerable -= dt;
+  if (game.guardRequested) {
+    if (game.selectedClass === "melee" && player.guardCooldown <= 0 && player.dashTime <= 0) {
+      player.guardTime = classProfile.techniqueDuration;
+      player.guardCooldown = classProfile.techniqueCooldown;
+      player.attackBuffer = 0;
+      player.slash = null;
+      game.dashRequested = false;
+      addPulse(player.x, player.y, classProfile.color, 58, .25);
+      addFloater(player.x, player.y - 34, "BLADE GUARD", classProfile.color);
+    }
+    game.guardRequested = false;
+  }
   player.aimHold = Math.max(0, player.aimHold - dt);
   let moveX = 0;
   let moveY = 0;
@@ -2676,7 +2824,7 @@ function updatePlayer(dt) {
     player.stillTime += dt;
   }
   player.attackFlash = Math.max(0, player.attackFlash - dt);
-  if (game.dashRequested && player.dashCooldown <= 0) {
+  if (game.dashRequested && player.dashCooldown <= 0 && player.guardTime <= 0) {
     const dashAngle = Math.atan2(player.lastMoveY, player.lastMoveX);
     if (game.selectedClass === "melee" && hasTrait("m_echo")) {
       game.delayedAttacks.push({ delay: Math.max(.1, .22 - augmentRank("m_echo") * .04), kind: "slash", angle: dashAngle, damageScale: .54 + augmentRank("m_echo") * .18, x: player.x, y: player.y, synthetic: true, aftershock: hasSynergy("aftershock") || augmentRank("m_echo") >= 3, guardPulse: false });
@@ -2713,11 +2861,11 @@ function updatePlayer(dt) {
     if (game.selectedClass === "artillery" && (hasTrait("a_dashbomb") || orbitalTier >= 2)) {
       player.dashBombCount += 1;
       const novaMine = orbitalTier >= 2 || (hasSynergy("nova_mine") && player.dashBombCount % 3 === 0);
-      launchGrenade(dashAngle + Math.PI, { x: player.x, y: player.y, targetX: player.x, targetY: player.y, speed: 1, damage: novaMine ? 30 : 17, blastRadius: novaMine ? 132 : 62 + augmentRank("a_dashbomb") * 12, dashBomb: true, dashAngle, supernova: novaMine, color: novaMine ? "#f6dc66" : "#69a9ff" });
+      launchGrenade(dashAngle + Math.PI, { x: player.x, y: player.y, targetX: player.x, targetY: player.y, speed: 1, damage: novaMine ? 30 : 17, blastRadius: artilleryBlastRadius(novaMine ? 132 : 62 + augmentRank("a_dashbomb") * 12), dashBomb: true, dashAngle, supernova: novaMine, color: novaMine ? "#f6dc66" : "#69a9ff" });
       if (augmentRank("a_dashbomb") >= 3) {
         const endX = player.x + Math.cos(dashAngle) * 118;
         const endY = player.y + Math.sin(dashAngle) * 118;
-        launchGrenade(dashAngle, { x: endX, y: endY, targetX: endX, targetY: endY, speed: 1, damage: 14, blastRadius: 70, dashBomb: true, dashAngle, color: "#69a9ff" });
+        launchGrenade(dashAngle, { x: endX, y: endY, targetX: endX, targetY: endY, speed: 1, damage: 14, blastRadius: artilleryBlastRadius(70), dashBomb: true, dashAngle, color: "#69a9ff" });
       }
       if (hasTrait("a_dashbomb")) noteAugment("a_dashbomb");
       if (novaMine) {
@@ -2725,18 +2873,18 @@ function updatePlayer(dt) {
         if (hasSynergy("nova_mine")) noteProtocol("nova_mine");
       }
     }
-    player.dashTime = .17;
+    player.dashTime = classProfile.dashDuration;
     player.dashCooldown = game.output.guard.dashCooldown;
-    player.invulnerable = Math.max(player.invulnerable, .28);
+    player.invulnerable = Math.max(player.invulnerable, game.selectedClass === "sniper" ? .34 : .28);
     game.dashRequested = false;
-    addPulse(player.x, player.y, "#58d7d3", 42, .24);
+    addPulse(player.x, player.y, classProfile.color, game.selectedClass === "sniper" ? 54 : 42, .24);
   }
   const dashing = player.dashTime > 0;
   if (dashing) {
     player.dashTime -= dt;
     moveX = player.lastMoveX;
     moveY = player.lastMoveY;
-    if (Math.random() < .75) addParticles(player.x, player.y, "#58d7d3", 1, 15);
+    if (Math.random() < .75) addParticles(player.x, player.y, classProfile.color, 1, game.selectedClass === "sniper" ? 24 : 15);
     if (game.output.guard.dashDamage > 0) {
       for (const enemy of game.enemies) {
         if (enemy.dead || enemy.dashHit) continue;
@@ -2751,7 +2899,7 @@ function updatePlayer(dt) {
   } else {
     for (const enemy of game.enemies) enemy.dashHit = false;
   }
-  const speed = dashing ? 610 * COMBAT_TEMPO.unitMove : player.speed;
+  const speed = dashing ? classProfile.dashSpeed * COMBAT_TEMPO.unitMove : player.speed * (player.guardTime > 0 ? .55 : 1);
   player.x = clamp(player.x + moveX * speed * dt, bounds.left + player.radius, bounds.right - player.radius);
   player.y = clamp(player.y + moveY * speed * dt, bounds.top + player.radius, bounds.bottom - player.radius);
   if (player.aimHold <= 0) player.weaponFacing = smoothAngle(player.weaponFacing, player.facing, smoothFactor(10, dt));
@@ -2767,7 +2915,7 @@ function updatePlayer(dt) {
     player.bufferedAim = cursorAim;
     game.attackRequested = false;
   }
-  if (player.attackBuffer > 0 && player.attackCooldown <= 0 && player.dashTime <= 0 && startSlash(player.bufferedAim)) {
+  if (player.attackBuffer > 0 && player.attackCooldown <= 0 && player.dashTime <= 0 && player.guardTime <= 0 && startSlash(player.bufferedAim)) {
     player.attackBuffer = 0;
     player.bufferedAim = null;
   }
@@ -2788,6 +2936,243 @@ function fireEnemyBullet(enemy, speed, count) {
       radius: enemy.type === "guardian" ? 7 : 5, damage: enemy.damage, life: 3.2, dead: false
     });
   }
+}
+
+function spawnEnemyBulletAt(x, y, angle, speed, damage, color, radius = 6, life = 4.2) {
+  game.enemyBullets.push({
+    x, y, vx: Math.cos(angle) * speed * COMBAT_TEMPO.projectile, vy: Math.sin(angle) * speed * COMBAT_TEMPO.projectile,
+    radius, damage, color: color || "#ff695d", life, dead: false
+  });
+}
+
+function fireBossRadial(enemy, count, speed, damageScale = .62, offset = 0) {
+  for (let index = 0; index < count; index += 1) {
+    spawnEnemyBulletAt(enemy.x, enemy.y, offset + index / count * Math.PI * 2, speed, enemy.damage * damageScale, enemy.accent, 6.5);
+  }
+}
+
+function fireBossFan(enemy, count, speed, spread = .18, damageScale = .68) {
+  const base = Math.atan2(game.player.y - enemy.y, game.player.x - enemy.x);
+  for (let index = 0; index < count; index += 1) {
+    const angle = base + (index - (count - 1) / 2) * spread;
+    spawnEnemyBulletAt(enemy.x, enemy.y, angle, speed, enemy.damage * damageScale, enemy.accent, 7);
+  }
+}
+
+function addBossCircle(x, y, radius, delay, damage, color) {
+  game.bossHazards.push({ kind: "circle", x, y, radius, delay, maxDelay: delay, life: .34, damage, color, triggered: false, dead: false });
+}
+
+function addBossBurst(x, y, delay, settings = {}) {
+  game.bossHazards.push({ kind: "burst", x, y, delay, maxDelay: delay, life: .1, triggered: false, dead: false, ...settings });
+}
+
+function addBossLine(x, y, angle, width, delay, damage, color) {
+  game.bossHazards.push({ kind: "line", x, y, angle, width, length: Math.max(game.width, game.height) * 1.35, delay, maxDelay: delay, life: .3, damage, color, triggered: false, dead: false });
+}
+
+function addGravityWell(x, y, radius, delay, life, damage, color) {
+  game.bossHazards.push({ kind: "gravity", x, y, radius, delay, maxDelay: delay, life, maxLife: life, damage, color, tick: 0, dead: false });
+}
+
+function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lengthSquared = dx * dx + dy * dy || 1;
+  const amount = clamp(((px - x1) * dx + (py - y1) * dy) / lengthSquared, 0, 1);
+  return Math.hypot(px - (x1 + dx * amount), py - (y1 + dy * amount));
+}
+
+function beginBossPattern(enemy) {
+  const profile = BOSS_PROFILES[enemy.type];
+  const pattern = profile.patterns[enemy.patternIndex % profile.patterns.length];
+  enemy.patternIndex += 1;
+  enemy.patternId = pattern.id;
+  enemy.patternName = pattern.name;
+  enemy.patternWindupMax = pattern.windup / (enemy.hp / enemy.maxHp <= .5 ? 1.18 : 1);
+  enemy.patternWindup = enemy.patternWindupMax;
+  enemy.patternCooldown = pattern.cooldown;
+  addFloater(enemy.x, enemy.y - enemy.radius - 18, pattern.name, profile.accent, { life: enemy.patternWindupMax + .35 });
+}
+
+function executeBossPattern(enemy) {
+  const profile = BOSS_PROFILES[enemy.type];
+  const bounds = roomBounds();
+  const phase = enemy.hp / enemy.maxHp <= .5 ? 2 : 1;
+  const aim = Math.atan2(game.player.y - enemy.y, game.player.x - enemy.x);
+  const centerX = game.player.x;
+  const centerY = game.player.y;
+  if (enemy.patternId === "hammer_slam") {
+    addBossCircle(enemy.x, enemy.y, phase === 2 ? 180 : 150, .16, enemy.damage, profile.color);
+    fireBossRadial(enemy, phase === 2 ? 16 : 12, 220, .56, game.time * .3);
+  } else if (enemy.patternId === "furnace_fan") {
+    fireBossFan(enemy, phase === 2 ? 9 : 7, 285, .16, .68);
+    addBossBurst(enemy.x, enemy.y, .3, { aimed: true, count: 5, speed: 330, spread: .13, damage: enemy.damage * .58, color: profile.accent });
+  } else if (enemy.patternId === "rail_charge") {
+    enemy.bossDashTime = phase === 2 ? .82 : .68;
+    enemy.bossDashAngle = aim;
+    enemy.trailTick = 0;
+  } else if (enemy.patternId === "slag_mines") {
+    const count = phase === 2 ? 7 : 5;
+    for (let index = 0; index < count; index += 1) {
+      const angle = index / count * Math.PI * 2;
+      const radius = index === 0 ? 0 : 92 + (index % 2) * 54;
+      addBossCircle(clamp(centerX + Math.cos(angle) * radius, bounds.left + 45, bounds.right - 45), clamp(centerY + Math.sin(angle) * radius, bounds.top + 45, bounds.bottom - 45), 54, .72 + index * .08, enemy.damage * .78, "#ff9b4a");
+    }
+  } else if (enemy.patternId === "drone_forge") {
+    const aliveAdds = game.enemies.filter((target) => !target.dead && !isBossType(target.type)).length;
+    const count = Math.max(0, Math.min(phase + 1, 6 - aliveAdds));
+    for (let index = 0; index < count; index += 1) {
+      const angle = index / Math.max(1, count) * Math.PI * 2;
+      spawnEnemy(index % 2 ? "turret" : "drone", enemy.x + Math.cos(angle) * 105, enemy.y + Math.sin(angle) * 105);
+    }
+    fireBossRadial(enemy, 10, 190, .48, .2);
+  } else if (enemy.patternId === "prism_lance") {
+    addBossLine(enemy.x, enemy.y, aim, phase === 2 ? 54 : 42, .22, enemy.damage * 1.05, profile.accent);
+  } else if (enemy.patternId === "kaleidoscope") {
+    fireBossRadial(enemy, phase === 2 ? 20 : 16, 230, .52, game.time * .55);
+    addBossBurst(enemy.x, enemy.y, .34, { count: phase === 2 ? 20 : 16, speed: 250, offset: game.time * .55 + Math.PI / 16, damage: enemy.damage * .48, color: profile.accent });
+  } else if (enemy.patternId === "mirror_gate") {
+    const gates = [[bounds.left + 55, bounds.top + 55], [bounds.right - 55, bounds.top + 55], [bounds.left + 55, bounds.bottom - 55], [bounds.right - 55, bounds.bottom - 55]];
+    for (const [x, y] of gates) addBossBurst(x, y, .46, { aimed: true, aimX: centerX, aimY: centerY, count: phase === 2 ? 5 : 3, speed: 280, spread: .16, damage: enemy.damage * .58, color: profile.accent });
+  } else if (enemy.patternId === "blink_shot") {
+    const blinkAngle = aim + Math.PI + (enemy.patternIndex % 2 ? .72 : -.72);
+    enemy.x = clamp(centerX + Math.cos(blinkAngle) * 260, bounds.left + enemy.radius, bounds.right - enemy.radius);
+    enemy.y = clamp(centerY + Math.sin(blinkAngle) * 220, bounds.top + enemy.radius, bounds.bottom - enemy.radius);
+    enemy.renderX = enemy.x;
+    enemy.renderY = enemy.y;
+    addPulse(enemy.x, enemy.y, profile.accent, 78, .32);
+    fireBossFan(enemy, phase === 2 ? 7 : 5, 340, .12, .62);
+  } else if (enemy.patternId === "prism_cage") {
+    const count = phase === 2 ? 14 : 10;
+    for (let index = 0; index < count; index += 1) {
+      const angle = index / count * Math.PI * 2;
+      const x = clamp(centerX + Math.cos(angle) * 230, bounds.left + 20, bounds.right - 20);
+      const y = clamp(centerY + Math.sin(angle) * 230, bounds.top + 20, bounds.bottom - 20);
+      addBossBurst(x, y, .34 + index * .025, { aimX: centerX, aimY: centerY, aimed: true, count: 1, speed: 245, damage: enemy.damage * .52, color: profile.accent });
+    }
+  } else if (enemy.patternId === "spiral_tide") {
+    fireBossRadial(enemy, phase === 2 ? 18 : 14, 215, .5, game.time * .7);
+    addBossBurst(enemy.x, enemy.y, .28, { count: phase === 2 ? 18 : 14, speed: 235, offset: game.time * .7 + .22, damage: enemy.damage * .48, color: profile.accent });
+    addBossBurst(enemy.x, enemy.y, .56, { count: phase === 2 ? 18 : 14, speed: 255, offset: game.time * .7 + .44, damage: enemy.damage * .46, color: profile.color });
+  } else if (enemy.patternId === "gravity_well") {
+    addGravityWell(centerX, centerY, phase === 2 ? 190 : 160, .28, phase === 2 ? 3.7 : 3.1, enemy.damage * .38, profile.color);
+  } else if (enemy.patternId === "void_dive") {
+    addBossCircle(enemy.x, enemy.y, 78, .25, enemy.damage * .7, profile.color);
+    const emergeAngle = Math.atan2(game.player.y - enemy.y, game.player.x - enemy.x) + Math.PI;
+    enemy.x = clamp(centerX + Math.cos(emergeAngle) * 115, bounds.left + enemy.radius, bounds.right - enemy.radius);
+    enemy.y = clamp(centerY + Math.sin(emergeAngle) * 115, bounds.top + enemy.radius, bounds.bottom - enemy.radius);
+    enemy.renderX = enemy.x;
+    enemy.renderY = enemy.y;
+    addBossCircle(enemy.x, enemy.y, phase === 2 ? 126 : 105, .52, enemy.damage, profile.accent);
+  } else if (enemy.patternId === "tail_sweep") {
+    addBossCircle(enemy.x, enemy.y, phase === 2 ? 150 : 125, .18, enemy.damage * .82, profile.color);
+    fireBossRadial(enemy, phase === 2 ? 16 : 12, 275, .56, aim);
+  } else if (enemy.patternId === "abyss_spawn") {
+    const aliveAdds = game.enemies.filter((target) => !target.dead && !isBossType(target.type)).length;
+    const count = Math.max(0, Math.min(phase + 1, 5 - aliveAdds));
+    for (let index = 0; index < count; index += 1) {
+      const angle = index / Math.max(1, count) * Math.PI * 2 + .4;
+      spawnEnemy("brute", enemy.x + Math.cos(angle) * 120, enemy.y + Math.sin(angle) * 120);
+    }
+    addGravityWell(enemy.x, enemy.y, 132, .18, 2.4, enemy.damage * .32, profile.accent);
+  }
+  enemy.patternId = null;
+}
+
+function updateBossEnemy(enemy, dt, bounds) {
+  const player = game.player;
+  const profile = BOSS_PROFILES[enemy.type];
+  enemy.patternCooldown -= dt;
+  if (enemy.patternWindup > 0) {
+    enemy.patternWindup -= dt;
+    if (enemy.patternWindup <= 0) executeBossPattern(enemy);
+  } else if (enemy.patternCooldown <= 0 && enemy.bossDashTime <= 0) {
+    beginBossPattern(enemy);
+  }
+  const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+  let velocity = 0;
+  let movementAngle = angle;
+  if (enemy.bossDashTime > 0) {
+    enemy.bossDashTime -= dt;
+    movementAngle = enemy.bossDashAngle;
+    velocity = enemy.speed * 5.8;
+    enemy.trailTick -= dt;
+    if (enemy.trailTick <= 0) {
+      enemy.trailTick = .11;
+      addBossCircle(enemy.x, enemy.y, 38, .34, enemy.damage * .5, profile.color);
+    }
+  } else if (enemy.patternWindup <= 0) {
+    if (enemy.type === "forge_titan") velocity = distance > 155 ? enemy.speed : distance < 95 ? -enemy.speed * .35 : 0;
+    else if (enemy.type === "prism_warden") {
+      movementAngle = angle + (enemy.id % 2 ? 1 : -1) * Math.PI * .45;
+      velocity = distance < 230 ? -enemy.speed * .55 : enemy.speed * .7;
+    } else {
+      movementAngle = angle + Math.PI * .34;
+      velocity = distance > 250 ? enemy.speed * .72 : enemy.speed * .52;
+    }
+  }
+  enemy.x = clamp(enemy.x + Math.cos(movementAngle) * velocity * dt, bounds.left + enemy.radius, bounds.right - enemy.radius);
+  enemy.y = clamp(enemy.y + Math.sin(movementAngle) * velocity * dt, bounds.top + enemy.radius, bounds.bottom - enemy.radius);
+  if (distance < player.radius + enemy.radius + 5 && enemy.attackCooldown <= 0) {
+    damagePlayer(enemy.damage, enemy.x, enemy.y);
+    enemy.attackCooldown = .72 / COMBAT_TEMPO.attackRate;
+  }
+}
+
+function updateBossHazards(dt) {
+  const player = game.player;
+  for (const hazard of game.bossHazards) {
+    if (hazard.dead) continue;
+    if (hazard.delay > 0) {
+      hazard.delay -= dt;
+      if (hazard.delay > 0) continue;
+    }
+    if (hazard.kind === "gravity") {
+      hazard.life -= dt;
+      const dx = hazard.x - player.x;
+      const dy = hazard.y - player.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      if (distance < hazard.radius) {
+        const pull = (1 - distance / hazard.radius) * 118 * dt;
+        player.x += dx / distance * pull;
+        player.y += dy / distance * pull;
+        hazard.tick -= dt;
+        if (hazard.tick <= 0 && distance < hazard.radius * .62) {
+          hazard.tick = .48;
+          damagePlayer(hazard.damage, hazard.x, hazard.y);
+        }
+      }
+      if (hazard.life <= 0) hazard.dead = true;
+      continue;
+    }
+    if (!hazard.triggered) {
+      hazard.triggered = true;
+      if (hazard.kind === "circle") {
+        if (Math.hypot(player.x - hazard.x, player.y - hazard.y) <= hazard.radius + player.radius) damagePlayer(hazard.damage, hazard.x, hazard.y);
+        addPulse(hazard.x, hazard.y, hazard.color, hazard.radius, .32);
+        addParticles(hazard.x, hazard.y, hazard.color, 18, 180);
+      } else if (hazard.kind === "line") {
+        const x2 = hazard.x + Math.cos(hazard.angle) * hazard.length;
+        const y2 = hazard.y + Math.sin(hazard.angle) * hazard.length;
+        if (pointToSegmentDistance(player.x, player.y, hazard.x, hazard.y, x2, y2) <= hazard.width * .5 + player.radius) damagePlayer(hazard.damage, hazard.x, hazard.y);
+        game.shake = Math.max(game.shake, 12);
+      } else if (hazard.kind === "burst") {
+        const count = hazard.count || 1;
+        const base = hazard.aimed ? Math.atan2((hazard.aimY ?? player.y) - hazard.y, (hazard.aimX ?? player.x) - hazard.x) : hazard.offset || 0;
+        for (let index = 0; index < count; index += 1) {
+          const angle = hazard.aimed ? base + (index - (count - 1) / 2) * (hazard.spread || 0) : base + index / count * Math.PI * 2;
+          spawnEnemyBulletAt(hazard.x, hazard.y, angle, hazard.speed || 250, hazard.damage || 10, hazard.color, 6.5);
+        }
+        addPulse(hazard.x, hazard.y, hazard.color, 42, .24);
+        hazard.dead = true;
+      }
+    }
+    hazard.life -= dt;
+    if (hazard.life <= 0) hazard.dead = true;
+  }
+  game.bossHazards = game.bossHazards.filter((hazard) => !hazard.dead);
 }
 
 function updateEnemies(dt) {
@@ -2819,6 +3204,10 @@ function updateEnemies(dt) {
     }
     if (enemy.hp <= 0) { killEnemy(enemy); continue; }
     if (enemy.stun > 0) continue;
+    if (isBossType(enemy.type)) {
+      updateBossEnemy(enemy, dt, bounds);
+      continue;
+    }
     const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
     const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
     let move = 1;
@@ -3290,7 +3679,7 @@ function updateDelayedAttacks(dt) {
     const target = game.enemies.filter((enemy) => !enemy.dead).sort((a, b) => distanceSquared(a, orbital) - distanceSquared(b, orbital))[0];
     if (target) {
       const angle = Math.atan2(target.y - orbital.y, target.x - orbital.x);
-      launchGrenade(angle, { x: orbital.x, y: orbital.y, targetX: target.x, targetY: target.y, speed: 520, damage: 13, blastRadius: 54, fragment: true, orbital: true, color: "#71efad" });
+      launchGrenade(angle, { x: orbital.x, y: orbital.y, targetX: target.x, targetY: target.y, speed: 520, damage: 13, blastRadius: artilleryBlastRadius(54), fragment: true, orbital: true, color: "#71efad" });
     }
     orbital.fired = true;
   }
@@ -3308,10 +3697,12 @@ function createAuditEnemy(id, x, y, hp, maxHp) {
 }
 
 function createAuditPlayer() {
+  const profile = CLASS_PROFILES[game.selectedClass] || CLASS_PROFILES.melee;
   return {
-    x: 300, y: 500, renderX: 300, renderY: 500, radius: 17, hp: 80, maxHp: 100, level: 1, speed: 225,
+    x: 300, y: 500, renderX: 300, renderY: 500, radius: 17, hp: profile.maxHp, maxHp: profile.maxHp, level: 1, speed: profile.moveSpeed * COMBAT_TEMPO.unitMove,
     aim: 0, facing: 0, weaponFacing: 0, aimHold: 0, bufferedAim: null,
-    attackCooldown: 0, dashCooldown: 0, dashTime: 0, invulnerable: 0, combo: 0, slash: null,
+    attackCooldown: 0, dashCooldown: 0, dashTime: 0, guardCooldown: 0, guardTime: 0, guardBlocks: 0,
+    invulnerable: 0, lifeStealFlash: 0, lifeStolen: 0, combo: 0, slash: null,
     nextSwingDirection: 1, swingCount: 0, attackBuffer: 0, shotCount: 0, dashBombCount: 0, rangerVolley: 0,
     stillTime: 2, attackFlash: 0, riposteReady: false, riposteTargetId: null, lastMoveX: 1, lastMoveY: 0
   };
@@ -3484,8 +3875,11 @@ function runFactoryToolAudits() {
     const rarityFootprints = moduleTypes.every((type) => {
       const footprint = partFootprint({ kind: "module", type });
       const rarity = RARITIES[MODULE_RARITIES[type]];
-      return Boolean(rarity) && footprint.width === rarity.width && footprint.height === rarity.height && [1, 2, 4].includes(footprint.width);
+      const expected = MODULE_FOOTPRINTS[type] || rarity;
+      return Boolean(rarity) && footprint.width === expected.width && footprint.height === expected.height && [1, 2, 4].includes(footprint.width) && [1, 2, 4].includes(footprint.height);
     });
+    const rectangleFootprints = Object.keys(MODULE_FOOTPRINTS).length >= 6 && Object.values(MODULE_FOOTPRINTS).some((shape) => shape.width === 1 && shape.height === 2) &&
+      Object.values(MODULE_FOOTPRINTS).some((shape) => shape.width === 2 && shape.height === 4) && Object.values(MODULE_FOOTPRINTS).every((shape) => shape.width !== shape.height);
     const toolThreeWayJackLayout = TOOL_TYPES.every((type) => {
       const part = createPart("tool", type);
       return part.ports.layout === "lego-tool-three-way" && PORT_EDGES.every((edge) => portOffsets(part, edge).length === 1);
@@ -3513,7 +3907,7 @@ function runFactoryToolAudits() {
     rebuildPhysicalWires();
     const restored = evaluateClassFactory().traits.has("m_mark") && factory.wires.length === 1;
     const rewireable = removed && disconnected && restored;
-    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, advancedToolProcessed, toolXCombinations, noInfiniteTool, droppedToWorld, stagedToolUnlocks, advancedToolLockedEarly, advancedToolUnlockedLater, droppedToolCollected, rarityFootprints, toolThreeWayJackLayout, randomAugmentJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
+    report = { disconnectedInactive, terminalFreeActive, branchLinesApply, toolProcessed, advancedToolProcessed, toolXCombinations, noInfiniteTool, droppedToWorld, stagedToolUnlocks, advancedToolLockedEarly, advancedToolUnlockedLater, droppedToolCollected, rarityFootprints, rectangleFootprints, toolThreeWayJackLayout, randomAugmentJackLayout, legendaryFits, footprintCollisionBlocked, rewireable, pass: false };
     report.pass = Object.entries(report).filter(([key]) => key !== "pass").every(([, value]) => Boolean(value));
   } finally {
     boardCols = savedCols;
@@ -3875,6 +4269,7 @@ function update(dt) {
   updatePlayer(combatDt);
   updateToolDrops(combatDt);
   updateEnemies(combatDt);
+  updateBossHazards(combatDt);
   updateEnemyBullets(combatDt);
   updatePlayerShots(combatDt);
   updateZones(combatDt);
@@ -3907,7 +4302,25 @@ function drawArena() {
   gradient.addColorStop(1, "#0b1012");
   ctx.fillStyle = gradient;
   ctx.fillRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
-  const tile = 48;
+  if (isBossRoom()) {
+    const profile = BOSS_PROFILES[bossTypeForRoom()];
+    ctx.save();
+    ctx.globalAlpha = .09;
+    ctx.fillStyle = profile.color;
+    ctx.fillRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+    ctx.globalAlpha = .34;
+    ctx.strokeStyle = profile.accent;
+    ctx.lineWidth = 2;
+    for (let ring = 1; ring <= 4; ring += 1) {
+      ctx.beginPath(); ctx.arc(game.width * .5, game.height * .49, ring * Math.min(game.width, game.height) * .085, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.font = "900 11px monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = profile.accent;
+    ctx.fillText(profile.title + " // CORE CHAMBER", game.width * .5, bounds.bottom - 24);
+    ctx.restore();
+  }
+  const tile = isBossRoom() ? 64 : 48;
   ctx.strokeStyle = "rgba(106,139,143,.11)";
   ctx.lineWidth = 1;
   for (let x = bounds.left; x <= bounds.right; x += tile) {
@@ -3942,7 +4355,7 @@ function drawArena() {
     ctx.fillStyle = "#bff7f3";
     ctx.font = "700 9px monospace";
     ctx.textAlign = "center";
-    ctx.fillText("NEXT SECTOR", game.width * .5, bounds.top);
+    ctx.fillText(isBossRoom() ? "BOSS CORE EXIT" : "NEXT SECTOR", game.width * .5, bounds.top);
   }
   ctx.fillStyle = "#334045";
   const pillars = [
@@ -3960,6 +4373,19 @@ function drawEnemyTelegraphs() {
   for (const enemy of game.enemies) {
     if (enemy.dead) continue;
     ctx.save();
+    if (isBossType(enemy.type) && enemy.patternWindup > 0) {
+      const readiness = 1 - clamp(enemy.patternWindup / enemy.patternWindupMax, 0, 1);
+      ctx.globalAlpha = .28 + readiness * .62;
+      ctx.strokeStyle = enemy.accent;
+      ctx.lineWidth = 2 + readiness * 3;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.radius + 18 + readiness * 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * readiness); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = enemy.accent;
+      ctx.font = "800 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(enemy.patternName, enemy.x, enemy.y - enemy.radius - 24);
+    }
     if (enemy.shootWindup > 0) {
       const maxWindup = enemy.type === "guardian" ? .42 : .38;
       const readiness = 1 - clamp(enemy.shootWindup / maxWindup, 0, 1);
@@ -4016,7 +4442,31 @@ function drawEnemy(enemy) {
   ctx.shadowBlur = critical ? 34 : flash ? 22 : 10;
   ctx.shadowColor = critical ? "#f6dc66" : enemy.color;
   ctx.fillStyle = critical ? "#fff5b8" : flash ? "#ffffff" : enemy.color;
-  if (enemy.type === "drone") {
+  if (enemy.type === "forge_titan") {
+    ctx.rotate(Math.sin(game.time * 1.8) * .05);
+    ctx.fillStyle = flash ? "#fff" : "#7b3026";
+    drawRoundedRect(-enemy.radius, -enemy.radius * .78, enemy.radius * 2, enemy.radius * 1.56, 10); ctx.fill();
+    ctx.strokeStyle = enemy.accent; ctx.lineWidth = 5; ctx.stroke();
+    ctx.fillStyle = "#291414"; ctx.fillRect(-enemy.radius * .52, -enemy.radius * .36, enemy.radius * 1.04, enemy.radius * .72);
+    ctx.fillStyle = enemy.accent; ctx.fillRect(-13, -8, 26, 16);
+    ctx.fillRect(-enemy.radius - 18, -10, 18, 20); ctx.fillRect(enemy.radius, -10, 18, 20);
+  } else if (enemy.type === "prism_warden") {
+    ctx.rotate(game.time * .55);
+    ctx.beginPath(); ctx.moveTo(0, -enemy.radius); ctx.lineTo(enemy.radius * .78, 0); ctx.lineTo(0, enemy.radius); ctx.lineTo(-enemy.radius * .78, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = enemy.accent; ctx.lineWidth = 4; ctx.stroke();
+    ctx.rotate(-game.time * 1.3);
+    ctx.fillStyle = "#f0edff"; ctx.beginPath(); ctx.moveTo(0, -17); ctx.lineTo(13, 0); ctx.lineTo(0, 17); ctx.lineTo(-13, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = enemy.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, enemy.radius + 10, 0, Math.PI * 1.35); ctx.stroke();
+  } else if (enemy.type === "void_leviathan") {
+    ctx.rotate(Math.atan2((game.player.renderY ?? game.player.y) - drawY, (game.player.renderX ?? game.player.x) - drawX));
+    ctx.strokeStyle = enemy.color; ctx.lineWidth = 18; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(-8, 0, enemy.radius * .72, -1.15, 1.15); ctx.stroke();
+    ctx.strokeStyle = enemy.accent; ctx.lineWidth = 5;
+    for (let index = 0; index < 4; index += 1) {
+      ctx.beginPath(); ctx.arc(-22 - index * 13, 0, enemy.radius * (.58 - index * .08), -.75, .75); ctx.stroke();
+    }
+    ctx.fillStyle = "#f6dcff"; ctx.beginPath(); ctx.arc(15, 0, 8, 0, Math.PI * 2); ctx.fill();
+  } else if (enemy.type === "drone") {
     ctx.rotate(Math.PI / 4);
     ctx.fillRect(-enemy.radius * .7, -enemy.radius * .7, enemy.radius * 1.4, enemy.radius * 1.4);
     ctx.fillStyle = "#270e12";
@@ -4065,24 +4515,27 @@ function drawEnemy(enemy) {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(drawX, drawY, enemy.radius + 4, 0, Math.PI * 2); ctx.stroke();
   }
-  const width = enemy.radius * 2.2;
-  ctx.fillStyle = "#1a0d10";
-  ctx.fillRect(drawX - width * .5, drawY - enemy.radius - 12, width, 4);
-  ctx.fillStyle = enemy.color;
-  ctx.fillRect(drawX - width * .5, drawY - enemy.radius - 12, width * clamp(enemy.hp / enemy.maxHp, 0, 1), 4);
+  if (!isBossType(enemy.type)) {
+    const width = enemy.radius * 2.2;
+    ctx.fillStyle = "#1a0d10";
+    ctx.fillRect(drawX - width * .5, drawY - enemy.radius - 12, width, 4);
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(drawX - width * .5, drawY - enemy.radius - 12, width * clamp(enemy.hp / enemy.maxHp, 0, 1), 4);
+  }
 }
 
 function drawRobot() {
   const player = game.player;
+  const profile = CLASS_PROFILES[game.selectedClass] || CLASS_PROFILES.melee;
   ctx.save();
   ctx.translate(player.renderX ?? player.x, player.renderY ?? player.y);
   if (player.invulnerable > 0 && Math.floor(player.invulnerable * 18) % 2) ctx.globalAlpha = .42;
   ctx.save();
   ctx.rotate(player.facing);
   ctx.shadowBlur = 18;
-  ctx.shadowColor = "#58d7d3";
+  ctx.shadowColor = profile.color;
   ctx.fillStyle = "#172b2d";
-  ctx.strokeStyle = "#7ce7e1";
+  ctx.strokeStyle = profile.color;
   ctx.lineWidth = 2;
   drawRoundedRect(-16, -14, 32, 28, 8);
   ctx.fill();
@@ -4094,10 +4547,36 @@ function drawRobot() {
   ctx.fillRect(-2, -6, 7, 12);
   ctx.fillStyle = "#c9f05a";
   ctx.fillRect(1, -4, 3, 8);
-  ctx.fillStyle = "#58d7d3";
+  ctx.fillStyle = profile.color;
   ctx.fillRect(-15, -20, 8, 7);
   ctx.fillRect(-15, 13, 8, 7);
   ctx.restore();
+  if (player.lifeStealFlash > 0) {
+    ctx.save();
+    ctx.globalAlpha = clamp(player.lifeStealFlash / .22, 0, 1);
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#71efad";
+    ctx.strokeStyle = "#71efad";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, 34, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  if (player.guardTime > 0) {
+    const guardRatio = clamp(player.guardTime / profile.techniqueDuration, 0, 1);
+    ctx.save();
+    ctx.rotate(player.weaponFacing);
+    ctx.globalAlpha = .52 + guardRatio * .38;
+    ctx.shadowBlur = 28;
+    ctx.shadowColor = profile.color;
+    ctx.strokeStyle = "#eafffd";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(0, 0, 43, -.92, .92); ctx.stroke();
+    ctx.strokeStyle = profile.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 49, -1.05, 1.05); ctx.stroke();
+    ctx.restore();
+  }
   const attackReady = 1 - clamp(player.attackCooldown / game.output.primary.cooldown, 0, 1);
   const dashReady = 1 - clamp(player.dashCooldown / game.output.guard.dashCooldown, 0, 1);
   const classColor = game.output.build?.color || CLASS_PROFILES[game.selectedClass].color;
@@ -4218,6 +4697,46 @@ function drawRobot() {
   ctx.restore();
 }
 
+function drawBossHazards() {
+  for (const hazard of game.bossHazards) {
+    if (hazard.dead) continue;
+    ctx.save();
+    const warning = hazard.delay > 0;
+    const progress = warning ? 1 - clamp(hazard.delay / Math.max(.001, hazard.maxDelay), 0, 1) : 1;
+    ctx.strokeStyle = hazard.color || "#ff714f";
+    ctx.fillStyle = hazard.color || "#ff714f";
+    if (hazard.kind === "circle" || hazard.kind === "gravity") {
+      const radius = hazard.radius * (warning ? .88 + progress * .12 : 1);
+      ctx.globalAlpha = warning ? .16 + progress * .2 : hazard.kind === "gravity" ? .16 : .3;
+      ctx.beginPath(); ctx.arc(hazard.x, hazard.y, radius, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = warning ? .55 + progress * .4 : .8;
+      ctx.lineWidth = warning ? 2 + progress * 3 : 3;
+      ctx.setLineDash(warning ? [8, 7] : hazard.kind === "gravity" ? [16, 8] : []);
+      ctx.beginPath(); ctx.arc(hazard.x, hazard.y, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (warning ? progress : 1)); ctx.stroke();
+      if (hazard.kind === "gravity" && !warning) {
+        ctx.globalAlpha = .7;
+        for (let ring = 1; ring <= 3; ring += 1) {
+          ctx.beginPath(); ctx.arc(hazard.x, hazard.y, radius * ring / 4 + Math.sin(game.time * 3 + ring) * 5, game.time * (ring % 2 ? 1 : -1), game.time * (ring % 2 ? 1 : -1) + Math.PI * 1.3); ctx.stroke();
+        }
+      }
+    } else if (hazard.kind === "line") {
+      const x2 = hazard.x + Math.cos(hazard.angle) * hazard.length;
+      const y2 = hazard.y + Math.sin(hazard.angle) * hazard.length;
+      ctx.globalAlpha = warning ? .18 + progress * .3 : .72;
+      ctx.lineWidth = warning ? Math.max(4, hazard.width * .18) : hazard.width;
+      ctx.setLineDash(warning ? [18, 12] : []);
+      ctx.beginPath(); ctx.moveTo(hazard.x, hazard.y); ctx.lineTo(x2, y2); ctx.stroke();
+    } else if (hazard.kind === "burst") {
+      ctx.globalAlpha = .35 + progress * .55;
+      ctx.lineWidth = 2;
+
+      ctx.beginPath(); ctx.arc(hazard.x, hazard.y, 16 + progress * 12, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hazard.x - 12, hazard.y); ctx.lineTo(hazard.x + 12, hazard.y); ctx.moveTo(hazard.x, hazard.y - 12); ctx.lineTo(hazard.x, hazard.y + 12); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
 function drawZones() {
   for (const zone of game.zones) {
     ctx.save();
@@ -4281,16 +4800,16 @@ function drawProjectiles() {
   }
   for (const bullet of game.enemyBullets) {
     const speed = Math.hypot(bullet.vx, bullet.vy) || 1;
-    ctx.strokeStyle = "rgba(255,69,61,.42)";
+    ctx.strokeStyle = bullet.color || "rgba(255,69,61,.42)";
     ctx.lineWidth = bullet.radius * .9;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(bullet.x, bullet.y);
     ctx.lineTo(bullet.x - bullet.vx / speed * 16, bullet.y - bullet.vy / speed * 16);
     ctx.stroke();
-    ctx.fillStyle = "#ff695d";
+    ctx.fillStyle = bullet.color || "#ff695d";
     ctx.shadowBlur = 12;
-    ctx.shadowColor = "#ff3c36";
+    ctx.shadowColor = bullet.color || "#ff3c36";
     ctx.beginPath();
     ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
     ctx.fill();
@@ -4364,7 +4883,7 @@ function drawRoomBanner() {
   ctx.fillStyle = "#dfe9e7";
   ctx.textAlign = "center";
   ctx.font = "900 26px sans-serif";
-  ctx.fillText("B" + Math.ceil(game.room / 5) + " — ROOM " + String(((game.room - 1) % 5) + 1).padStart(2, "0"), game.width * .5, game.height * .49);
+  ctx.fillText(isBossRoom() ? "SECTOR " + sectorNumber() + " — BOSS CORE" : "SECTOR " + sectorNumber() + " — ROUND " + sectorRoom(), game.width * .5, game.height * .49);
   ctx.fillStyle = "#8aa0a2";
   ctx.font = "10px monospace";
   ctx.fillText(roomType(game.room).toUpperCase(), game.width * .5, game.height * .49 + 21);
@@ -4406,6 +4925,7 @@ function draw() {
   ctx.save();
   ctx.translate(game.cameraOffsetX, game.cameraOffsetY);
   drawArena();
+  drawBossHazards();
   drawZones();
   drawToolDrops();
   drawEnemyTelegraphs();
@@ -4419,15 +4939,15 @@ function draw() {
 }
 
 function formatRoom() {
-  return "B" + Math.ceil(game.room / 5) + "-" + String(((game.room - 1) % 5) + 1).padStart(2, "0");
+  return isBossRoom() ? "S" + sectorNumber() + "-BOSS" : "S" + sectorNumber() + "-R" + sectorRoom();
 }
 
 function updateHud() {
   if (!game.player) return;
   const xpRatio = clamp(game.xp / game.xpNext, 0, 1);
   const healthRatio = clamp(game.player.hp / game.player.maxHp, 0, 1);
-  const attackRatio = 1 - clamp(game.player.attackCooldown / game.output.primary.cooldown, 0, 1);
   const dashRatio = 1 - clamp(game.player.dashCooldown / game.output.guard.dashCooldown, 0, 1);
+  const profile = CLASS_PROFILES[game.selectedClass];
   $("#health-fill").style.width = clamp(game.player.hp / game.player.maxHp, 0, 1) * 100 + "%";
   $("#health-text").textContent = Math.ceil(game.player.hp) + " / " + game.player.maxHp;
   $("#xp-fill").style.width = xpRatio * 100 + "%";
@@ -4439,28 +4959,46 @@ function updateHud() {
   $("#hud-ram-fill").style.width = Math.min(100, usedRam / capacity * 100) + "%";
   $("#factory-toggle").classList.toggle("ram-tight", capacity - usedRam <= 2);
   $("#time-text").textContent = formatRoom();
-  $("#objective-text").textContent = game.roomCleared ? "북쪽 출구로 이동" : "적 전멸";
-  $("#objective-count").textContent = game.roomCleared ? "GATE OPEN" : game.enemies.length + " TARGET" + (game.enemies.length === 1 ? "" : "S");
+  const boss = game.enemies.find((enemy) => !enemy.dead && isBossType(enemy.type));
+  $("#objective-text").textContent = game.roomCleared ? "북쪽 출구로 이동" : boss ? "보스 코어 격파" : "적 전멸";
+  $("#objective-count").textContent = game.roomCleared ? "GATE OPEN" : boss ? boss.patternName : game.enemies.length + " TARGET" + (game.enemies.length === 1 ? "" : "S");
   $("#combat-objective").classList.toggle("complete", game.roomCleared);
-  $("#attack-ready-fill").style.width = attackRatio * 100 + "%";
+  const bossHud = $("#boss-hud");
+  bossHud.hidden = !boss;
+  if (boss) {
+    const bossProfile = BOSS_PROFILES[boss.type];
+    bossHud.style.setProperty("--boss-color", bossProfile.color);
+    $("#boss-title").textContent = "SECTOR " + sectorNumber() + " · " + bossProfile.title;
+    $("#boss-name").textContent = bossProfile.name;
+    $("#boss-pattern").textContent = boss.patternWindup > 0 ? "CHARGING · " + boss.patternName : "NEXT SIGNAL · " + boss.patternName;
+    $("#boss-hp-text").textContent = Math.ceil(boss.hp) + " / " + Math.ceil(boss.maxHp);
+    $("#boss-health-fill").style.width = clamp(boss.hp / boss.maxHp, 0, 1) * 100 + "%";
+  }
   $("#dash-ready-fill").style.width = dashRatio * 100 + "%";
-  $("#attack-status").textContent = attackRatio >= .999 ? "READY" : Math.max(0, game.player.attackCooldown).toFixed(1) + "s";
   $("#dash-status").textContent = dashRatio >= .999 ? "READY" : Math.max(0, game.player.dashCooldown).toFixed(1) + "s";
-  $("#attack-ability").classList.toggle("ready", attackRatio >= .999);
   $("#dash-ability").classList.toggle("ready", dashRatio >= .999);
+  $("#dash-name").textContent = profile.dashName;
+  const technique = $("#technique-ability");
+  const hasTechnique = Boolean(profile.techniqueName);
+  technique.hidden = !hasTechnique;
+  $(".ability-rack").classList.toggle("single", !hasTechnique);
+  if (hasTechnique) {
+    const techniqueRatio = 1 - clamp(game.player.guardCooldown / profile.techniqueCooldown, 0, 1);
+    $("#technique-key").textContent = profile.techniqueKey;
+    $("#technique-name").textContent = profile.techniqueName;
+    $("#technique-ready-fill").style.width = techniqueRatio * 100 + "%";
+    $("#technique-status").textContent = game.player.guardTime > 0 ? "ACTIVE" : techniqueRatio >= .999 ? "READY" : Math.max(0, game.player.guardCooldown).toFixed(1) + "s";
+    technique.classList.toggle("ready", techniqueRatio >= .999 || game.player.guardTime > 0);
+  }
   const build = game.output.build;
   const tuning = game.output.tuning;
   const buildSignature = $("#build-signature");
-  buildSignature.hidden = !build && !game.output.activeCount;
-  if (build || game.output.activeCount) {
-    buildSignature.style.setProperty("--build-color", build?.color || CLASS_PROFILES[game.selectedClass].color);
-    $("#build-tier").textContent = tuning.mode + " FACTORY" + (build ? " · TIER " + ["0", "I", "II", "III"][build.tier] : "") + " · " + Math.round(tuning.throughput * 100) + "% FLOW";
-    $("#build-name").textContent = build?.name || "가공 증강 " + game.output.activeCount + "기";
-    const buildEffectText = (build?.tiers[build.tier - 1] || ("피해 ×" + tuning.damageMult.toFixed(2) + " · 주기 ×" + tuning.cooldownMult.toFixed(2) + (tuning.echo ? " · 지연 복제" : ""))) + " · CRIT " + Math.round(game.output.primary.crit * 100) + "%";
-    $("#build-effect").textContent = buildEffectText;
-    $("#build-effect").title = buildEffectText;
+  buildSignature.hidden = !build;
+  if (build) {
+    buildSignature.style.setProperty("--build-color", build.color || CLASS_PROFILES[game.selectedClass].color);
+    $("#build-tier").textContent = "TIER " + ["0", "I", "II", "III"][build.tier] + " · " + Math.round(tuning.throughput * 100) + "% FLOW";
+    $("#build-name").textContent = build.name;
   }
-  $("#attack-name").textContent = build?.attackName || CLASS_PROFILES[game.selectedClass].attackName;
   $("#game").style.setProperty("--active-build-color", build?.color || CLASS_PROFILES[game.selectedClass].color);
   $("#game").classList.toggle("low-health", healthRatio > 0 && healthRatio <= .3 && game.mode === "playing");
   canvas.dataset.combatClass = game.selectedClass;
@@ -4484,6 +5022,23 @@ function updateHud() {
   canvas.dataset.bodyFacing = game.player.facing.toFixed(4);
   canvas.dataset.attackFacing = game.player.aim.toFixed(4);
   canvas.dataset.weaponFacing = game.player.weaponFacing.toFixed(4);
+  canvas.dataset.playerMaxHp = String(game.player.maxHp);
+  canvas.dataset.playerSpeed = game.player.speed.toFixed(2);
+  canvas.dataset.dashSpeed = String(profile.dashSpeed);
+  canvas.dataset.blastRadius = String(game.output.primary.blastRadius || 0);
+  canvas.dataset.lifeSteal = String(profile.lifeSteal || 0);
+  canvas.dataset.lifeStolen = game.player.lifeStolen.toFixed(2);
+  canvas.dataset.guardTime = game.player.guardTime.toFixed(3);
+  canvas.dataset.guardCooldown = game.player.guardCooldown.toFixed(3);
+  canvas.dataset.guardBlocks = String(game.player.guardBlocks);
+  canvas.dataset.roomKind = isBossRoom() ? "boss" : "combat";
+  canvas.dataset.sectorRoom = String(sectorRoom());
+  canvas.dataset.bossType = boss?.type || "none";
+  canvas.dataset.bossPattern = boss?.patternName || "none";
+  canvas.dataset.bossHp = boss ? boss.hp.toFixed(1) : "0";
+  canvas.dataset.bossHazards = String(game.bossHazards.length);
+  canvas.dataset.enemyBullets = String(game.enemyBullets.length);
+  canvas.dataset.bossCount = String(game.enemies.filter((enemy) => !enemy.dead && isBossType(enemy.type)).length);
 }
 
 function togglePause() {
@@ -4655,7 +5210,7 @@ $("#board-expand").addEventListener("click", () => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Tab"].includes(event.code)) event.preventDefault();
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Tab", "ShiftLeft", "ShiftRight"].includes(event.code)) event.preventDefault();
   if (game.mode === "start") {
     const classIndex = ["Digit1", "Digit2", "Digit3"].indexOf(event.code);
     if (classIndex >= 0) {
@@ -4690,6 +5245,7 @@ window.addEventListener("keydown", (event) => {
   game.keys.add(event.code);
   if (event.code === "Space" && game.mode === "playing") game.dashRequested = true;
   if (event.code === "KeyJ" && !event.repeat && game.mode === "playing") game.attackRequested = true;
+  if ((event.code === "ShiftLeft" || event.code === "ShiftRight") && !event.repeat && game.mode === "playing") game.guardRequested = true;
   if (event.code === "KeyE" && game.mode === "playing") tryNextRoom(false);
   if (event.code === "Tab" && game.mode === "playing") openFactory(true);
   if ((event.code === "KeyP" || event.code === "Escape") && ["playing", "paused"].includes(game.mode)) togglePause();
@@ -4707,6 +5263,7 @@ function clearAllCombatInput() {
   game.keys.clear();
   game.attackRequested = false;
   game.dashRequested = false;
+  game.guardRequested = false;
 }
 window.addEventListener("keyup", (event) => game.keys.delete(event.code));
 window.addEventListener("blur", clearAllCombatInput);
@@ -4733,7 +5290,14 @@ canvas.addEventListener("contextmenu", (event) => {
 window.addEventListener("resize", resizeCanvas);
 
 if (TEST_MODE) {
-  canvas.getInputAuditState = () => ({ playerX: game.player?.x ?? null, keys: [...game.keys], dashTime: game.player?.dashTime ?? 0 });
+  canvas.getInputAuditState = () => ({
+    playerX: game.player?.x ?? null,
+    keys: [...game.keys],
+    dashTime: game.player?.dashTime ?? 0,
+    guardTime: game.player?.guardTime ?? 0,
+    guardCooldown: game.player?.guardCooldown ?? 0,
+    guardBlocks: game.player?.guardBlocks ?? 0
+  });
   $("#test-panel").hidden = false;
   renderTestModuleButtons();
   $("#test-scrap").addEventListener("click", () => {
@@ -4756,6 +5320,12 @@ if (TEST_MODE) {
       finishRoom();
     }
     tryNextRoom(true);
+  });
+  $("#test-boss").addEventListener("click", () => {
+    if (game.mode !== "playing") return;
+    const offset = isBossRoom() ? ROOMS_PER_SECTOR : ROOMS_PER_SECTOR - sectorRoom();
+    game.enemies = [];
+    enterRoom(game.room + offset);
   });
   $("#test-audit").addEventListener("click", () => {
     const audit = runAllAugmentAudits();

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-23" />
+    <link rel="stylesheet" href="styles.css?v=prototype-25" />
   </head>
   <body>
     <main class="game" id="game">
@@ -22,13 +22,17 @@
       </header>
 
       <section class="combat-objective" id="combat-objective" aria-live="polite">
-        <span id="time-text">B1-01</span>
+        <span id="time-text">S1-R1</span>
         <b id="objective-text">적 전멸</b>
         <em id="objective-count">4 TARGETS</em>
       </section>
 
+      <section class="boss-hud" id="boss-hud" hidden aria-live="polite">
+        <span id="boss-title">SECTOR BOSS</span><b id="boss-name">용광로 거신</b><em id="boss-pattern">패턴 대기</em><strong id="boss-hp-text">980 / 980</strong><i><u id="boss-health-fill"></u></i>
+      </section>
+
       <section class="build-signature" id="build-signature" hidden aria-live="polite">
-        <span id="build-tier">LINE REACTOR</span><b id="build-name">기본 전투</b><em id="build-effect">프로토콜 연결 대기</em>
+        <span id="build-tier">TIER I</span><b id="build-name">완성형 빌드</b>
       </section>
 
       <button class="factory-toggle" id="factory-toggle" type="button" aria-label="공장 보드 열기, Tab">
@@ -37,11 +41,11 @@
       </button>
 
       <section class="ability-rack" aria-label="전투 행동 준비 상태">
-        <article class="ability ready" id="attack-ability">
-          <span>CLICK</span><b id="attack-name">공격</b><em id="attack-status">READY</em><i><u id="attack-ready-fill"></u></i>
+        <article class="ability ready" id="technique-ability" hidden>
+          <span id="technique-key">SHIFT</span><b id="technique-name">칼날 방벽</b><em id="technique-status">READY</em><i><u id="technique-ready-fill"></u></i>
         </article>
         <article class="ability ready" id="dash-ability">
-          <span>SPACE</span><b>대시</b><em id="dash-status">READY</em><i><u id="dash-ready-fill"></u></i>
+          <span>SPACE</span><b id="dash-name">대시</b><em id="dash-status">READY</em><i><u id="dash-ready-fill"></u></i>
         </article>
       </section>
 
@@ -61,20 +65,20 @@
               <header><span>SELECT COMBAT FRAME</span><b>시작 클래스 선택</b><small>숫자키 1–3으로도 선택할 수 있습니다.</small></header>
               <div class="class-cards">
                 <button class="class-card" type="button" data-class="melee" aria-pressed="false" style="--class-color:#58d7d3">
-                  <kbd>1</kbd><i>刃</i><span><b>근접 클래스</b><em>절단 집행자</em><small>좌우 콤보 · 표식 · 반격 · 점멸</small></span><strong>10 AUGMENTS</strong>
+                  <kbd>1</kbd><i>刃</i><span><b>근접 클래스</b><em>절단 집행자</em><small>HP 150 · 피흡 8% · Shift 방어</small></span><strong>TANK / SUSTAIN</strong>
                 </button>
                 <button class="class-card" type="button" data-class="sniper" aria-pressed="false" style="--class-color:#f6dc66">
-                  <kbd>2</kbd><i>◎</i><span><b>원거리 저격 클래스</b><em>레일 관측자</em><small>관통 · 도탄 · 표식 · 정지 충전</small></span><strong>10 AUGMENTS</strong>
+                  <kbd>2</kbd><i>◎</i><span><b>원거리 저격 클래스</b><em>레일 관측자</em><small>HP 50 · 이동 +20% · 회피 +35%</small></span><strong>MOBILE / GLASS</strong>
                 </button>
                 <button class="class-card" type="button" data-class="artillery" aria-pressed="false" style="--class-color:#ff714f">
-                  <kbd>3</kbd><i>✹</i><span><b>광역 공격 클래스</b><em>폭발 설계자</em><small>흡입 · 분열 · 지대 · 연쇄 기폭</small></span><strong>10 AUGMENTS</strong>
+                  <kbd>3</kbd><i>✹</i><span><b>광역 공격 클래스</b><em>폭발 설계자</em><small>HP 100 · 이동 -16% · 폭발 +25%</small></span><strong>AREA / CONTROL</strong>
                 </button>
               </div>
             </section>
           </div>
           <footer class="start-footer">
             <div class="start-controls" aria-label="핵심 조작">
-              <span><kbd>WASD</kbd><b>이동</b></span><span><kbd>MOUSE</kbd><b>조준</b></span><span><kbd>CLICK / J</kbd><b>공격</b></span><span><kbd>SPACE</kbd><b>대시</b></span>
+              <span><kbd>WASD</kbd><b>이동</b></span><span><kbd>CLICK / J</kbd><b>공격</b></span><span><kbd>SPACE</kbd><b>대시</b></span><span><kbd>SHIFT</kbd><b>근접 방벽</b></span>
             </div>
             <div class="start-action"><small id="selected-class-copy">클래스를 먼저 선택하세요.</small><button id="start-button" type="button" disabled>선택한 클래스 가동 <kbd>ENTER</kbd></button></div>
           </footer>
@@ -126,14 +130,14 @@
                 <b>배치 규칙</b>
                 <p>RANK는 전투 성능을, 희귀도는 물리 크기와 단자 구조를 결정합니다. 선택 카드의 도면이 NEW PART와 보드까지 그대로 이어집니다.</p>
                 <div class="hardware-legend" aria-label="증강 희귀도와 단자 범례">
-                  <span class="common"><i>1×1</i><b>일반</b></span>
-                  <span class="rare"><i>2×2</i><b>희귀</b></span>
+                  <span class="common"><i>1×1/1×2</i><b>일반</b></span>
+                  <span class="rare"><i>2×2/2×4</i><b>희귀</b></span>
                   <span class="legendary"><i>4×4</i><b>전설</b></span>
                   <span class="jack"><i>IN</i><b>좌 입력</b></span>
                   <span class="jack output"><i>OUT</i><b>상·우·하 출력</b></span>
                 </div>
                 <ul>
-                  <li>일반은 1×1, 희귀는 2×2, 전설은 4×4 공간을 차지하며 획득 시 정해진 단자는 RANK가 올라도 고정됩니다.</li>
+                  <li>희귀도별 기본 크기에 더해 일부 증강은 1×2·2×1·2×4·4×2 직사각형이며, 획득 시 정해진 크기와 단자는 RANK가 올라도 고정됩니다.</li>
                   <li>도구는 상·우·하 세 방향 모두 출력하며, 서로 다른 도구가 연속될 때 순서와 무관한 X 조합이 활성화됩니다.</li>
                   <li>보드·NEW PART·STORAGE·드랍 도구를 빈 셀로 끌어 놓으세요. 클릭으로 들어 올린 뒤 놓는 방식도 유지됩니다.</li>
                 </ul>
@@ -193,6 +197,7 @@
         <button id="test-scrap" type="button">방 즉시 정리</button>
         <button id="test-level" type="button">레벨업 배송</button>
         <button id="test-next-room" type="button">다음 방</button>
+        <button id="test-boss" type="button">보스룸 이동</button>
         <button id="test-audit" type="button">전체 빌드 진단</button>
         <output id="test-audit-result" role="status"></output>
         <div id="test-module-buttons" aria-label="테스트 모듈 배송"></div>
@@ -200,6 +205,6 @@
       </div>
     </main>
 
-    <script type="module" src="game.js?v=prototype-23"></script>
+    <script type="module" src="game.js?v=prototype-25"></script>
   </body>
 </html>

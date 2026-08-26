@@ -31,15 +31,19 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-23") && html.includes("game.js?v=prototype-23") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-23 누락");
-check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list", "factory-tool-combo-list", "factory-synergy-list", "hud-ram-text", "hud-ram-fill", "choice-ram-capacity", "factory-ram-meta", "factory-tab-ram"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM 성장/공정 도구 UI 항목 누락");
+check(html.includes("styles.css?v=prototype-25") && html.includes("game.js?v=prototype-25") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-25 누락");
+check(["build-signature", "boss-hud", "boss-health-fill", "boss-pattern", "test-boss", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list", "factory-tool-combo-list", "factory-synergy-list", "hud-ram-text", "hud-ram-fill", "choice-ram-capacity", "factory-ram-meta", "factory-tab-ram"].every((id) => html.includes(`id="${id}"`)), "보스/빌드/RAM 성장/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
 check(source.includes("runFactoryToolAudits") && source.includes("augmentHardwarePreview") && source.includes("augmentChoicePreviewPart") && source.includes("NEW JACK LAYOUT") && source.includes("AUGMENT_MAX_RANK = 3") && source.includes("AUGMENT_EVOLUTION_RANK = 2") && source.includes("TOOL_COMBINATIONS") && source.includes("findToolCombination") && source.includes("RAM_PER_LEVEL = 2") && source.includes("ramCapacityAtLevel") && source.includes("setFactoryView") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("minimum + offsetSeed %") && source.includes("previewPartPlacement") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
 
-const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
+const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "technique-ability", "technique-status", "technique-ready-fill", "dash-name", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
 check(essentialHudIds.every((id) => html.includes(`id="${id}"`)), "필수 전투 HUD 항목 누락");
 check(removedHudClasses.every((className) => !html.includes(`class="${className}`)), "비필수 전투 HUD가 다시 노출됨");
+check(!html.includes('id="attack-ability"') && !html.includes('id="build-effect"'), "중복 공격 카드 또는 상세 빌드 효과 HUD가 다시 노출됨");
+check(source.includes("maxHp: 150") && source.includes("maxHp: 50") && source.includes("moveSpeed: 270") && source.includes("moveSpeed: 190") && source.includes("dashSpeed: 825") && source.includes("lifeSteal: .08") && source.includes("blastRadiusMult: 1.25") && source.includes("guardRequested"), "클래스 정체성 스탯·피흡·방벽 정의 누락");
+check(source.includes('const BOSS_TYPES = ["forge_titan", "prism_warden", "void_leviathan"]') && source.includes("COMBAT_ROOMS_PER_SECTOR = 5") && source.includes("function updateBossHazards") && source.includes("function executeBossPattern"), "3종 보스·5라운드 진행·보스 패턴 시스템 누락");
+check(source.includes("MODULE_FOOTPRINTS") && source.includes("width: 1, height: 2") && source.includes("width: 2, height: 4") && html.includes("1×2") && html.includes("2×4"), "직사각형 증강 점유 규칙 또는 UI 범례 누락");
 check(source.includes("ctx.rotate(player.facing)"), "플레이어 본체 이동 방향 렌더링 누락");
 check(source.includes("ctx.rotate(player.weaponFacing)"), "공격 무기 방향 렌더링 누락");
 check(source.includes("startSlash(player.bufferedAim)"), "입력 순간 공격 각도 버퍼 누락");
@@ -145,8 +149,9 @@ try {
     const nonMovementPreserved = game.keys.has("KeyJ");
     game.attackRequested = true;
     game.dashRequested = true;
+    game.guardRequested = true;
     clearAllCombatInput();
-    return { movementCleared, nonMovementPreserved, allKeysCleared: game.keys.size === 0, requestsCleared: !game.attackRequested && !game.dashRequested };
+    return { movementCleared, nonMovementPreserved, allKeysCleared: game.keys.size === 0, requestsCleared: !game.attackRequested && !game.dashRequested && !game.guardRequested };
   })()`, runtime, { timeout: 1000 });
   check(Object.values(inputResetAudit).every(Boolean), `우클릭·포커스 입력 정리 검증 실패: ${JSON.stringify(inputResetAudit)}`);
   const classRenderAudit = vm.runInContext(`[
@@ -171,6 +176,122 @@ try {
     return { doubledRange: range === 104 * MELEE_WEAPON_SCALE, slashUsesRange: game.player.slash?.range === range };
   })()`, runtime, { timeout: 1000 });
   check(Object.values(meleeWeaponAudit).every(Boolean), `근접 무기 2배 스케일 런타임 검증 실패: ${JSON.stringify(meleeWeaponAudit)}`);
+  const classIdentityAudit = vm.runInContext(`(() => {
+    const close = (actual, expected) => Math.abs(actual - expected) < .01;
+    const setup = (classId) => {
+      game.mode = "start";
+      selectClass(classId);
+      startGame();
+      game.enemies = [];
+      game.enemyBullets = [];
+      game.playerShots = [];
+      game.player.x = 300;
+      game.player.y = 500;
+      game.player.renderX = 300;
+      game.player.renderY = 500;
+      game.player.lastMoveX = 1;
+      game.player.lastMoveY = 0;
+    };
+
+    setup("melee");
+    const meleeStats = game.player.maxHp === 150 && close(game.player.speed, 225 * COMBAT_TEMPO.unitMove);
+    game.player.hp = 100;
+    const target = createAuditEnemy(9001, 350, 500, 100, 100);
+    game.enemies = [target];
+    damageEnemy(target, 20, { ...game.output.primary, crit: 0, knockback: 0, stun: 0 }, 0, true);
+    const lifeSteal = close(game.player.hp, 101.6) && close(game.player.lifeStolen, 1.6);
+    game.guardRequested = true;
+    updatePlayer(.016);
+    const guardActivated = game.player.guardTime > 0 && game.player.guardCooldown > 3.9;
+    const hpBeforeGuard = game.player.hp;
+    damagePlayer(30, 250, 500);
+    const guardBlocked = close(game.player.hp, hpBeforeGuard) && game.player.guardBlocks === 1 && game.player.guardTime === 0;
+    game.player.x = 300;
+    game.player.dashCooldown = 0;
+    game.player.invulnerable = 0;
+    game.dashRequested = true;
+    updatePlayer(.016);
+    updatePlayer(.1);
+    const meleeDashDistance = game.player.x - 300;
+
+    setup("sniper");
+    const sniperStats = game.player.maxHp === 50 && close(game.player.speed, 270 * COMBAT_TEMPO.unitMove);
+    game.dashRequested = true;
+    updatePlayer(.016);
+    updatePlayer(.1);
+    const sniperDashDistance = game.player.x - 300;
+    const longEvade = sniperDashDistance > meleeDashDistance * 1.3;
+
+    setup("artillery");
+    const artilleryStats = game.player.maxHp === 100 && close(game.player.speed, 190 * COMBAT_TEMPO.unitMove);
+    const blastExpanded = close(game.output.primary.blastRadius, 86 * 1.25);
+    return { meleeStats, lifeSteal, guardActivated, guardBlocked, sniperStats, longEvade, artilleryStats, blastExpanded };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(classIdentityAudit).every(Boolean), `클래스 정체성 런타임 검증 실패: ${JSON.stringify(classIdentityAudit)}`);
+  const bossAudit = vm.runInContext(`(() => {
+    game.mode = "start";
+    selectClass("melee");
+    startGame();
+    game.enemies = [];
+    enterRoom(5);
+    const fifthIsCombat = !isBossRoom() && sectorRoom() === 5 && game.enemies.some((enemy) => enemy.type === "guardian");
+    const bossReports = [];
+    for (const [index, room] of [6, 12, 18].entries()) {
+      game.enemies = [];
+      game.bossHazards = [];
+      game.enemyBullets = [];
+      enterRoom(room);
+      const boss = game.enemies.find((enemy) => isBossType(enemy.type));
+      const profile = boss && BOSS_PROFILES[boss.type];
+      const expectedType = BOSS_TYPES[index];
+      const emitted = [];
+      for (const pattern of profile?.patterns || []) {
+        game.enemies = [boss];
+        game.bossHazards = [];
+        game.enemyBullets = [];
+        boss.bossDashTime = 0;
+        boss.patternId = pattern.id;
+        const beforeX = boss.x;
+        const beforeY = boss.y;
+        executeBossPattern(boss);
+        emitted.push(game.bossHazards.length > 0 || game.enemyBullets.length > 0 || boss.bossDashTime > 0 || game.enemies.length > 1 || Math.hypot(boss.x - beforeX, boss.y - beforeY) > 10);
+      }
+      updateHud();
+      bossReports.push({
+        dedicated: isBossRoom(room) && game.enemies.filter((enemy) => isBossType(enemy.type)).length === 1,
+        rotates: boss?.type === expectedType,
+        fivePatterns: profile?.patterns.length === 5 && new Set(profile.patterns.map((pattern) => pattern.id)).size === 5,
+        everyPatternEmits: emitted.length === 5 && emitted.every(Boolean),
+        distinctStyle: Boolean(profile?.name && profile?.color && profile?.accent && profile?.description),
+        hud: !document.querySelector("#boss-hud").hidden && document.querySelector("#boss-name").textContent === profile?.name
+      });
+    }
+    game.enemies = [];
+    game.bossHazards = [];
+    enterRoom(6);
+    game.player.hp = game.player.maxHp;
+    game.player.invulnerable = 0;
+    game.player.guardTime = 0;
+    const hpBeforeHazard = game.player.hp;
+    addBossCircle(game.player.x, game.player.y, 60, 0, 12, "#ff714f");
+    updateBossHazards(.016);
+    const hazardDamages = game.player.hp < hpBeforeHazard;
+    const cycleLabels = formatRoom() === "S1-BOSS" && roomType(6) === "보스룸" && sectorNumber(18) === 3;
+    return { fifthIsCombat, threeBosses: bossReports.length === 3 && bossReports.every((report) => Object.values(report).every(Boolean)), hazardDamages, cycleLabels, reports: bossReports };
+  })()`, runtime, { timeout: 1800 });
+  check(bossAudit.fifthIsCombat && bossAudit.threeBosses && bossAudit.hazardDamages && bossAudit.cycleLabels, `보스룸·3종 보스·5패턴 런타임 검증 실패: ${JSON.stringify(bossAudit)}`);
+  const rectangleAudit = vm.runInContext(`(() => {
+    const shapes = Object.entries(MODULE_FOOTPRINTS).map(([type, shape]) => ({ type, ...shape, actual: partFootprint({ kind: "module", type }) }));
+    const hasOneByTwo = shapes.some((shape) => shape.width === 1 && shape.height === 2);
+    const hasTwoByFour = shapes.some((shape) => shape.width === 2 && shape.height === 4);
+    const allRectangular = shapes.length >= 6 && shapes.every((shape) => shape.width !== shape.height && shape.actual.width === shape.width && shape.actual.height === shape.height);
+    const previewed = shapes.every((shape) => augmentHardwarePreview(ensurePartPorts({ id: 30000 + shapes.indexOf(shape), kind: "module", type: shape.type }), "RECT TEST").includes('data-footprint="' + shape.width + '×' + shape.height + '"'));
+    board.fill(null);
+    const tall = createPart("module", shapes.find((shape) => shape.width === 2 && shape.height === 4).type);
+    const placeable = board.some((_, index) => canPlacePart(index, tall));
+    return { hasOneByTwo, hasTwoByFour, allRectangular, previewed, placeable };
+  })()`, runtime, { timeout: 1000 });
+  check(Object.values(rectangleAudit).every(Boolean), `직사각형 증강 점유·미리보기 검증 실패: ${JSON.stringify(rectangleAudit)}`);
   const tempoAudit = vm.runInContext(`(() => {
     game.mode = "start";
     selectClass("sniper");
@@ -178,7 +299,7 @@ try {
     game.enemies = [];
     game.playerShots = [];
     const close = (actual, expected) => Math.abs(actual - expected) < .001;
-    const playerMove = close(game.player.speed, 225 * COMBAT_TEMPO.unitMove);
+    const playerMove = close(game.player.speed, CLASS_PROFILES.sniper.moveSpeed * COMBAT_TEMPO.unitMove);
     const attackRate = close(game.output.primary.cooldown, CLASS_PROFILES.sniper.cooldown / COMBAT_TEMPO.attackRate);
     spawnRailShot(0, { speed: 100 });
     launchGrenade(0, { speed: 100 });

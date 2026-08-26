@@ -217,6 +217,11 @@ async function auditViewport(session, viewport) {
     await session.send("Input.dispatchKeyEvent", { type: "keyUp", key: "d", code: "KeyD", windowsVirtualKeyCode: 68, nativeVirtualKeyCode: 68 });
     rightClickReset = xWhileMoving > xBeforeMove + 4 && !afterRightClick.keyHeld && Math.abs(xAfterSettling - afterRightClick.x) < 1.5;
     assert(rightClickReset, "wide: 우클릭 후 이동 입력이 고착됨 " + JSON.stringify({ xBeforeMove, xWhileMoving, afterRightClick, xAfterSettling }));
+    await session.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, nativeVirtualKeyCode: 16 });
+    await sleep(45);
+    const guardState = await evaluate(session, "document.querySelector('#game-canvas').getInputAuditState()");
+    await session.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, nativeVirtualKeyCode: 16 });
+    assert(guardState.guardTime > 0 && guardState.guardCooldown > 3.8, "wide: 실제 Shift 입력으로 칼날 방벽이 발동하지 않음 " + JSON.stringify(guardState));
   }
   const combat = await evaluate(session, `(() => {
     const rect = (selector) => {
@@ -229,12 +234,23 @@ async function auditViewport(session, viewport) {
       abilities: rect('.ability-rack'),
       factoryToggle: rect('#factory-toggle'),
       ramText: document.querySelector('#hud-ram-text')?.textContent || '',
-      ramCapacity: Number(document.querySelector('#game-canvas').dataset.ramCapacity || 0)
+      ramCapacity: Number(document.querySelector('#game-canvas').dataset.ramCapacity || 0),
+      health: document.querySelector('#health-text')?.textContent || '',
+      maxHp: Number(document.querySelector('#game-canvas').dataset.playerMaxHp || 0),
+      speed: Number(document.querySelector('#game-canvas').dataset.playerSpeed || 0),
+      lifeSteal: Number(document.querySelector('#game-canvas').dataset.lifeSteal || 0),
+      techniqueVisible: !document.querySelector('#technique-ability').hidden,
+      techniqueName: document.querySelector('#technique-name')?.textContent || '',
+      abilityCount: document.querySelectorAll('.ability-rack .ability:not([hidden])').length,
+      duplicateAttackCard: Boolean(document.querySelector('#attack-ability')),
+      verboseBuildEffect: Boolean(document.querySelector('#build-effect'))
     };
   })()`);
   assert(pointerTarget.id === "game-canvas", `${viewport.name}: 전투 클릭이 ${pointerTarget.id || pointerTarget.className || pointerTarget.tag}에 차단됨`);
   assert(swingAfterClick >= 1, `${viewport.name}: 실제 마우스 클릭 공격 미발동`);
   assert(combat.ramText === "0 / 10" && combat.ramCapacity === 10, `${viewport.name}: 전투 HUD 초기 RAM 표시 오류 ${JSON.stringify(combat)}`);
+  assert(combat.health === "150 / 150" && combat.maxHp === 150 && Math.abs(combat.speed - 225 * 1.42) < .02 && combat.lifeSteal === .08, `${viewport.name}: 근접 클래스 체력·속도·피흡 UI 상태 오류 ${JSON.stringify(combat)}`);
+  assert(combat.techniqueVisible && combat.techniqueName === "칼날 방벽" && combat.abilityCount === 2 && !combat.duplicateAttackCard && !combat.verboseBuildEffect, `${viewport.name}: 필수 행동 중심 HUD 정리 실패 ${JSON.stringify(combat)}`);
   for (const [name, rect] of Object.entries(combat).filter(([, value]) => value && typeof value === "object" && "left" in value)) {
     assert(rectFits(rect, viewport.width, viewport.height), `${viewport.name}: ${name} HUD 잘림 ${JSON.stringify(rect)}`);
   }
@@ -287,8 +303,9 @@ async function auditViewport(session, viewport) {
       })()`);
       return state.open ? state : null;
     });
-    assert(compactChoice.cards.length === 3 && compactChoice.hardware === 3 && compactChoice.cards.every((card) => card.hardware && ["1×1", "2×2", "4×4"].includes(card.footprint)), `${viewport.name}: 물리 도면 3택 누락 ${JSON.stringify(compactChoice)}`);
+    assert(compactChoice.cards.length === 3 && compactChoice.hardware === 3 && compactChoice.cards.every((card) => card.hardware && ["1×1", "1×2", "2×1", "2×2", "2×4", "4×2", "4×4"].includes(card.footprint)), `${viewport.name}: 물리 도면 3택 누락 ${JSON.stringify(compactChoice)}`);
     assert(compactChoice.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1) && compactChoice.overflowX <= 1 && compactChoice.overlayScrollable, `${viewport.name}: 도면 카드 가로 잘림 또는 세로 스크롤 보호 누락 ${JSON.stringify(compactChoice)}`);
+    await sleep(320);
     await captureUi(session, viewport, "levelup");
   }
 
@@ -320,8 +337,9 @@ async function auditViewport(session, viewport) {
       return state.open ? state : null;
     });
     assert(portraitChoice.cards.length === 3 && portraitChoice.ranks === 3 && portraitChoice.effects === 3 && portraitChoice.evolutions === 3 && portraitChoice.hardware === 3 && portraitChoice.diagrams === 3, "portrait: 랭크·진화·물리 도면 3택 UI 누락 " + JSON.stringify(portraitChoice));
-    assert(portraitChoice.cards.every((card) => card.hardware && ["common", "rare", "legendary"].includes(card.hardware.rarity) && ["1×1", "2×2", "4×4"].includes(card.hardware.footprint) && card.hardware.inputs === 1 && card.hardware.outputs >= 1 && card.hardware.outputs <= 2 && card.hardware.label.includes("칸 점유")), "portrait: 희귀도·크기·단자 정보 누락 " + JSON.stringify(portraitChoice));
+    assert(portraitChoice.cards.every((card) => card.hardware && ["common", "rare", "legendary"].includes(card.hardware.rarity) && ["1×1", "1×2", "2×1", "2×2", "2×4", "4×2", "4×4"].includes(card.hardware.footprint) && card.hardware.inputs === 1 && card.hardware.outputs >= 1 && card.hardware.outputs <= 2 && card.hardware.label.includes("칸 점유")), "portrait: 희귀도·크기·단자 정보 누락 " + JSON.stringify(portraitChoice));
     assert(portraitChoice.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1) && portraitChoice.overflowX <= 1, "portrait: 레벨업 카드 가로 잘림 " + JSON.stringify(portraitChoice));
+    await sleep(320);
     await captureUi(session, viewport, "levelup");
   }
 
@@ -480,8 +498,9 @@ async function auditViewport(session, viewport) {
     });
     assert(levelRamUi.level === 2 && levelRamUi.capacity === 12 && levelRamUi.hudRam.endsWith('/ 12') && levelRamUi.expansion === '10 → 12 RAM' && levelRamUi.gain === '+2 CAPACITY', "wide: 레벨업 RAM 성장 UI 실패 " + JSON.stringify(levelRamUi));
     assert(levelRamUi.cards.length === 3 && levelRamUi.ranks === 3 && levelRamUi.effects === 3 && levelRamUi.evolutions === 3 && levelRamUi.hardware === 3 && levelRamUi.diagrams === 3, "wide: 랭크·진화·물리 도면 3택 UI 누락 " + JSON.stringify(levelRamUi));
-    assert(levelRamUi.cards.every((card) => card.hardware && ["common", "rare", "legendary"].includes(card.hardware.rarity) && ["1×1", "2×2", "4×4"].includes(card.hardware.footprint) && card.hardware.inputs === 1 && card.hardware.outputs >= 1 && card.hardware.outputs <= 2 && card.hardware.label.includes("칸 점유")), "wide: 희귀도·크기·단자 정보 누락 " + JSON.stringify(levelRamUi));
+    assert(levelRamUi.cards.every((card) => card.hardware && ["common", "rare", "legendary"].includes(card.hardware.rarity) && ["1×1", "1×2", "2×1", "2×2", "2×4", "4×2", "4×4"].includes(card.hardware.footprint) && card.hardware.inputs === 1 && card.hardware.outputs >= 1 && card.hardware.outputs <= 2 && card.hardware.label.includes("칸 점유")), "wide: 희귀도·크기·단자 정보 누락 " + JSON.stringify(levelRamUi));
     assert(levelRamUi.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1 && card.top >= -1 && card.bottom <= viewport.height + 1), "wide: 레벨업 카드 잘림 " + JSON.stringify(levelRamUi));
+    await sleep(320);
     await captureUi(session, viewport, "levelup");
     const selectedHardware = await evaluate(session, `(() => { const card = document.querySelector('.augment-card.rank-0'); const hardware = card?.querySelector('.augment-hardware'); return card && hardware ? { type: card.dataset.choice, rarity: hardware.dataset.rarity, footprint: hardware.dataset.footprint, inputs: hardware.dataset.inputCount, outputs: hardware.dataset.outputCount, ports: [...hardware.querySelectorAll('.hardware-jack')].map((jack) => ({ edge: [...jack.classList].find((name) => name.startsWith('edge-')), left: jack.style.getPropertyValue('--port-left'), top: jack.style.getPropertyValue('--port-top') })) } : null; })()`);
     await clickElement(session, '.augment-card.rank-0');
@@ -494,6 +513,132 @@ async function auditViewport(session, viewport) {
     await captureUi(session, viewport, "new-part");
   }
   return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}${viewport.name === "wide" && rightClickReset ? " · right-click reset" : ""}`;
+}
+
+async function auditRectangleHardware(session) {
+  const viewport = { name: "rectangle", width: 1280, height: 720 };
+  const configs = [
+    { type: "m_hook", footprint: "1×2", widthRatio: [0.8, 1.3], heightMin: 1.6 },
+    { type: "m_execute", footprint: "2×4", widthRatio: [1.6, 2.4], heightMin: 3.35 }
+  ];
+  const reports = [];
+  for (const config of configs) {
+    await session.send("Emulation.setDeviceMetricsOverride", { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
+    const url = new URL(baseUrl);
+    url.searchParams.set("test", "1");
+    url.searchParams.set("rectangle-audit", config.type + "-" + Date.now());
+    await session.send("Page.navigate", { url: url.href });
+    await waitUntil(async () => evaluate(session, `document.readyState === 'complete' && Boolean(document.querySelector('#ui-stage'))`));
+    await sleep(160);
+    await clickElement(session, '[data-class="melee"]');
+    await clickElement(session, '#start-button');
+    await sleep(70);
+    await clickElement(session, `[data-test-module="${config.type}"]`);
+    const pending = await waitUntil(async () => {
+      const state = await evaluate(session, `(() => {
+        const hardware = document.querySelector('#pending-part .augment-hardware');
+        return hardware ? { footprint: hardware.dataset.footprint, cells: hardware.querySelectorAll('.hardware-cell').length, valid: document.querySelectorAll('#factory-board .valid-target').length } : null;
+      })()`);
+      return state?.footprint === config.footprint ? state : null;
+    });
+    assert(pending.valid > 0 && pending.cells === config.footprint.split('×').map(Number).reduce((a, b) => a * b), `${config.type}: 직사각형 NEW PART 도면 오류 ${JSON.stringify(pending)}`);
+    await clickElement(session, '#factory-board .valid-target');
+    await sleep(760);
+    const placed = await evaluate(session, `(() => {
+      const token = document.querySelector('.module-${config.type}');
+      const cell = token?.closest('[data-cell-index]');
+      const a = token?.getBoundingClientRect();
+      const b = cell?.getBoundingClientRect();
+      return a && b ? { footprint: token.dataset.footprint, widthRatio: a.width / b.width, heightRatio: a.height / b.height, wires: document.querySelectorAll('.circuit-wire').length } : null;
+    })()`);
+    assert(placed && placed.footprint === config.footprint && placed.widthRatio >= config.widthRatio[0] && placed.widthRatio <= config.widthRatio[1] && placed.heightRatio >= config.heightMin && placed.wires === 1, `${config.type}: 직사각형 실제 보드 점유 오류 ${JSON.stringify(placed)}`);
+    await captureUi(session, { ...viewport, name: config.type }, 'rectangle');
+    reports.push({ type: config.type, pending, placed });
+  }
+  return "1×2 + 2×4 physical board UI PASS";
+}
+async function auditBossRooms(session) {
+  const viewport = { name: "boss", width: 1280, height: 720 };
+  await session.send("Emulation.setDeviceMetricsOverride", { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
+  const url = new URL(baseUrl);
+  url.searchParams.set("test", "1");
+  url.searchParams.set("boss-audit", String(Date.now()));
+  await session.send("Page.navigate", { url: url.href });
+  await waitUntil(async () => evaluate(session, `document.readyState === 'complete' && Boolean(document.querySelector('#test-boss'))`));
+  await sleep(180);
+  await clickElement(session, '[data-class="melee"]');
+  await clickElement(session, '#start-button');
+  await sleep(90);
+  const expected = [
+    { type: "forge_titan", name: "용광로 거신", room: "S1-BOSS" },
+    { type: "prism_warden", name: "프리즘 감시자", room: "S2-BOSS" },
+    { type: "void_leviathan", name: "공허 레비아탄", room: "S3-BOSS" }
+  ];
+  const reports = [];
+  for (let index = 0; index < expected.length; index += 1) {
+    await clickElement(session, '#test-boss');
+    const initial = await waitUntil(async () => {
+      const state = await evaluate(session, `(() => {
+        const canvas = document.querySelector('#game-canvas');
+        const hud = document.querySelector('#boss-hud');
+        const rect = hud.getBoundingClientRect();
+        return {
+          type: canvas.dataset.bossType,
+          count: Number(canvas.dataset.bossCount || 0),
+          roomKind: canvas.dataset.roomKind,
+          room: document.querySelector('#time-text')?.textContent || '',
+          name: document.querySelector('#boss-name')?.textContent || '',
+          hp: document.querySelector('#boss-hp-text')?.textContent || '',
+          bar: parseFloat(document.querySelector('#boss-health-fill')?.style.width || '0'),
+          hidden: hud.hidden,
+          rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+        };
+      })()`);
+      return state.type === expected[index].type ? state : null;
+    });
+    assert(initial.count === 1 && initial.roomKind === 'boss' && initial.room === expected[index].room && initial.name === expected[index].name && initial.hp.includes('/') && initial.bar > 99 && !initial.hidden, `boss ${expected[index].type}: 전용 룸·HUD 초기 상태 오류 ${JSON.stringify(initial)}`);
+    assert(rectFits(initial.rect, viewport.width, viewport.height), `boss ${expected[index].type}: 보스 HUD 잘림 ${JSON.stringify(initial.rect)}`);
+    const signal = await waitUntil(async () => {
+      const state = await evaluate(session, `(() => { const canvas = document.querySelector('#game-canvas'); return { pattern: canvas.dataset.bossPattern || '', hazards: Number(canvas.dataset.bossHazards || 0), bullets: Number(canvas.dataset.enemyBullets || 0) }; })()`);
+      return state.pattern && state.pattern !== '패턴 분석 중' && state.pattern !== 'none' && state.hazards + state.bullets > 0 ? state : null;
+    }, 5000);
+    reports.push({ ...initial, signal });
+    await captureUi(session, { ...viewport, name: expected[index].type }, 'boss');
+  }
+  assert(new Set(reports.map((report) => report.type)).size === 3 && reports.every((report) => report.signal.hazards + report.signal.bullets > 0), `3종 보스 패턴 신호 검증 실패 ${JSON.stringify(reports)}`);
+  return "3 boss rooms × live pattern UI PASS";
+}
+async function auditSecondaryClass(session, classId, expected) {
+  await session.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  const url = new URL(baseUrl);
+  url.searchParams.set("test", "1");
+  url.searchParams.set("class-audit", classId + "-" + Date.now());
+  await session.send("Page.navigate", { url: url.href });
+  await waitUntil(async () => evaluate(session, `document.readyState === 'complete' && Boolean(document.querySelector('#ui-stage'))`));
+  await sleep(180);
+  await clickElement(session, `[data-class="${classId}"]`);
+  await clickElement(session, "#start-button");
+  await sleep(100);
+  const state = await evaluate(session, `(() => {
+    const canvas = document.querySelector('#game-canvas');
+    const rack = document.querySelector('.ability-rack');
+    return {
+      hp: document.querySelector('#health-text')?.textContent || '',
+      maxHp: Number(canvas.dataset.playerMaxHp || 0),
+      speed: Number(canvas.dataset.playerSpeed || 0),
+      dashSpeed: Number(canvas.dataset.dashSpeed || 0),
+      blastRadius: Number(canvas.dataset.blastRadius || 0),
+      techniqueHidden: document.querySelector('#technique-ability').hidden,
+      singleRack: rack.classList.contains('single'),
+      visibleAbilities: document.querySelectorAll('.ability-rack .ability:not([hidden])').length,
+      dashName: document.querySelector('#dash-name')?.textContent || ''
+    };
+  })()`);
+  assert(state.hp === `${expected.maxHp} / ${expected.maxHp}` && state.maxHp === expected.maxHp, `${classId}: 체력 정체성 오류 ${JSON.stringify(state)}`);
+  assert(Math.abs(state.speed - expected.moveSpeed * 1.42) < .02 && state.dashSpeed === expected.dashSpeed, `${classId}: 이동·회피 정체성 오류 ${JSON.stringify(state)}`);
+  assert(state.techniqueHidden && state.singleRack && state.visibleAbilities === 1 && state.dashName === expected.dashName, `${classId}: 클래스별 필수 HUD 정리 오류 ${JSON.stringify(state)}`);
+  if (classId === "artillery") assert(Math.abs(state.blastRadius - 107.5) < .01, `artillery: 기본 폭발 반경 25% 확장 실패 ${JSON.stringify(state)}`);
+  return `${classId} identity UI PASS`;
 }
 
 async function main() {
@@ -525,6 +670,10 @@ async function main() {
 
     const reports = [];
     for (const viewport of viewports) reports.push(await auditViewport(session, viewport));
+    reports.push(await auditSecondaryClass(session, "sniper", { maxHp: 50, moveSpeed: 270, dashSpeed: 825, dashName: "장거리 회피" }));
+    reports.push(await auditSecondaryClass(session, "artillery", { maxHp: 100, moveSpeed: 190, dashSpeed: 610, dashName: "중량 대시" }));
+    reports.push(await auditBossRooms(session));
+    reports.push(await auditRectangleHardware(session));
     await session.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     const liveResize = await waitUntil(async () => {
       const value = await evaluate(session, `(() => {

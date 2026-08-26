@@ -56,8 +56,12 @@ kbd { font-family: var(--mono); }
 .combat-objective.complete { border-color: rgba(88,215,211,.58); box-shadow: 0 0 28px rgba(88,215,211,.15); }.combat-objective.complete em { color: var(--cyan); }
 .game:has(.test-panel:not([hidden])) .combat-objective { top: 78px; }
 
-.build-signature { --build-color: var(--cyan); position: absolute; z-index: 11; bottom: 68px; left: 50%; display: grid; min-width: 286px; max-width: 430px; border: 1px solid color-mix(in srgb, var(--build-color) 55%, transparent); border-left: 4px solid var(--build-color); border-radius: 2px; padding: 7px 11px; background: rgba(8,13,15,.88); transform: translateX(-50%); box-shadow: 0 9px 26px #0008, 0 0 24px color-mix(in srgb, var(--build-color) 12%, transparent); pointer-events: none; }
-.build-signature > span { color: var(--build-color); font: 8px var(--mono); letter-spacing: .14em; }.build-signature > b { margin-top: 2px; font-size: 12px; }.build-signature > em { margin-top: 2px; overflow: hidden; color: #9bacad; font: 8px var(--mono); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.boss-hud { --boss-color: var(--orange); position: absolute; z-index: 13; top: 58px; left: 50%; display: grid; width: min(520px, calc(var(--ui-vw) * 48)); grid-template-columns: 1fr auto; gap: 2px 12px; border: 1px solid color-mix(in srgb, var(--boss-color) 58%, transparent); border-top: 3px solid var(--boss-color); padding: 8px 12px 10px; background: rgba(8,10,12,.9); transform: translateX(-50%); box-shadow: 0 12px 36px #0009, 0 0 34px color-mix(in srgb, var(--boss-color) 13%, transparent); pointer-events: none; }
+.boss-hud > span { color: var(--boss-color); font: 8px var(--mono); letter-spacing: .16em; }.boss-hud > b { grid-column: 1; font-size: 15px; }.boss-hud > em { grid-column: 1; color: #a9b8b9; font: 8px var(--mono); font-style: normal; }.boss-hud > strong { grid-column: 2; grid-row: 1 / 4; align-self: center; color: #f2f6f5; font: 10px var(--mono); }.boss-hud > i { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: #28191b; }.boss-hud > i > u { display: block; width: 100%; height: 100%; background: var(--boss-color); box-shadow: 0 0 12px var(--boss-color); transition: width .12s linear; }
+.game:has(.test-panel:not([hidden])) .boss-hud { top: 118px; }
+
+.build-signature { --build-color: var(--cyan); position: absolute; z-index: 11; bottom: 62px; left: 50%; display: flex; min-width: 0; max-width: 310px; align-items: center; gap: 8px; border: 1px solid color-mix(in srgb, var(--build-color) 55%, transparent); border-left: 3px solid var(--build-color); border-radius: 2px; padding: 6px 9px; background: rgba(8,13,15,.88); transform: translateX(-50%); box-shadow: 0 9px 26px #0008, 0 0 24px color-mix(in srgb, var(--build-color) 12%, transparent); pointer-events: none; }
+.build-signature > span { color: var(--build-color); font: 8px var(--mono); letter-spacing: .1em; white-space: nowrap; }.build-signature > b { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 
 
 .factory-toggle { position: absolute; z-index: 11; right: 18px; bottom: 17px; display: flex; align-items: center; gap: 9px; border: 1px solid rgba(88,215,211,.3); border-radius: 3px; padding: 8px 9px 8px 11px; color: var(--text); background: rgba(8,13,15,.8); box-shadow: 0 7px 20px #0006; pointer-events: auto; }
@@ -67,12 +71,12 @@ kbd { font-family: var(--mono); }
 .factory-toggle > b { font-size: 11px; }
 .factory-toggle > kbd { border: 1px solid #526168; border-radius: 2px; padding: 3px 5px; color: #a8b7ba; font: 8px var(--mono); }
 
-.ability-rack { position: absolute; z-index: 10; bottom: 16px; left: 50%; display: grid; width: 262px; grid-template-columns: 1fr 1fr; gap: 5px; transform: translateX(-50%); pointer-events: none; }
+.ability-rack { position: absolute; z-index: 10; bottom: 16px; left: 50%; display: grid; width: 278px; grid-template-columns: 1fr 1fr; gap: 5px; transform: translateX(-50%); pointer-events: none; }.ability-rack.single { width: 136px; grid-template-columns: 1fr; }
 .ability { position: relative; display: grid; grid-template-columns: 1fr auto; min-height: 38px; overflow: hidden; border: 1px solid rgba(132,151,156,.24); border-radius: 2px; padding: 5px 7px 7px; background: rgba(8,13,15,.78); box-shadow: 0 7px 18px #0006; }
 .ability > span { color: #748589; font: 8px var(--mono); letter-spacing: .08em; }.ability > b { grid-column: 1; font-size: 11px; }.ability > em { grid-column: 2; grid-row: 1 / 3; align-self: center; color: #718084; font: 8px var(--mono); font-style: normal; }
 .ability > i { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: #273235; }.ability > i > u { display: block; width: 100%; height: 100%; background: var(--ability-color, var(--cyan)); transition: width .06s linear; text-decoration: none; }
 .ability.ready { border-color: color-mix(in srgb, var(--ability-color, var(--cyan)) 45%, transparent); }.ability.ready > em { color: var(--ability-color, var(--cyan)); }.ability.ready > b { color: #f2f7f6; }
-#attack-ability { --ability-color: var(--class-color, var(--cyan)); }
+#technique-ability { --ability-color: var(--class-color, var(--cyan)); }
 #dash-ability { --ability-color: var(--lime); }
 
 .system-toast { position: absolute; z-index: 42; top: 92px; left: 50%; display: grid; min-width: 330px; border: 1px solid rgba(88,215,211,.52); border-left: 4px solid var(--toast-color, var(--cyan)); padding: 9px 14px; background: rgba(8,16,18,.94); transform: translate(-50%, -14px); opacity: 0; box-shadow: 0 14px 45px #0009, 0 0 25px color-mix(in srgb, var(--toast-color, var(--cyan)) 12%, transparent); transition: opacity .2s, transform .2s; pointer-events: none; }
@@ -330,6 +334,8 @@ kbd { font-family: var(--mono); }
 }
 
 @media (max-width: 560px) {
+  .boss-hud { top: 64px; width: calc(var(--ui-width) - 28px); }
+  .game:has(.test-panel:not([hidden])) .boss-hud { top: 124px; }
   .start-card { width: 100%; padding: 18px; }
   .start-intro { grid-template-columns: 1fr; gap: 8px; }
   .start-card h1 { font-size: 56px; }
@@ -341,6 +347,7 @@ kbd { font-family: var(--mono); }
   .start-action > small { max-width: none; text-align: left; }
   .start-action > button { width: 100%; }
   .ability-rack { left: 14px; width: 250px; transform: none; }
+  .ability-rack.single { width: 122px; }
   .factory-toggle { right: 12px; }
 }
 
@@ -659,10 +666,10 @@ kbd { font-family: var(--mono); }
 .augment-hardware { display: grid; min-width: 0; grid-template-columns: 78px minmax(0, 1fr); align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--rarity-color) 42%, #344248); border-left: 3px solid var(--rarity-color); padding: 7px 9px; background: linear-gradient(90deg, color-mix(in srgb, var(--rarity-color) 8%, #0e1517), #0d1416); }
 .augment-card .augment-hardware { margin: 0 0 14px; }
 .hardware-diagram { display: grid; width: 72px; height: 72px; place-items: center; border: 1px dashed #34464b; background: repeating-linear-gradient(0deg, transparent 0 8px, rgba(132,158,162,.06) 9px), repeating-linear-gradient(90deg, transparent 0 8px, rgba(132,158,162,.06) 9px), #091012; }
-.hardware-grid { position: relative; display: grid; grid-template-columns: repeat(var(--hardware-cols), 1fr); grid-template-rows: repeat(var(--hardware-rows), 1fr); border: 1px solid var(--rarity-color); background: color-mix(in srgb, var(--module-color) 8%, #12191b); box-shadow: 0 0 13px color-mix(in srgb, var(--rarity-color) 22%, transparent); }
-.hardware-grid.size-1 { width: 24px; height: 24px; }
-.hardware-grid.size-2 { width: 44px; height: 44px; }
-.hardware-grid.size-4 { width: 64px; height: 64px; }
+.hardware-grid { position: relative; display: grid; width: var(--hardware-width, 44px); height: var(--hardware-height, 44px); grid-template-columns: repeat(var(--hardware-cols), 1fr); grid-template-rows: repeat(var(--hardware-rows), 1fr); border: 1px solid var(--rarity-color); background: color-mix(in srgb, var(--module-color) 8%, #12191b); box-shadow: 0 0 13px color-mix(in srgb, var(--rarity-color) 22%, transparent); }
+.hardware-grid.size-1 { --hardware-width: 24px; --hardware-height: 24px; }
+.hardware-grid.size-2 { --hardware-width: 44px; --hardware-height: 44px; }
+.hardware-grid.size-4 { --hardware-width: 64px; --hardware-height: 64px; }
 .hardware-cell { min-width: 0; min-height: 0; border: 1px solid color-mix(in srgb, var(--rarity-color) 22%, #243237); background: color-mix(in srgb, var(--module-color) 7%, #111719); }
 .hardware-grid > b { position: absolute; z-index: 2; top: 50%; left: 50%; display: grid; width: 17px; aspect-ratio: 1; place-items: center; border-radius: 3px; color: #0b1112; background: var(--module-color); transform: translate(-50%, -50%); font: 900 9px var(--mono); }
 .hardware-jack { position: absolute; z-index: 3; top: var(--port-top); left: var(--port-left); display: block; width: 7px; aspect-ratio: 1; border: 1px solid #071012; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px currentColor; transform: translate(-50%, -50%); }
