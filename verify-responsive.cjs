@@ -275,6 +275,23 @@ async function auditViewport(session, viewport) {
   }
   await captureUi(session, viewport, "factory");
 
+  if (viewport.name === "compact" || viewport.name === "short") {
+    await clickElement(session, "#factory-commit");
+    await sleep(80);
+    await evaluate(session, "document.querySelector('#test-level').click()");
+    const compactChoice = await waitUntil(async () => {
+      const state = await evaluate(session, `(() => {
+        const overlay = document.querySelector('#choice-overlay');
+        const cards = [...document.querySelectorAll('.augment-card')].map((card) => { const rect = card.getBoundingClientRect(); const hardware = card.querySelector('.augment-hardware'); return { left: rect.left, right: rect.right, hardware: Boolean(hardware), footprint: hardware?.dataset.footprint || '' }; });
+        return { open: !overlay.hidden, cards, hardware: document.querySelectorAll('.augment-card .augment-hardware').length, overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth, overlayScrollable: overlay.scrollHeight >= overlay.clientHeight };
+      })()`);
+      return state.open ? state : null;
+    });
+    assert(compactChoice.cards.length === 3 && compactChoice.hardware === 3 && compactChoice.cards.every((card) => card.hardware && ["1×1", "2×2", "4×4"].includes(card.footprint)), `${viewport.name}: 물리 도면 3택 누락 ${JSON.stringify(compactChoice)}`);
+    assert(compactChoice.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1) && compactChoice.overflowX <= 1 && compactChoice.overlayScrollable, `${viewport.name}: 도면 카드 가로 잘림 또는 세로 스크롤 보호 누락 ${JSON.stringify(compactChoice)}`);
+    await captureUi(session, viewport, "levelup");
+  }
+
   if (viewport.name === "portrait") {
     await evaluate(session, "document.querySelector('[data-factory-view=\"output\"]').click()");
     await sleep(40);
@@ -286,7 +303,8 @@ async function auditViewport(session, viewport) {
         const overlay = document.querySelector('#choice-overlay');
         const cards = [...document.querySelectorAll('.augment-card')].map((card) => {
           const rect = card.getBoundingClientRect();
-          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, state: card.querySelector('.card-top strong')?.textContent || '' };
+          const hardware = card.querySelector('.augment-hardware');
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, state: card.querySelector('.card-top strong')?.textContent || '', hardware: hardware ? { rarity: hardware.dataset.rarity, footprint: hardware.dataset.footprint, inputs: Number(hardware.dataset.inputCount), outputs: Number(hardware.dataset.outputCount), label: hardware.getAttribute('aria-label') || '' } : null };
         });
         return {
           open: !overlay.hidden,
@@ -294,12 +312,15 @@ async function auditViewport(session, viewport) {
           ranks: document.querySelectorAll('.augment-card .rank-track').length,
           effects: document.querySelectorAll('.augment-card .next-rank-effect').length,
           evolutions: document.querySelectorAll('.augment-card .evolution-preview').length,
+          hardware: document.querySelectorAll('.augment-card .augment-hardware').length,
+          diagrams: document.querySelectorAll('.augment-card .hardware-grid').length,
           overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth
         };
       })()`);
       return state.open ? state : null;
     });
-    assert(portraitChoice.cards.length === 3 && portraitChoice.ranks === 3 && portraitChoice.effects === 3 && portraitChoice.evolutions === 3, "portrait: 랭크·진화 3택 UI 누락 " + JSON.stringify(portraitChoice));
+    assert(portraitChoice.cards.length === 3 && portraitChoice.ranks === 3 && portraitChoice.effects === 3 && portraitChoice.evolutions === 3 && portraitChoice.hardware === 3 && portraitChoice.diagrams === 3, "portrait: 랭크·진화·물리 도면 3택 UI 누락 " + JSON.stringify(portraitChoice));
+    assert(portraitChoice.cards.every((card) => card.hardware && ["common", "rare", "legendary"].includes(card.hardware.rarity) && ["1×1", "2×2", "4×4"].includes(card.hardware.footprint) && card.hardware.inputs === 1 && card.hardware.outputs >= 1 && card.hardware.outputs <= 2 && card.hardware.label.includes("칸 점유")), "portrait: 희귀도·크기·단자 정보 누락 " + JSON.stringify(portraitChoice));
     assert(portraitChoice.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1) && portraitChoice.overflowX <= 1, "portrait: 레벨업 카드 가로 잘림 " + JSON.stringify(portraitChoice));
     await captureUi(session, viewport, "levelup");
   }
@@ -425,6 +446,16 @@ async function auditViewport(session, viewport) {
     })()`);
     assert(augmentAudit.status === "pass" && augmentAudit.reports.length === 3 && augmentAudit.reports.every((report) => !report.missingActivations.length && !report.missingEffects.length), "wide: 30개 증강 실제 활성·효과 감사 실패 " + JSON.stringify(augmentAudit));
 
+    const cleanLevelToken = `${viewport.name}-level-${Date.now()}`;
+    const cleanLevelUrl = new URL(baseUrl);
+    cleanLevelUrl.searchParams.set("responsive-audit", cleanLevelToken);
+    cleanLevelUrl.searchParams.set("test", "1");
+    await session.send("Page.navigate", { url: cleanLevelUrl.href });
+    await waitUntil(async () => evaluate(session, `document.readyState === 'complete' && new URLSearchParams(location.search).get('responsive-audit') === ${JSON.stringify(cleanLevelToken)} && Boolean(document.querySelector('#ui-stage'))`));
+    await sleep(260);
+    await clickElement(session, '[data-class="melee"]');
+    await clickElement(session, '#start-button');
+    await sleep(80);
     await clickElement(session, '#test-level');
     const levelRamUi = await waitUntil(async () => {
       const state = await evaluate(session, `(() => ({
@@ -436,18 +467,31 @@ async function auditViewport(session, viewport) {
         gain: document.querySelector('#choice-ram-gain').textContent,
         cards: [...document.querySelectorAll('.augment-card')].map((card) => {
           const rect = card.getBoundingClientRect();
-          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, state: card.querySelector('.card-top strong')?.textContent || '' };
+          const hardware = card.querySelector('.augment-hardware');
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, state: card.querySelector('.card-top strong')?.textContent || '', hardware: hardware ? { rarity: hardware.dataset.rarity, footprint: hardware.dataset.footprint, inputs: Number(hardware.dataset.inputCount), outputs: Number(hardware.dataset.outputCount), label: hardware.getAttribute('aria-label') || '' } : null };
         }),
         ranks: document.querySelectorAll('.augment-card .rank-track').length,
         effects: document.querySelectorAll('.augment-card .next-rank-effect').length,
-        evolutions: document.querySelectorAll('.augment-card .evolution-preview').length
+        evolutions: document.querySelectorAll('.augment-card .evolution-preview').length,
+        hardware: document.querySelectorAll('.augment-card .augment-hardware').length,
+        diagrams: document.querySelectorAll('.augment-card .hardware-grid').length
       }))()`);
       return state.choiceOpen ? state : null;
     });
     assert(levelRamUi.level === 2 && levelRamUi.capacity === 12 && levelRamUi.hudRam.endsWith('/ 12') && levelRamUi.expansion === '10 → 12 RAM' && levelRamUi.gain === '+2 CAPACITY', "wide: 레벨업 RAM 성장 UI 실패 " + JSON.stringify(levelRamUi));
-    assert(levelRamUi.cards.length === 3 && levelRamUi.ranks === 3 && levelRamUi.effects === 3 && levelRamUi.evolutions === 3, "wide: 랭크·진화 3택 UI 누락 " + JSON.stringify(levelRamUi));
+    assert(levelRamUi.cards.length === 3 && levelRamUi.ranks === 3 && levelRamUi.effects === 3 && levelRamUi.evolutions === 3 && levelRamUi.hardware === 3 && levelRamUi.diagrams === 3, "wide: 랭크·진화·물리 도면 3택 UI 누락 " + JSON.stringify(levelRamUi));
+    assert(levelRamUi.cards.every((card) => card.hardware && ["common", "rare", "legendary"].includes(card.hardware.rarity) && ["1×1", "2×2", "4×4"].includes(card.hardware.footprint) && card.hardware.inputs === 1 && card.hardware.outputs >= 1 && card.hardware.outputs <= 2 && card.hardware.label.includes("칸 점유")), "wide: 희귀도·크기·단자 정보 누락 " + JSON.stringify(levelRamUi));
     assert(levelRamUi.cards.every((card) => card.left >= -1 && card.right <= viewport.width + 1 && card.top >= -1 && card.bottom <= viewport.height + 1), "wide: 레벨업 카드 잘림 " + JSON.stringify(levelRamUi));
     await captureUi(session, viewport, "levelup");
+    const selectedHardware = await evaluate(session, `(() => { const card = document.querySelector('.augment-card.rank-0'); const hardware = card?.querySelector('.augment-hardware'); return card && hardware ? { type: card.dataset.choice, rarity: hardware.dataset.rarity, footprint: hardware.dataset.footprint, inputs: hardware.dataset.inputCount, outputs: hardware.dataset.outputCount, ports: [...hardware.querySelectorAll('.hardware-jack')].map((jack) => ({ edge: [...jack.classList].find((name) => name.startsWith('edge-')), left: jack.style.getPropertyValue('--port-left'), top: jack.style.getPropertyValue('--port-top') })) } : null; })()`);
+    await clickElement(session, '.augment-card.rank-0');
+    const choiceHardwareStatus = await evaluate(session, "document.querySelector('#choice-status .choice-hardware-status')?.textContent || ''");
+    assert(choiceHardwareStatus.includes("IN 좌 · OUT") && choiceHardwareStatus.includes("신규 단자 배정"), "wide: 선택 확정 상태줄 하드웨어 요약 누락 " + choiceHardwareStatus);
+    await clickElement(session, '#choice-confirm');
+    await sleep(140);
+    const pendingHardware = await evaluate(session, `(() => { const hardware = document.querySelector('#pending-part .augment-hardware'); return hardware ? { rarity: hardware.dataset.rarity, footprint: hardware.dataset.footprint, inputs: hardware.dataset.inputCount, outputs: hardware.dataset.outputCount, ports: [...hardware.querySelectorAll('.hardware-jack')].map((jack) => ({ edge: [...jack.classList].find((name) => name.startsWith('edge-')), left: jack.style.getPropertyValue('--port-left'), top: jack.style.getPropertyValue('--port-top') })), assigned: hardware.textContent.includes('ASSIGNED LAYOUT') } : null; })()`);
+    assert(selectedHardware && pendingHardware && selectedHardware.rarity === pendingHardware.rarity && selectedHardware.footprint === pendingHardware.footprint && selectedHardware.inputs === pendingHardware.inputs && selectedHardware.outputs === pendingHardware.outputs && JSON.stringify(selectedHardware.ports) === JSON.stringify(pendingHardware.ports) && pendingHardware.assigned, "wide: 선택 카드 도면이 NEW PART와 일치하지 않음 " + JSON.stringify({ selectedHardware, pendingHardware }));
+    await captureUi(session, viewport, "new-part");
   }
   return `${viewport.width}×${viewport.height} ${viewport.layout} ×${start.scale.toFixed(3)}${viewport.name === "wide" && rightClickReset ? " · right-click reset" : ""}`;
 }

@@ -1057,8 +1057,9 @@ function partToken(part, status, index) {
   const actionLabel = kind === "tool" ? "도구 인벤토리 회수" : "보관함으로 회수";
   const tokenClass = kind === "tool" ? "tool-token" : "module-token module-" + part.type;
   const sizeLabel = footprint.width + "×" + footprint.height;
+  const outputCount = kind === "module" ? part.ports.edges.filter((edge) => edge !== "left").length : 3;
   return '<div class="' + tokenClass + ' footprint-' + sizeLabel + ' size-' + footprint.width + ' ' + status + isNew + '" draggable="false" data-part-id="' +
-    part.id + '" data-label="' + def.name + (rarity ? " · " + rarity.label + " " + sizeLabel : " · 공정 도구") + '" style="--module-color:' + def.color + ';--footprint-w:' + footprint.width + ';--footprint-h:' + footprint.height + ';--footprint-width:' + footprintCssSize(footprint.width) + ';--footprint-height:' + footprintCssSize(footprint.height) + '">' +
+    part.id + '" data-rarity="' + (rarity?.id || "tool") + '" data-footprint="' + sizeLabel + '" data-output-count="' + outputCount + '" data-label="' + def.name + (rarity ? " · " + rarity.label + " " + sizeLabel + " · " + augmentPortSummary(part) : " · 공정 도구") + '" style="--module-color:' + def.color + ';--footprint-w:' + footprint.width + ';--footprint-h:' + footprint.height + ';--footprint-width:' + footprintCssSize(footprint.width) + ';--footprint-height:' + footprintCssSize(footprint.height) + '">' +
     '<span class="part-type">' + (kind === "tool" ? "PROCESS TOOL" : "AUGMENT NODE") + '</span><span class="part-code">' + def.code + '</span><span class="part-name">' + def.name + '</span>' +
     (kind === "module" ? '<span class="part-rank">R' + (part.rank || 1) + ((part.limit || 0) ? " · L+" + part.limit : "") + '</span>' : "") +
     (rarity ? '<span class="rarity-badge" style="--rarity-color:' + rarity.color + '">' + rarity.label + ' ' + sizeLabel + '</span>' : '<span class="rarity-badge tool-badge">DROP</span>') +
@@ -1078,9 +1079,10 @@ function renderPendingPart() {
   const footprint = partFootprint(factory.pending);
   const rarity = footprint.rarity;
   const toolTier = isTool ? TOOLS[factory.pending.type].tier : 0;
+  const hardwareCopy = rarity ? augmentHardwarePreview(factory.pending, "ASSIGNED LAYOUT") : "";
   target.innerHTML = '<div class="pending-module ' + (isTool ? "pending-tool" : "module-" + factory.pending.type) +
     '" draggable="false" data-pending-module="true" style="--module-color:' + def.color + '"><div class="module-large-icon">' + def.code + '</div><b>' + (isTool ? "T" + toolTier + " " : "") + def.name + (isTool ? "" : " · R" + (factory.pending.rank || 1)) + ' · ' + partRamCost(factory.pending) + ' RAM' +
-    '</b><span>' + (rarity ? rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · 희소 단자 2–3개 · 면당 1개' : '드랍 공정 도구 · 빈 셀로 끌어 놓기') + '</span><span>' + def.description + '</span></div>';
+    '</b>' + hardwareCopy + '<span>' + (rarity ? '선택 카드와 동일한 물리 도면 · 밝은 결합 셀에 배치' : '드랍 공정 도구 · 빈 셀로 끌어 놓기') + '</span><span>' + def.description + '</span></div>';
   $("#pending-archive").textContent = isTool ? "드랍 도구 선택 취소" : "장착하지 않고 보관";
   $("#pending-archive").hidden = false;
 }
@@ -1113,7 +1115,7 @@ function renderReserveParts() {
       const def = MODULES[module.type];
       const footprint = partFootprint(module);
       const rarity = footprint.rarity;
-      return '<button type="button" draggable="false" data-reserve-id="' + module.id + '" style="--module-color:' + def.color + '" title="' + def.description + '"><b>' + def.code + '</b><span>' + def.name + ' · R' + (module.rank || 1) + ((module.limit || 0) ? ' · L+' + module.limit : '') + ' · ' + rarity.label + ' ' + footprint.width + '×' + footprint.height + '</span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
+      return '<button type="button" draggable="false" class="reserve-part rarity-' + rarity.id + '" data-reserve-id="' + module.id + '" data-rarity="' + rarity.id + '" data-footprint="' + footprint.width + '×' + footprint.height + '" style="--module-color:' + def.color + ';--rarity-color:' + rarity.color + '" title="' + def.description + '"><b>' + def.code + '</b><span><strong>' + def.name + ' · R' + (module.rank || 1) + ((module.limit || 0) ? ' · L+' + module.limit : '') + '</strong><small>' + rarity.label + ' ' + footprint.width + '×' + footprint.height + ' · ' + augmentPortSummary(module) + '</small></span><em>' + MODULE_RAM[module.type] + ' RAM</em></button>';
     }).join("")
     : '<span class="reserve-empty">비어 있음</span>';
 }
@@ -1618,6 +1620,39 @@ function generateChoices() {
   return [...new Set(choices)].slice(0, 3);
 }
 
+const HARDWARE_EDGE_LABELS = { top: "상", right: "우", bottom: "하", left: "좌" };
+
+function augmentPortSummary(part) {
+  ensurePartPorts(part);
+  const outputs = part.ports.edges.filter((edge) => edge !== "left");
+  return "IN 좌 · OUT " + outputs.map((edge) => HARDWARE_EDGE_LABELS[edge]).join("/");
+}
+
+function augmentHardwarePreview(part, stateLabel = "ASSIGNED LAYOUT") {
+  ensurePartPorts(part);
+  const def = MODULES[part.type];
+  const footprint = partFootprint(part);
+  const rarity = footprint.rarity;
+  const outputEdges = part.ports.edges.filter((edge) => edge !== "left");
+  const cells = Array.from({ length: footprint.width * footprint.height }, () => '<i class="hardware-cell"></i>').join("");
+  const ports = part.ports.edges.map((edge) => {
+    const direction = edge === "left" ? "input" : "output";
+    const offset = portOffsets(part, edge)[0] || 0;
+    return '<span class="hardware-jack ' + direction + ' edge-' + edge + '" style="' + portStyle(edge, offset, footprint) + '" aria-hidden="true"></span>';
+  }).join("");
+  const sizeLabel = footprint.width + "×" + footprint.height;
+  const occupiedCells = footprint.width * footprint.height;
+  return '<div class="augment-hardware rarity-' + rarity.id + '" data-rarity="' + rarity.id + '" data-footprint="' + sizeLabel + '" data-input-count="1" data-output-count="' + outputEdges.length + '" aria-label="' + rarity.label + ' ' + sizeLabel + ', ' + occupiedCells + '칸 점유, 입력 좌측 1개, 출력 ' + outputEdges.map((edge) => HARDWARE_EDGE_LABELS[edge]).join(', ') + '">' +
+    '<div class="hardware-diagram"><div class="hardware-grid size-' + footprint.width + '" style="--hardware-cols:' + footprint.width + ';--hardware-rows:' + footprint.height + '">' + cells + '<b>' + def.code + '</b>' + ports + '</div></div>' +
+    '<div class="hardware-copy"><span style="--rarity-color:' + rarity.color + '">' + rarity.code + ' · ' + rarity.label + '</span><b>' + sizeLabel + ' · ' + occupiedCells + ' CELLS</b><small>' + augmentPortSummary(part) + '</small><em>' + stateLabel + '</em></div></div>';
+}
+
+function augmentChoicePreviewPart(type) {
+  const owned = ownedModulePart(type);
+  if (owned) return { part: ensurePartPorts(owned), locked: true };
+  return { part: ensurePartPorts({ id: factory.nextId, kind: "module", type, rank: 1 }), locked: false };
+}
+
 function rankPips(rank) {
   return Array.from({ length: AUGMENT_MAX_RANK }, (_, index) =>
     '<i class="' + (index < rank ? "filled" : "") + '"></i>').join("");
@@ -1634,9 +1669,11 @@ function showLevelChoices() {
   $("#choice-ram-capacity").textContent = previousCapacity + " → " + currentCapacity + " RAM";
   $("#choice-ram-gain").textContent = "+" + (currentCapacity - previousCapacity) + " CAPACITY";
   $(".choice-shell h2").textContent = classProfile.name + " 증강 획득 / 강화";
-  $(".choice-shell header p").textContent = "같은 증강은 RANK 3까지 성장합니다. 지정된 두 증강이 모두 RANK 2가 되면 순서와 무관하게 완성형 진화가 가동됩니다.";
+  $(".choice-shell header p").textContent = "RANK는 전투 성능, 희귀도는 점유 크기와 단자 구조를 결정합니다. 도면과 진화 파트너를 함께 비교하세요.";
   $("#choice-cards").innerHTML = choices.map((type, index) => {
     const def = MODULES[type];
+    const hardware = augmentChoicePreviewPart(type);
+    const hardwareCopy = augmentHardwarePreview(hardware.part, hardware.locked ? "LAYOUT LOCKED" : "NEW JACK LAYOUT");
     const rank = ownedRank(type);
     const limit = ownedLimit(type);
     const nextRank = Math.min(AUGMENT_MAX_RANK, Math.max(1, rank + 1));
@@ -1658,7 +1695,7 @@ function showLevelChoices() {
       '"><span class="card-shortcut">' + (index + 1) + '</span><div class="card-top"><span>MODULE / ' +
       def.code + '</span><strong>' + state + '</strong></div><div class="card-icon">' +
       def.code + '</div><div class="rank-track" aria-label="현재 랭크 ' + rank + '"><span>' + rankPips(rank) + '</span><b>' + (rank ? "R" + rank : "NEW") +
-      '</b></div><h3>' + def.name + '</h3><p>' + def.description +
+      '</b></div>' + hardwareCopy + '<h3>' + def.name + '</h3><p>' + def.description +
       '</p><div class="next-rank-effect">' + nextEffect + '</div>' + evolutionCopy +
       '<div class="placement-hint">' + MODULE_RAM[type] + ' RAM · ' + def.hint + '</div></button>';
   }).join("");
@@ -1677,12 +1714,16 @@ function previewAugmentChoice(type) {
     card.setAttribute("aria-pressed", String(selected));
   }
   const rank = ownedRank(type);
+  const hardware = augmentChoicePreviewPart(type);
+  const footprint = partFootprint(hardware.part);
+  const rarity = footprint.rarity;
+  const hardwareStatus = rarity.label + " " + footprint.width + "×" + footprint.height + " · " + augmentPortSummary(hardware.part) + " · " + (hardware.locked ? "기존 레이아웃 고정" : "신규 단자 배정");
   const evolution = evolutionForType(type);
   const partnerType = evolution?.types.find((candidate) => candidate !== type);
   const partnerRank = partnerType ? ownedRank(partnerType) : 0;
   const action = rank === 0 ? "신규 획득" : rank < AUGMENT_MAX_RANK ? "RANK " + rank + " → " + (rank + 1) : "LIMIT BREAK";
   const evolutionReady = evolution && Math.min(AUGMENT_MAX_RANK, Math.max(1, rank + 1)) >= AUGMENT_EVOLUTION_RANK && partnerRank >= AUGMENT_EVOLUTION_RANK;
-  $("#choice-status").innerHTML = MODULES[type].name + ' · ' + action + (evolutionReady ? ' · <b>진화 ' + evolution.name + ' 준비</b>' : '') + ' · <kbd>ENTER</kbd> 확정';
+  $("#choice-status").innerHTML = MODULES[type].name + ' · ' + action + '<span class="choice-hardware-status">' + hardwareStatus + '</span>' + (evolutionReady ? ' · <b>진화 ' + evolution.name + ' 준비</b>' : '') + ' · <kbd>ENTER</kbd> 확정';
   $("#choice-confirm").innerHTML = MODULES[type].name + ' ' + action + ' <kbd>ENTER</kbd>';
   $("#choice-confirm").disabled = false;
 }

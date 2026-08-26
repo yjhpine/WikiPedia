@@ -31,10 +31,10 @@ check(new Set(playstyleIds).size === 9, `주력 플레이스타일 정의 ${new 
 check(new Set(ramEntries).size === 30, `모듈 RAM 비용 정의 ${new Set(ramEntries).size}/30`);
 check(toolIds.every((id) => source.includes(`  ${id}: {`)), "공정 도구 6종 정의 누락");
 check(html.includes('id="test-audit"'), "브라우저 자동 진단 버튼 누락");
-check(html.includes("styles.css?v=prototype-22") && html.includes("game.js?v=prototype-22") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-22 누락");
+check(html.includes("styles.css?v=prototype-23") && html.includes("game.js?v=prototype-23") && html.includes('id="critical-flash"'), "치명타 화면 효과 또는 캐시 버전 prototype-23 누락");
 check(["build-signature", "pending-archive", "reserve-parts", "factory-tools", "factory-recipe-list", "factory-tool-combo-list", "factory-synergy-list", "hud-ram-text", "hud-ram-fill", "choice-ram-capacity", "factory-ram-meta", "factory-tab-ram"].every((id) => html.includes(`id="${id}"`)), "빌드/RAM 성장/공정 도구 UI 항목 누락");
 check(html.includes('id="ui-stage"') && html.includes('viewport-fit=cover'), "전체 UI 스테이지 또는 안전 영역 viewport 설정 누락");
-check(source.includes("runFactoryToolAudits") && source.includes("AUGMENT_MAX_RANK = 3") && source.includes("AUGMENT_EVOLUTION_RANK = 2") && source.includes("TOOL_COMBINATIONS") && source.includes("findToolCombination") && source.includes("RAM_PER_LEVEL = 2") && source.includes("ramCapacityAtLevel") && source.includes("setFactoryView") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("minimum + offsetSeed %") && source.includes("previewPartPlacement") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
+check(source.includes("runFactoryToolAudits") && source.includes("augmentHardwarePreview") && source.includes("augmentChoicePreviewPart") && source.includes("NEW JACK LAYOUT") && source.includes("AUGMENT_MAX_RANK = 3") && source.includes("AUGMENT_EVOLUTION_RANK = 2") && source.includes("TOOL_COMBINATIONS") && source.includes("findToolCombination") && source.includes("RAM_PER_LEVEL = 2") && source.includes("ramCapacityAtLevel") && source.includes("setFactoryView") && source.includes("clearMovementInput") && source.includes('canvas.addEventListener("contextmenu"') && source.includes("seed % 6 === 0") && source.includes("minimum + offsetSeed %") && source.includes("previewPartPlacement") && source.includes("operationalCircuit") && source.includes("spawnToolDrop") && source.includes("rebuildPhysicalWires") && source.includes("findPhysicalPortMatch") && source.includes("lego-tool-three-way") && source.includes("lego-augment-random") && source.includes("COMBAT_TEMPO") && source.includes("MELEE_WEAPON_SCALE = 2") && source.includes("range: 104 * MELEE_WEAPON_SCALE") && source.includes("ctx.scale(MELEE_WEAPON_SCALE, MELEE_WEAPON_SCALE)") && source.includes("availableToolTypes") && source.includes("dragTargetIsValid") && source.includes("tool-palette") && source.includes("triggerImpactFeedback") && source.includes("flashCriticalFeedback") && source.includes("hitStop"), "우클릭 입력 정리·희소 단자·도구 진행·전투 템포·치명타·근접 무기 진단 누락");
 
 const essentialHudIds = ["health-text", "xp-text", "time-text", "objective-count", "attack-status", "dash-status", "factory-toggle"];
 const removedHudClasses = ["hud-right", "combat-readout", "control-hint", "mini-board"];
@@ -51,7 +51,7 @@ check(!source.includes('.factory-header > div > span'), "삭제된 공장 헤더
 check(!/\.game\s*\{[^}]*min-width:\s*920px/.test(styles), "좁은 화면을 강제로 잘라내는 게임 최소 너비가 남아 있음");
 check(/\.overlay\s*\{[^}]*overflow:\s*auto/.test(styles), "긴 오버레이의 양방향 스크롤 보호 누락");
 check(/\.factory-layout\s*\{[^}]*overflow-x:\s*auto/.test(styles), "좁은 공장 3열의 가로 스크롤 보호 누락");
-check(styles.includes(".augment-card .placement-hint { position: static;") && styles.includes(".build-affinity { position: static;"), "증강 카드 설명·태그 고정 배치 겹침 위험");
+check(styles.includes(".augment-card .placement-hint { position: static;") && styles.includes(".build-affinity { position: static;") && styles.includes(".augment-hardware") && styles.includes(".hardware-grid.size-4") && styles.includes(".hardware-jack.input") && styles.includes(".hardware-legend"), "증강 카드 설명·희귀도·크기·단자 미리보기 스타일 누락");
 check(styles.includes(".circuit-port") && styles.includes(".circuit-wires") && styles.includes("--footprint-w") && styles.includes("Schematic circuit-board reskin") && styles.includes("Lego proximity circuit controls") && html.includes('id="board-expand"'), "다중 크기 레고 단자·확장 회로도 UI 누락");
 check(/\.board-message\s*\{[^}]*position:\s*sticky[^}]*white-space:\s*normal/.test(styles), "긴 보드 메시지 줄바꿈·고정 보호 누락");
 check(/\.factory-action-bar\s*\{[^}]*position:\s*sticky/.test(styles) && html.includes('class="factory-action-bar"'), "공장 적용 버튼 고정 영역 누락");
@@ -339,7 +339,23 @@ try {
     const fixedModuleRam = startingRam === MODULE_RAM.m_mark && ramUsage(evolved) === MODULE_RAM.m_mark + MODULE_RAM.m_step + PROTOCOL_RAM;
     const evolutionActive = evolved.synergyKinds.has("first_mark") && evolved.synergies[0]?.name === "붉은 추격선";
     const rankPipsVisible = (rankPips(2).match(/class="filled"/g) || []).length === 2;
-    return { rank2, partnerSuggested, rank3, limitRank, rankDoesNotDuplicate, fixedModuleRam, evolutionActive, rankPipsVisible };
+    const rarityPreviewCoverage = ["m_mark", "m_guard", "m_step"].every((type, index) => {
+      const preview = augmentChoicePreviewPart(type);
+      const footprint = partFootprint(preview.part);
+      const markup = augmentHardwarePreview(preview.part, "TEST LAYOUT");
+      return footprint.width === [1, 2, 4][index] && markup.includes('data-rarity="' + ["common", "rare", "legendary"][index] + '"') &&
+        markup.includes('data-footprint="' + footprint.width + '×' + footprint.height + '"') && markup.includes('data-input-count="1"') &&
+        markup.includes('data-output-count="' + (preview.part.ports.edges.length - 1) + '"') && markup.includes("IN 좌 · OUT ");
+    });
+    const savedNextId = factory.nextId;
+    const predicted = augmentChoicePreviewPart("m_riposte").part;
+    const predictedLayout = JSON.stringify({ id: predicted.id, edges: predicted.ports.edges, offsets: predicted.ports.offsets });
+    const created = createPart("module", "m_riposte");
+    const previewMatchesCreatedPart = predictedLayout === JSON.stringify({ id: created.id, edges: created.ports.edges, offsets: created.ports.offsets });
+    factory.nextId = savedNextId;
+    const ownedPreview = augmentChoicePreviewPart("m_mark");
+    const rankKeepsPhysicalLayout = ownedPreview.locked && ownedPreview.part.id === 8100 && augmentHardwarePreview(ownedPreview.part, "LAYOUT LOCKED").includes("LAYOUT LOCKED");
+    return { rank2, partnerSuggested, rank3, limitRank, rankDoesNotDuplicate, fixedModuleRam, evolutionActive, rankPipsVisible, rarityPreviewCoverage, previewMatchesCreatedPart, rankKeepsPhysicalLayout };
   })()`, runtime, { timeout: 1800 });
   check(Object.values(rankProgressionAudit).every(Boolean), `증강 랭크·리미트·진화 선택 흐름 실패: ${JSON.stringify(rankProgressionAudit)}`);
   const fullAudit = vm.runInContext(`runAllAugmentAudits()`, runtime, { timeout: 5000 });

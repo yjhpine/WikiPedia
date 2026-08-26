@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b0c" />
     <title>증강 라인 — 던전 크롤러 프로토타입</title>
-    <link rel="stylesheet" href="styles.css?v=prototype-22" />
+    <link rel="stylesheet" href="styles.css?v=prototype-23" />
   </head>
   <body>
     <main class="game" id="game">
@@ -124,9 +124,16 @@
               </section>
               <div class="factory-help">
                 <b>배치 규칙</b>
-                <p>증강은 반복 획득하면 RANK가 오릅니다. 서로 다른 도구를 연속 배선하면 도구 A × 도구 B 공정 코어가 되고, RANK 2 파트너 증강 둘을 함께 가동하면 완성형 진화가 열립니다.</p>
+                <p>RANK는 전투 성능을, 희귀도는 물리 크기와 단자 구조를 결정합니다. 선택 카드의 도면이 NEW PART와 보드까지 그대로 이어집니다.</p>
+                <div class="hardware-legend" aria-label="증강 희귀도와 단자 범례">
+                  <span class="common"><i>1×1</i><b>일반</b></span>
+                  <span class="rare"><i>2×2</i><b>희귀</b></span>
+                  <span class="legendary"><i>4×4</i><b>전설</b></span>
+                  <span class="jack"><i>IN</i><b>좌 입력</b></span>
+                  <span class="jack output"><i>OUT</i><b>상·우·하 출력</b></span>
+                </div>
                 <ul>
-                  <li>일반은 1×1, 희귀는 2×2, 전설은 4×4 공간을 차지합니다.</li>
+                  <li>일반은 1×1, 희귀는 2×2, 전설은 4×4 공간을 차지하며 획득 시 정해진 단자는 RANK가 올라도 고정됩니다.</li>
                   <li>도구는 상·우·하 세 방향 모두 출력하며, 서로 다른 도구가 연속될 때 순서와 무관한 X 조합이 활성화됩니다.</li>
                   <li>보드·NEW PART·STORAGE·드랍 도구를 빈 셀로 끌어 놓으세요. 클릭으로 들어 올린 뒤 놓는 방식도 유지됩니다.</li>
                 </ul>
@@ -193,6 +200,6 @@
       </div>
     </main>
 
-    <script type="module" src="game.js?v=prototype-22"></script>
+    <script type="module" src="game.js?v=prototype-23"></script>
   </body>
 </html>
